@@ -5,22 +5,14 @@ import { splitSubtitleByMeaning } from "./geminiService";
 
 /**
  * ElevenLabs API Service
- * 타임스탬프 포함 버전 - 자막 데이터 동시 생성
+ * 서버 프록시(/api/elevenlabs)를 통해 API 호출
  */
 
-const OUTPUT_FORMAT = "mp3_44100_128";
-
-/**
- * 저장된 ElevenLabs 모델 ID 가져오기
- */
 export const getElevenLabsModelId = (): ElevenLabsModelId => {
   const saved = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL);
   return (saved as ElevenLabsModelId) || CONFIG.DEFAULT_ELEVENLABS_MODEL;
 };
 
-/**
- * ElevenLabs 모델 ID 저장
- */
 export const setElevenLabsModelId = (modelId: ElevenLabsModelId): void => {
   localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL, modelId);
 };
@@ -28,12 +20,9 @@ export const setElevenLabsModelId = (modelId: ElevenLabsModelId): void => {
 export interface ElevenLabsResult {
   audioData: string | null;
   subtitleData: SubtitleData | null;
-  estimatedDuration: number | null;  // 추정 오디오 길이 (초)
+  estimatedDuration: number | null;
 }
 
-/**
- * 문자 단위 타임스탬프를 단어 단위로 변환
- */
 function convertToWords(
   characters: string[],
   startTimes: number[],
@@ -46,135 +35,106 @@ function convertToWords(
 
   for (let i = 0; i < characters.length; i++) {
     const char = characters[i];
-
     if (char === ' ' || char === '\n' || char === '\t') {
-      // 공백을 만나면 현재 단어 저장
       if (currentWord.length > 0) {
-        words.push({
-          word: currentWord,
-          start: wordStart,
-          end: wordEnd
-        });
+        words.push({ word: currentWord, start: wordStart, end: wordEnd });
         currentWord = '';
       }
     } else {
-      // 새 단어 시작
-      if (currentWord.length === 0) {
-        wordStart = startTimes[i];
-      }
+      if (currentWord.length === 0) wordStart = startTimes[i];
       currentWord += char;
       wordEnd = endTimes[i];
     }
   }
-
-  // 마지막 단어 저장
   if (currentWord.length > 0) {
-    words.push({
-      word: currentWord,
-      start: wordStart,
-      end: wordEnd
-    });
+    words.push({ word: currentWord, start: wordStart, end: wordEnd });
   }
-
   return words;
 }
 
-/**
- * AI 의미 단위 분리 + 단어 타이밍 매핑
- * - Gemini AI로 의미 단위 분리
- * - 분리된 청크와 ElevenLabs 단어 타이밍을 매핑
- * - 각 청크의 시작/끝 시간 계산
- */
 async function createMeaningChunks(
   fullText: string,
   words: SubtitleWord[]
 ): Promise<MeaningChunk[]> {
-  // AI 기반 의미 단위 분리
   const textChunks = await splitSubtitleByMeaning(fullText, 20);
-
-  if (textChunks.length === 0 || words.length === 0) {
-    return [];
-  }
+  if (textChunks.length === 0 || words.length === 0) return [];
 
   const meaningChunks: MeaningChunk[] = [];
   let wordIndex = 0;
 
   for (const chunkText of textChunks) {
-    // 청크에 포함된 단어 수 계산 (공백 제거 후 비교)
     const chunkWords = chunkText.split(/\s+/).filter(w => w.length > 0);
-    const chunkWordCount = chunkWords.length;
+    if (chunkWords.length === 0) continue;
 
-    if (chunkWordCount === 0) continue;
-
-    // 시작 인덱스 저장
     const startWordIndex = wordIndex;
-
-    // 청크에 해당하는 단어들 찾기
     let matchedWords = 0;
-    while (wordIndex < words.length && matchedWords < chunkWordCount) {
+    while (wordIndex < words.length && matchedWords < chunkWords.length) {
       matchedWords++;
       wordIndex++;
     }
 
-    // 매칭된 단어가 있으면 청크 생성
     if (startWordIndex < words.length) {
       const endWordIndex = Math.min(wordIndex - 1, words.length - 1);
-
       meaningChunks.push({
         text: chunkText,
         startTime: words[startWordIndex].start,
-        endTime: words[endWordIndex].end
+        endTime: words[endWordIndex].end,
       });
     }
   }
 
-  // 청크 간 간격 제거: endTime을 다음 청크의 startTime까지 연장
   for (let i = 0; i < meaningChunks.length - 1; i++) {
     meaningChunks[i].endTime = meaningChunks[i + 1].startTime;
   }
-
   return meaningChunks;
+}
+
+function preprocessTtsText(text: string): string {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => !/[.!?。…,，]$/.test(line) ? line + '.' : line)
+    .join(' ');
+}
+
+function buildElevenLabsHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const customKey = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
+  if (customKey && customKey.length >= 10) headers['x-custom-api-key'] = customKey;
+  const customVoice = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID);
+  if (customVoice) headers['x-custom-voice-id'] = customVoice;
+  const sessionToken = localStorage.getItem('c2gen_session_token');
+  if (sessionToken) headers['x-session-token'] = sessionToken;
+  return headers;
 }
 
 export const generateAudioWithElevenLabs = async (
   text: string,
-  providedApiKey?: string,
+  _providedApiKey?: string,
   providedVoiceId?: string,
-  providedModelId?: ElevenLabsModelId
+  providedModelId?: ElevenLabsModelId,
+  options?: { speed?: number; stability?: number }
 ): Promise<ElevenLabsResult> => {
 
-  const savedApiKey = process.env.ELEVENLABS_API_KEY || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
-  const savedVoiceId = process.env.ELEVENLABS_VOICE_ID || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID);
-
-  const finalKey = providedApiKey || savedApiKey;
-  const finalVoiceId = providedVoiceId || savedVoiceId || CONFIG.DEFAULT_VOICE_ID;
+  const finalVoiceId = providedVoiceId || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID) || CONFIG.DEFAULT_VOICE_ID;
   const finalModelId = providedModelId || getElevenLabsModelId();
-
-  if (!finalKey || finalKey.length < 10) {
-    console.warn("ElevenLabs API Key가 설정되지 않았습니다.");
-    return { audioData: null, subtitleData: null, estimatedDuration: null };
-  }
+  const speed = options?.speed ?? 1.0;
+  const stability = options?.stability ?? 0.6;
+  const processedText = preprocessTtsText(text);
 
   try {
-    // 타임스탬프 포함 엔드포인트 사용
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${finalVoiceId}/with-timestamps`;
-
-    const response = await fetch(url, {
+    const headers = buildElevenLabsHeaders();
+    const response = await fetch('/api/elevenlabs', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'xi-api-key': finalKey,
-      },
+      headers,
       body: JSON.stringify({
-        text: text,
-        model_id: finalModelId,
-        output_format: OUTPUT_FORMAT,
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.0,
-          use_speaker_boost: true
-        }
+        action: 'generateAudio',
+        text: processedText,
+        voiceId: finalVoiceId,
+        modelId: finalModelId,
+        speed,
+        stability,
       }),
     });
 
@@ -185,38 +145,26 @@ export const generateAudioWithElevenLabs = async (
     }
 
     const jsonResponse = await response.json();
+    if (jsonResponse.error) {
+      console.warn("ElevenLabs:", jsonResponse.error);
+      return { audioData: null, subtitleData: null, estimatedDuration: null };
+    }
 
-    // 오디오 데이터 (이미 base64로 옴)
     const audioBase64 = jsonResponse.audio_base64;
-
-    // 타임스탬프 데이터 파싱
     let subtitleData: SubtitleData | null = null;
     let estimatedDuration: number | null = null;
 
     if (jsonResponse.alignment) {
       const { characters, character_start_times_seconds, character_end_times_seconds } = jsonResponse.alignment;
+      const words = convertToWords(characters, character_start_times_seconds, character_end_times_seconds);
+      subtitleData = { words, fullText: text };
 
-      const words = convertToWords(
-        characters,
-        character_start_times_seconds,
-        character_end_times_seconds
-      );
-
-      subtitleData = {
-        words,
-        fullText: text
-      };
-
-      // 마지막 문자의 끝 시간 + 버퍼로 오디오 길이 추정
-      // (오디오 끝에 약간의 무음이 있을 수 있으므로 0.3초 버퍼 추가)
-      if (character_end_times_seconds && character_end_times_seconds.length > 0) {
-        const lastCharEnd = character_end_times_seconds[character_end_times_seconds.length - 1];
-        estimatedDuration = lastCharEnd + 0.3;
+      if (character_end_times_seconds?.length > 0) {
+        estimatedDuration = character_end_times_seconds[character_end_times_seconds.length - 1] + 0.3;
       }
 
-      console.log(`[ElevenLabs] 모델: ${finalModelId}, 자막 데이터 생성 완료: ${words.length}개 단어, 추정 길이: ${estimatedDuration?.toFixed(2)}초`);
+      console.log(`[ElevenLabs] 모델: ${finalModelId}, 속도: ${speed}x, 자막: ${words.length}개 단어, 추정 길이: ${estimatedDuration?.toFixed(2)}초`);
 
-      // AI 의미 단위 분리 및 타이밍 매핑
       try {
         const meaningChunks = await createMeaningChunks(text, words);
         if (meaningChunks.length > 0) {
@@ -228,68 +176,104 @@ export const generateAudioWithElevenLabs = async (
       }
     }
 
-    return {
-      audioData: audioBase64,
-      subtitleData,
-      estimatedDuration
-    };
-
+    return { audioData: audioBase64, subtitleData, estimatedDuration };
   } catch (error) {
     console.error("ElevenLabs Generation Failed:", error);
     return { audioData: null, subtitleData: null, estimatedDuration: null };
   }
 };
 
-/**
- * ElevenLabs Voice 정보 타입
- */
 export interface ElevenLabsVoice {
   voice_id: string;
   name: string;
   category: string;
-  labels?: {
-    accent?: string;
-    age?: string;
-    gender?: string;
-    description?: string;
-    use_case?: string;
-  };
+  labels?: { accent?: string; age?: string; gender?: string; description?: string; use_case?: string };
   preview_url?: string;
 }
 
-/**
- * ElevenLabs에서 사용 가능한 음성 목록 가져오기
- */
 export const fetchElevenLabsVoices = async (apiKey?: string): Promise<ElevenLabsVoice[]> => {
-  const finalKey = apiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
-
-  if (!finalKey || finalKey.length < 10) {
-    console.warn("ElevenLabs API Key가 설정되지 않았습니다.");
-    return [];
-  }
-
   try {
-    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
-      method: 'GET',
-      headers: {
-        'xi-api-key': finalKey,
-      },
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey && apiKey.length >= 10) {
+      headers['x-custom-api-key'] = apiKey;
+    } else {
+      const savedKey = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
+      if (savedKey && savedKey.length >= 10) headers['x-custom-api-key'] = savedKey;
+    }
+
+    const response = await fetch('/api/elevenlabs', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'fetchVoices' }),
     });
 
     if (!response.ok) {
-      const errorDetail = await response.text();
-      console.error("ElevenLabs Voices API Error:", errorDetail);
+      console.error("ElevenLabs Voices API Error:", response.status);
       return [];
     }
 
     const data = await response.json();
     const voices: ElevenLabsVoice[] = data.voices || [];
-
     console.log(`[ElevenLabs] ${voices.length}개 음성 로드됨`);
     return voices;
-
   } catch (error) {
     console.error("ElevenLabs Voices Fetch Failed:", error);
     return [];
+  }
+};
+
+// ── 공유 음성 라이브러리 검색 ──
+
+export interface SharedVoice {
+  public_owner_id: string;
+  voice_id: string;
+  name: string;
+  accent?: string;
+  gender?: string;
+  age?: string;
+  language?: string;
+  description?: string;
+  preview_url?: string;
+  use_case?: string;
+  category?: string;
+  rate?: number;
+  cloned_by_count?: number;
+}
+
+export interface SharedVoiceSearchResult {
+  voices: SharedVoice[];
+  has_more: boolean;
+  last_sort_id?: string;
+}
+
+export const searchSharedVoices = async (params: {
+  search?: string;
+  gender?: string;
+  language?: string;
+  page_size?: number;
+  page?: number;
+}): Promise<SharedVoiceSearchResult> => {
+  try {
+    const headers = buildElevenLabsHeaders();
+    const response = await fetch('/api/elevenlabs', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'searchLibrary', ...params }),
+    });
+
+    if (!response.ok) {
+      console.error("ElevenLabs Library Search Error:", response.status);
+      return { voices: [], has_more: false };
+    }
+
+    const data = await response.json();
+    return {
+      voices: data.voices || [],
+      has_more: data.has_more || false,
+      last_sort_id: data.last_sort_id,
+    };
+  } catch (error) {
+    console.error("ElevenLabs Library Search Failed:", error);
+    return { voices: [], has_more: false };
   }
 };

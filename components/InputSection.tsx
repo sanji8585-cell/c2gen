@@ -1,11 +1,42 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { GenerationStep, ProjectSettings } from '../types';
-import { CONFIG, ELEVENLABS_MODELS, ElevenLabsModelId, IMAGE_MODELS, ImageModelId, FLUX_STYLE_CATEGORIES, FluxStyleId } from '../config';
-import { getElevenLabsModelId, setElevenLabsModelId, fetchElevenLabsVoices, ElevenLabsVoice } from '../services/elevenLabsService';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { GenerationStep, ProjectSettings, ReferenceImages, DEFAULT_REFERENCE_IMAGES } from '../types';
+import { CONFIG, ELEVENLABS_MODELS, ElevenLabsModelId, IMAGE_MODELS, ImageModelId, GEMINI_STYLE_CATEGORIES, GeminiStyleId, ELEVENLABS_DEFAULT_VOICES, VoiceGender, VoiceAge, VideoOrientation, getVideoOrientation, setVideoOrientation } from '../config';
+import { getElevenLabsModelId, setElevenLabsModelId, fetchElevenLabsVoices, ElevenLabsVoice, searchSharedVoices, SharedVoice } from '../services/elevenLabsService';
+
+/** 이미지 리사이즈+압축 (413 Payload Too Large 방지, Vercel 4.5MB 제한) */
+function compressImage(dataUrl: string, maxDim = 768, quality = 0.5): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl); // 실패 시 원본 반환
+    img.src = dataUrl;
+  });
+}
+
+// Gemini 스타일 맵
+const GEMINI_STYLE_MAP = new Map<string, { id: string; name: string; category: string; prompt: string }>();
+GEMINI_STYLE_CATEGORIES.forEach(category => {
+  category.styles.forEach(style => {
+    GEMINI_STYLE_MAP.set(style.id, { ...style, category: category.name });
+  });
+});
 
 interface InputSectionProps {
-  onGenerate: (topic: string, referenceImages: string[], sourceText: string | null) => void;
+  onGenerate: (topic: string, referenceImages: ReferenceImages, sourceText: string | null) => void;
   step: GenerationStep;
 }
 
@@ -13,14 +44,27 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
   const [topic, setTopic] = useState('');
   const [manualScript, setManualScript] = useState('');
-  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+
+  // 참조 이미지 상태 분리 (캐릭터/스타일)
+  const [characterRefImages, setCharacterRefImages] = useState<string[]>([]);
+  const [styleRefImages, setStyleRefImages] = useState<string[]>([]);
+  // 참조 강도 상태 (0~100)
+  const [characterStrength, setCharacterStrength] = useState(DEFAULT_REFERENCE_IMAGES.characterStrength);
+  const [styleStrength, setStyleStrength] = useState(DEFAULT_REFERENCE_IMAGES.styleStrength);
+
+  // 영상 방향 설정
+  const [videoOrientation, setVideoOrientationState] = useState<VideoOrientation>(getVideoOrientation);
+
+  const handleOrientationChange = useCallback((orientation: VideoOrientation) => {
+    setVideoOrientationState(orientation);
+    setVideoOrientation(orientation);
+  }, []);
 
   // 이미지 모델 설정
   const [imageModelId, setImageModelId] = useState<ImageModelId>('gemini-2.5-flash-image');
-  const [fluxStyleId, setFluxStyleId] = useState<FluxStyleId>('ghibli');
-  const [customStylePrompt, setCustomStylePrompt] = useState('');
-  const [characterPrompt, setCharacterPrompt] = useState(CONFIG.DEFAULT_CHARACTER_PROMPT);
-  const [showCharacterEdit, setShowCharacterEdit] = useState(false);
+  // Gemini 스타일 설정
+  const [geminiStyleId, setGeminiStyleId] = useState<GeminiStyleId>('gemini-none');
+  const [geminiCustomStylePrompt, setGeminiCustomStylePrompt] = useState('');
 
   // 프로젝트 관리
   const [projects, setProjects] = useState<ProjectSettings[]>([]);
@@ -29,35 +73,55 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
 
   // ElevenLabs 설정 상태
   const [showElevenLabsSettings, setShowElevenLabsSettings] = useState(false);
-  const [elApiKey, setElApiKey] = useState('');
   const [elVoiceId, setElVoiceId] = useState('');
   const [elModelId, setElModelId] = useState<ElevenLabsModelId>('eleven_multilingual_v2');
+  const [elSpeed, setElSpeed] = useState<number>(() => {
+    const saved = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED);
+    return saved ? parseFloat(saved) : 1.0;
+  });
+  const [elStability, setElStability] = useState<number>(() => {
+    const saved = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY);
+    return saved ? parseFloat(saved) : 0.6;
+  });
   const [voices, setVoices] = useState<ElevenLabsVoice[]>([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  // 음성 필터 상태
+  const [genderFilter, setGenderFilter] = useState<VoiceGender | null>(null);
+  const [ageFilter, setAgeFilter] = useState<VoiceAge | null>(null);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  // 음성 탭: 'premade' | 'library'
+  const [voiceTab, setVoiceTab] = useState<'premade' | 'library'>('premade');
+  // 라이브러리 검색 상태
+  const [libraryVoices, setLibraryVoices] = useState<SharedVoice[]>([]);
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryHasMore, setLibraryHasMore] = useState(false);
+  const [libraryPage, setLibraryPage] = useState(0);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // 파일 입력 ref 분리 (캐릭터/스타일)
+  const characterFileInputRef = useRef<HTMLInputElement>(null);
+  const styleFileInputRef = useRef<HTMLInputElement>(null);
   const voiceDropdownRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // 컴포넌트 마운트 시 저장된 설정 로드
   useEffect(() => {
-    const savedApiKey = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '';
+    // API 키는 환경변수에서 읽음 (elApiKey 상수로 이미 설정됨)
     const savedVoiceId = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID) || '';
     const savedModelId = getElevenLabsModelId();
     const savedImageModel = localStorage.getItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL) as ImageModelId || CONFIG.DEFAULT_IMAGE_MODEL;
-    const savedFluxStyle = localStorage.getItem(CONFIG.STORAGE_KEYS.FLUX_STYLE) as FluxStyleId || 'ghibli';
-    const savedCustomStyle = localStorage.getItem(CONFIG.STORAGE_KEYS.FLUX_CUSTOM_STYLE) || '';
-    const savedCharacter = localStorage.getItem(CONFIG.STORAGE_KEYS.FLUX_CHARACTER) || CONFIG.DEFAULT_CHARACTER_PROMPT;
 
-    setElApiKey(savedApiKey);
+    // Gemini 스타일 설정 로드
+    const savedGeminiStyle = localStorage.getItem(CONFIG.STORAGE_KEYS.GEMINI_STYLE) as GeminiStyleId || 'gemini-none';
+    const savedGeminiCustomStyle = localStorage.getItem(CONFIG.STORAGE_KEYS.GEMINI_CUSTOM_STYLE) || '';
+
     setElVoiceId(savedVoiceId);
     setElModelId(savedModelId);
     setImageModelId(savedImageModel);
-    setFluxStyleId(savedFluxStyle);
-    setCustomStylePrompt(savedCustomStyle);
-    setCharacterPrompt(savedCharacter);
+    setGeminiStyleId(savedGeminiStyle);
+    setGeminiCustomStylePrompt(savedGeminiCustomStyle);
 
     // 저장된 프로젝트 목록 로드
     const savedProjects = localStorage.getItem(CONFIG.STORAGE_KEYS.PROJECTS);
@@ -69,10 +133,9 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       }
     }
 
-    // API Key가 있으면 음성 목록 자동 로드
-    if (savedApiKey) {
-      loadVoices(savedApiKey);
-    }
+    // 서버에 API Key가 있으면 음성 목록 자동 로드
+    loadVoices();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 드롭다운 외부 클릭 시 닫기
@@ -96,34 +159,62 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     };
   }, []);
 
-  // 음성 목록 불러오기
-  const loadVoices = async (apiKey?: string) => {
-    const key = apiKey || elApiKey;
-    if (!key || key.length < 10) return;
-
+  // 음성 목록 불러오기 (서버 프록시 경유)
+  const loadVoices = useCallback(async () => {
     setIsLoadingVoices(true);
     try {
-      const voiceList = await fetchElevenLabsVoices(key);
+      const voiceList = await fetchElevenLabsVoices();
       setVoices(voiceList);
     } catch (e) {
       console.error('음성 목록 로드 실패:', e);
     } finally {
       setIsLoadingVoices(false);
     }
-  };
+  }, []);
 
-  // Voice 선택
-  const selectVoice = (voice: ElevenLabsVoice) => {
+  // Voice 선택 (useCallback으로 메모이제이션)
+  const selectVoice = useCallback((voice: ElevenLabsVoice) => {
     setElVoiceId(voice.voice_id);
     setShowVoiceDropdown(false);
-  };
+  }, []);
 
-  // 음성 미리듣기
-  const playVoicePreview = (e: React.MouseEvent, voice: ElevenLabsVoice) => {
-    e.stopPropagation(); // 버튼 클릭 시 voice 선택 방지
+  // 공유 라이브러리 음성 선택
+  const selectSharedVoice = useCallback((voice: SharedVoice) => {
+    setElVoiceId(voice.voice_id);
+    setShowVoiceDropdown(false);
+  }, []);
 
+  // 공유 라이브러리 검색 (gender를 직접 파라미터로 받아 stale closure 방지)
+  const searchLibrary = useCallback(async (query: string, page: number = 0, gender?: string | null) => {
+    setLibraryLoading(true);
+    try {
+      const result = await searchSharedVoices({
+        search: query || undefined,
+        gender: (gender !== undefined ? gender : genderFilter) || undefined,
+        page_size: 20,
+        page,
+      });
+      if (page === 0) {
+        setLibraryVoices(result.voices);
+      } else {
+        setLibraryVoices(prev => [...prev, ...result.voices]);
+      }
+      setLibraryHasMore(result.has_more);
+      setLibraryPage(page);
+    } catch (e) {
+      console.error('라이브러리 검색 실패:', e);
+    } finally {
+      setLibraryLoading(false);
+    }
+  }, [genderFilter]);
+
+  // 미리듣기 테스트 문구
+  const PREVIEW_TEXT = "테스트 목소리입니다";
+
+  // API를 사용한 음성 미리듣기 (서버 프록시 경유)
+  const playVoicePreviewWithApi = async (voiceId: string, voiceName: string) => {
     // 이미 재생 중인 음성이면 정지
-    if (playingVoiceId === voice.voice_id) {
+    if (playingVoiceId === voiceId) {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -132,81 +223,94 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       return;
     }
 
-    // preview_url이 없으면 무시
-    if (!voice.preview_url) {
-      console.warn('이 음성에는 미리듣기가 없습니다:', voice.name);
-      return;
-    }
-
     // 기존 재생 중지
     if (audioRef.current) {
       audioRef.current.pause();
     }
 
-    // 새 오디오 재생
-    const audio = new Audio(voice.preview_url);
-    audioRef.current = audio;
-    setPlayingVoiceId(voice.voice_id);
+    setPlayingVoiceId(voiceId);
 
-    audio.play().catch(err => {
-      console.error('음성 재생 실패:', err);
+    try {
+      // 서버 프록시를 통한 TTS 생성
+      const response = await fetch('/api/elevenlabs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generatePreview',
+          text: PREVIEW_TEXT,
+          voiceId,
+          modelId: elModelId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API 오류: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.audio_base64) throw new Error('오디오 데이터 없음');
+
+      // base64 → 오디오 재생
+      const audio = new Audio(`data:audio/mpeg;base64,${result.audio_base64}`);
+      audioRef.current = audio;
+
+      audio.play().catch(err => {
+        console.error('음성 재생 실패:', err);
+        setPlayingVoiceId(null);
+      });
+
+      audio.onended = () => {
+        setPlayingVoiceId(null);
+        audioRef.current = null;
+      };
+
+    } catch (error) {
+      console.error('미리듣기 생성 실패:', error);
+      alert(`"${voiceName}" 미리듣기 생성에 실패했습니다.`);
       setPlayingVoiceId(null);
-    });
-
-    audio.onended = () => {
-      setPlayingVoiceId(null);
-      audioRef.current = null;
-    };
-  };
-
-  // 선택된 Voice 이름 가져오기
-  const getSelectedVoiceName = () => {
-    if (!elVoiceId) return '기본값 사용';
-    const voice = voices.find(v => v.voice_id === elVoiceId);
-    return voice ? voice.name : elVoiceId.slice(0, 12) + '...';
-  };
-
-  // ElevenLabs 설정 저장
-  const saveElevenLabsSettings = () => {
-    if (elApiKey) {
-      localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY, elApiKey);
     }
+  };
+
+  // 음성 미리듣기 (API 음성용)
+  const playVoicePreview = (e: React.MouseEvent, voice: ElevenLabsVoice) => {
+    e.stopPropagation();
+    playVoicePreviewWithApi(voice.voice_id, voice.name);
+  };
+
+  // 기본 음성 미리듣기 (기본 음성 목록용)
+  const playDefaultVoicePreview = (e: React.MouseEvent, voice: typeof ELEVENLABS_DEFAULT_VOICES[number]) => {
+    e.stopPropagation();
+    playVoicePreviewWithApi(voice.id, voice.name);
+  };
+
+  // ElevenLabs 설정 저장 (API 키는 환경변수에서 읽으므로 저장하지 않음)
+  const saveElevenLabsSettings = () => {
     if (elVoiceId) {
       localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID, elVoiceId);
     }
     setElevenLabsModelId(elModelId);
+    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED, String(elSpeed));
+    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY, String(elStability));
     setShowElevenLabsSettings(false);
   };
 
-  // 이미지 모델 선택
-  const selectImageModel = (modelId: ImageModelId) => {
+  // 이미지 모델 선택 (useCallback으로 메모이제이션)
+  const selectImageModel = useCallback((modelId: ImageModelId) => {
     setImageModelId(modelId);
     localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, modelId);
-  };
+  }, []);
 
-  // Flux 스타일 선택
-  const selectFluxStyle = (styleId: FluxStyleId) => {
-    setFluxStyleId(styleId);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.FLUX_STYLE, styleId);
-  };
+  // Gemini 스타일 선택 (useCallback으로 메모이제이션)
+  const selectGeminiStyle = useCallback((styleId: GeminiStyleId) => {
+    setGeminiStyleId(styleId);
+    localStorage.setItem(CONFIG.STORAGE_KEYS.GEMINI_STYLE, styleId);
+  }, []);
 
-  // 커스텀 스타일 저장
-  const saveCustomStyle = (prompt: string) => {
-    setCustomStylePrompt(prompt);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.FLUX_CUSTOM_STYLE, prompt);
-  };
-
-  // 캐릭터 프롬프트 저장
-  const saveCharacterPrompt = (prompt: string) => {
-    setCharacterPrompt(prompt);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.FLUX_CHARACTER, prompt);
-  };
-
-  // 캐릭터 프롬프트 초기화
-  const resetCharacterPrompt = () => {
-    setCharacterPrompt(CONFIG.DEFAULT_CHARACTER_PROMPT);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.FLUX_CHARACTER, CONFIG.DEFAULT_CHARACTER_PROMPT);
-  };
+  // Gemini 커스텀 스타일 저장 (useCallback으로 메모이제이션)
+  const saveGeminiCustomStyle = useCallback((prompt: string) => {
+    setGeminiCustomStylePrompt(prompt);
+    localStorage.setItem(CONFIG.STORAGE_KEYS.GEMINI_CUSTOM_STYLE, prompt);
+  }, []);
 
   // 프로젝트 저장
   const saveProject = () => {
@@ -218,9 +322,6 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       imageModel: imageModelId,
-      fluxStyle: fluxStyleId,
-      fluxCustomStyle: customStylePrompt,
-      fluxCharacter: characterPrompt,
       elevenLabsVoiceId: elVoiceId,
       elevenLabsModel: elModelId,
     };
@@ -235,17 +336,11 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
   // 프로젝트 불러오기
   const loadProject = (project: ProjectSettings) => {
     setImageModelId(project.imageModel as ImageModelId);
-    setFluxStyleId(project.fluxStyle as FluxStyleId);
-    setCustomStylePrompt(project.fluxCustomStyle);
-    setCharacterPrompt(project.fluxCharacter);
     setElVoiceId(project.elevenLabsVoiceId);
     setElModelId(project.elevenLabsModel as ElevenLabsModelId);
 
     // localStorage에도 저장
     localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, project.imageModel);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.FLUX_STYLE, project.fluxStyle);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.FLUX_CUSTOM_STYLE, project.fluxCustomStyle);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.FLUX_CHARACTER, project.fluxCharacter);
     localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID, project.elevenLabsVoiceId);
     setElevenLabsModelId(project.elevenLabsModel as ElevenLabsModelId);
 
@@ -268,9 +363,6 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       ...project,
       updatedAt: Date.now(),
       imageModel: imageModelId,
-      fluxStyle: fluxStyleId,
-      fluxCustomStyle: customStylePrompt,
-      fluxCharacter: characterPrompt,
       elevenLabsVoiceId: elVoiceId,
       elevenLabsModel: elModelId,
     };
@@ -281,54 +373,129 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     alert(`프로젝트 "${project.name}" 업데이트 완료!`);
   };
 
-  // 선택된 Flux 스타일 정보 가져오기
-  const getSelectedFluxStyle = () => {
-    if (fluxStyleId === 'custom') {
-      return { id: 'custom', name: '커스텀', category: '직접 입력', prompt: customStylePrompt };
+  // 선택된 Gemini 스타일 정보 가져오기 (useMemo로 캐싱 - O(1) 조회)
+  const selectedGeminiStyle = useMemo(() => {
+    if (geminiStyleId === 'gemini-none') {
+      return { id: 'gemini-none', name: '없음', category: '기본', prompt: '' };
     }
-    for (const category of FLUX_STYLE_CATEGORIES) {
-      const style = category.styles.find(s => s.id === fluxStyleId);
-      if (style) return { ...style, category: category.name };
+    if (geminiStyleId === 'gemini-custom') {
+      return { id: 'gemini-custom', name: '커스텀', category: '직접 입력', prompt: geminiCustomStylePrompt };
     }
-    return null;
-  };
+    return GEMINI_STYLE_MAP.get(geminiStyleId) || null;
+  }, [geminiStyleId, geminiCustomStylePrompt]);
+
+  // 필터링된 기본 음성 목록 (성별 + 연령 + 검색어)
+  const filteredDefaultVoices = useMemo(() => {
+    let filtered = [...ELEVENLABS_DEFAULT_VOICES];
+    if (genderFilter) filtered = filtered.filter(v => v.gender === genderFilter);
+    if (ageFilter) filtered = filtered.filter(v => v.age === ageFilter);
+    if (voiceSearchQuery.trim()) {
+      const q = voiceSearchQuery.toLowerCase();
+      filtered = filtered.filter(v =>
+        v.name.toLowerCase().includes(q) ||
+        v.accent.toLowerCase().includes(q) ||
+        v.description.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [genderFilter, ageFilter, voiceSearchQuery]);
+
+  // 필터링된 API 음성 목록
+  const filteredApiVoices = useMemo(() => {
+    if (!genderFilter) return voices;
+    return voices.filter(v => v.labels?.gender?.toLowerCase() === genderFilter);
+  }, [voices, genderFilter]);
+
+  // 선택된 음성의 이름 가져오기 (기본 음성 목록도 확인)
+  const getSelectedVoiceInfo = useCallback(() => {
+    if (!elVoiceId) return { name: '기본값 사용', description: '시스템 기본 음성' };
+
+    // 기본 음성 목록에서 찾기
+    const defaultVoice = ELEVENLABS_DEFAULT_VOICES.find(v => v.id === elVoiceId);
+    if (defaultVoice) {
+      return { name: defaultVoice.name, description: defaultVoice.description };
+    }
+
+    // API 음성 목록에서 찾기
+    const apiVoice = voices.find(v => v.voice_id === elVoiceId);
+    if (apiVoice) {
+      return { name: apiVoice.name, description: apiVoice.labels?.description || apiVoice.category };
+    }
+
+    return { name: elVoiceId.slice(0, 12) + '...', description: '직접 입력한 ID' };
+  }, [elVoiceId, voices]);
 
   const isProcessing = step !== GenerationStep.IDLE && step !== GenerationStep.COMPLETED && step !== GenerationStep.ERROR;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // 폼 제출 핸들러 (useCallback으로 메모이제이션)
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (isProcessing) return;
 
-    if (activeTab === 'auto') {
-      if (topic.trim()) onGenerate(topic, referenceImages, null);
-    } else {
-      if (manualScript.trim()) onGenerate("Manual Script Input", referenceImages, manualScript);
-    }
-  };
+    // ReferenceImages 타입으로 전달 (강도 포함)
+    const refImages: ReferenceImages = {
+      character: characterRefImages,
+      style: styleRefImages,
+      characterStrength,
+      styleStrength
+    };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (activeTab === 'auto') {
+      if (topic.trim()) onGenerate(topic, refImages, null);
+    } else {
+      if (manualScript.trim()) onGenerate("Manual Script Input", refImages, manualScript);
+    }
+  }, [isProcessing, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, onGenerate]);
+
+  // 캐릭터 참조 이미지 업로드 핸들러 (자동 압축)
+  const handleCharacterImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const remainingSlots = 4 - referenceImages.length;
+      const remainingSlots = 2 - characterRefImages.length;
       const filesToProcess = (Array.from(files) as File[]).slice(0, remainingSlots);
       filesToProcess.forEach(file => {
         const reader = new FileReader();
-        reader.onloadend = () => setReferenceImages(prev => [...prev, reader.result as string].slice(0, 4));
+        reader.onloadend = async () => {
+          const compressed = await compressImage(reader.result as string);
+          setCharacterRefImages(prev => [...prev, compressed].slice(0, 2));
+        };
         reader.readAsDataURL(file);
       });
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+    if (characterFileInputRef.current) characterFileInputRef.current.value = '';
+  }, [characterRefImages.length]);
 
-  const removeImage = (index: number) => setReferenceImages(prev => prev.filter((_, i) => i !== index));
+  // 스타일 참조 이미지 업로드 핸들러 (자동 압축)
+  const handleStyleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const remainingSlots = 2 - styleRefImages.length;
+      const filesToProcess = (Array.from(files) as File[]).slice(0, remainingSlots);
+      filesToProcess.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const compressed = await compressImage(reader.result as string);
+          setStyleRefImages(prev => [...prev, compressed].slice(0, 2));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    if (styleFileInputRef.current) styleFileInputRef.current.value = '';
+  }, [styleRefImages.length]);
+
+  // 캐릭터 이미지 제거 핸들러
+  const removeCharacterImage = useCallback((index: number) => setCharacterRefImages(prev => prev.filter((_, i) => i !== index)), []);
+
+  // 스타일 이미지 제거 핸들러
+  const removeStyleImage = useCallback((index: number) => setStyleRefImages(prev => prev.filter((_, i) => i !== index)), []);
 
   return (
     <div className="w-full max-w-4xl mx-auto my-8 px-4">
       <div className="text-center mb-10">
         <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-2 text-white">
-          TubeGen <span className="text-brand-500">Studio</span>
+          C2 <span className="text-green-400">GEN</span>
         </h1>
-        <p className="text-slate-400 text-sm font-medium uppercase tracking-widest">졸라맨 V10.0 Concept-Based Engine</p>
+        <p className="text-slate-400 text-sm font-medium uppercase tracking-widest">AI Content Studio</p>
       </div>
 
       <div className="mb-4 flex flex-col gap-4">
@@ -395,8 +562,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-sm text-white truncate">{project.name}</div>
                           <div className="text-[10px] text-slate-500">
-                            {new Date(project.updatedAt).toLocaleDateString('ko-KR')} •
-                            {project.imageModel === 'fal-ai/flux/schnell' ? ' Flux' : ' Gemini'}
+                            {new Date(project.updatedAt).toLocaleDateString('ko-KR')} • Gemini
                           </div>
                         </div>
                         <div className="flex gap-1 ml-2">
@@ -438,27 +604,709 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
           )}
         </div>
 
-        {/* Global Reference Images */}
+        {/* 참조 이미지 설정 (캐릭터/스타일 분리) */}
         <div className="p-6 bg-slate-900/50 border border-slate-800 rounded-3xl backdrop-blur-sm shadow-xl">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <div className="flex-1 text-left">
-              <h3 className="text-white font-bold text-lg mb-1">글로벌 스타일 참조</h3>
-              <p className="text-slate-500 text-xs">참조 이미지를 올리면 화풍과 색감을 그대로 계승합니다.</p>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
             </div>
-            <div className="flex flex-wrap gap-3 items-center">
-              {referenceImages.map((img, idx) => (
-                <div key={idx} className="relative group">
-                  <div className="w-24 h-16 rounded-xl overflow-hidden border border-slate-700">
-                    <img src={img} alt={`Ref ${idx}`} className="w-full h-full object-cover" />
-                  </div>
-                  <button onClick={() => removeImage(idx)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+            <div>
+              <h3 className="text-white font-bold text-lg">참조 이미지 설정</h3>
+              <p className="text-slate-500 text-xs">참조 이미지가 있으면 고정 프롬프트보다 우선 적용됩니다</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 캐릭터 참조 영역 */}
+            <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">🧑</span>
+                <div>
+                  <h4 className="text-white font-bold text-sm">캐릭터 참조</h4>
+                  <p className="text-slate-500 text-[10px]">캐릭터의 외모/스타일 참조 (최대 2장)</p>
                 </div>
-              ))}
-              {referenceImages.length < 4 && (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-24 h-16 border-2 border-dashed border-slate-700 rounded-xl flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-500 transition-all"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></button>
+              </div>
+
+              {/* 캐릭터 참조 이미지가 있을 때 안내 메시지 */}
+              {characterRefImages.length > 0 && (
+                <div className="mb-3 px-2 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-amber-400 text-[10px] font-medium">
+                    ⚠️ 캐릭터 참조 이미지 우선 → 고정 캐릭터 프롬프트 제외
+                  </p>
+                </div>
               )}
-              <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" multiple />
+
+              <div className="flex flex-wrap gap-2 items-center mb-3">
+                {characterRefImages.map((img, idx) => (
+                  <div key={idx} className="relative group">
+                    <div className="w-20 h-14 rounded-lg overflow-hidden border border-violet-500/50">
+                      <img src={img} alt={`Character Ref ${idx}`} className="w-full h-full object-cover" />
+                    </div>
+                    <button
+                      onClick={() => removeCharacterImage(idx)}
+                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                {characterRefImages.length < 2 && (
+                  <button
+                    type="button"
+                    onClick={() => characterFileInputRef.current?.click()}
+                    className="w-20 h-14 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-500 hover:border-violet-500 hover:text-violet-400 transition-all"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                )}
+                <input
+                  type="file"
+                  ref={characterFileInputRef}
+                  onChange={handleCharacterImageChange}
+                  accept="image/*"
+                  className="hidden"
+                  multiple
+                />
+              </div>
+
+              {/* 캐릭터 참조 강도 슬라이더 */}
+              {characterRefImages.length > 0 && (
+                <div className="pt-3 border-t border-slate-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-slate-400">참조 강도</span>
+                    <span className="text-[10px] font-bold text-violet-400">{characterStrength}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={characterStrength}
+                    onChange={(e) => setCharacterStrength(Number(e.target.value))}
+                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500 mt-1">
+                    <span>약하게 (참고만)</span>
+                    <span>강하게 (정확히)</span>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* 스타일 참조 영역 */}
+            <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">🎨</span>
+                <div>
+                  <h4 className="text-white font-bold text-sm">화풍/스타일 참조</h4>
+                  <p className="text-slate-500 text-[10px]">전체적인 화풍과 분위기 참조 (최대 2장)</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 items-center mb-3">
+                {styleRefImages.map((img, idx) => (
+                  <div key={idx} className="relative group">
+                    <div className="w-20 h-14 rounded-lg overflow-hidden border border-fuchsia-500/50">
+                      <img src={img} alt={`Style Ref ${idx}`} className="w-full h-full object-cover" />
+                    </div>
+                    <button
+                      onClick={() => removeStyleImage(idx)}
+                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                {styleRefImages.length < 2 && (
+                  <button
+                    type="button"
+                    onClick={() => styleFileInputRef.current?.click()}
+                    className="w-20 h-14 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center text-slate-500 hover:border-fuchsia-500 hover:text-fuchsia-400 transition-all"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                )}
+                <input
+                  type="file"
+                  ref={styleFileInputRef}
+                  onChange={handleStyleImageChange}
+                  accept="image/*"
+                  className="hidden"
+                  multiple
+                />
+              </div>
+
+              {/* 스타일 참조 강도 슬라이더 */}
+              {styleRefImages.length > 0 && (
+                <div className="pt-3 border-t border-slate-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-slate-400">참조 강도</span>
+                    <span className="text-[10px] font-bold text-fuchsia-400">{styleStrength}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={styleStrength}
+                    onChange={(e) => setStyleStrength(Number(e.target.value))}
+                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-fuchsia-500"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500 mt-1">
+                    <span>약하게 (참고만)</span>
+                    <span>강하게 (정확히)</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 🎤 ElevenLabs 음성 설정 (참조 이미지 바로 아래) */}
+        <div className="p-4 bg-slate-900/50 border border-slate-800 rounded-2xl backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => setShowElevenLabsSettings(!showElevenLabsSettings)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-sm">🎤 나레이션 음성 설정</h3>
+                <p className="text-slate-500 text-xs">
+                  {`✅ ${getSelectedVoiceInfo().name}`}
+                </p>
+              </div>
+            </div>
+            <svg className={`w-5 h-5 text-slate-500 transition-transform ${showElevenLabsSettings ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showElevenLabsSettings && (
+            <div className="mt-4 pt-4 border-t border-slate-800 space-y-4">
+              {/* API Key 상태 표시 (서버 프록시에서 관리) */}
+              <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400">✅</span>
+                    <span className="text-sm text-slate-300">서버 연결됨</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => loadVoices()}
+                    disabled={isLoadingVoices}
+                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {isLoadingVoices ? '로딩...' : '커스텀 음성 불러오기'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Voice Selection - 확장된 UI */}
+              <div ref={voiceDropdownRef} className="relative">
+                <label className="block text-xs font-bold text-slate-400 mb-2">
+                  음성 선택
+                  <span className="text-purple-400 ml-2 font-normal">
+                    (프리메이드 {ELEVENLABS_DEFAULT_VOICES.length}개 + 라이브러리 수천 개)
+                  </span>
+                </label>
+
+                {/* 선택된 음성 표시 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => setShowVoiceDropdown(!showVoiceDropdown)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-left flex items-center justify-between hover:border-purple-500/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-white">{getSelectedVoiceInfo().name}</div>
+                      <div className="text-xs text-slate-500 line-clamp-1">{getSelectedVoiceInfo().description}</div>
+                    </div>
+                  </div>
+                  <svg className={`w-5 h-5 text-slate-500 transition-transform ${showVoiceDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* 드롭다운 목록 */}
+                {showVoiceDropdown && (
+                  <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-[32rem] overflow-hidden flex flex-col">
+                    {/* 탭: 프리메이드 / 라이브러리 */}
+                    <div className="flex border-b border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => setVoiceTab('premade')}
+                        className={`flex-1 px-4 py-2.5 text-xs font-bold transition-all ${
+                          voiceTab === 'premade' ? 'text-purple-400 border-b-2 border-purple-400 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        프리메이드 ({ELEVENLABS_DEFAULT_VOICES.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setVoiceTab('library'); if (libraryVoices.length === 0) searchLibrary(''); }}
+                        className={`flex-1 px-4 py-2.5 text-xs font-bold transition-all ${
+                          voiceTab === 'library' ? 'text-amber-400 border-b-2 border-amber-400 bg-slate-800/50' : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        커뮤니티 라이브러리
+                      </button>
+                    </div>
+
+                    {/* 프리메이드 탭 */}
+                    {voiceTab === 'premade' && (
+                      <>
+                        {/* 검색 + 필터 */}
+                        <div className="p-2 bg-slate-800/80 border-b border-slate-700 space-y-2">
+                          {/* 검색 입력 */}
+                          <input
+                            type="text"
+                            value={voiceSearchQuery}
+                            onChange={(e) => setVoiceSearchQuery(e.target.value)}
+                            placeholder="이름, 억양, 설명으로 검색..."
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none"
+                          />
+                          {/* 성별 필터 */}
+                          <div className="flex gap-1">
+                            <button type="button" onClick={() => setGenderFilter(null)}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === null ? 'bg-purple-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              전체
+                            </button>
+                            <button type="button" onClick={() => setGenderFilter('female')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'female' ? 'bg-pink-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              여성
+                            </button>
+                            <button type="button" onClick={() => setGenderFilter('male')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'male' ? 'bg-blue-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              남성
+                            </button>
+                          </div>
+                          {/* 연령 필터 */}
+                          <div className="flex gap-1">
+                            <button type="button" onClick={() => setAgeFilter(null)}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${ageFilter === null ? 'bg-purple-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              전 연령
+                            </button>
+                            <button type="button" onClick={() => setAgeFilter('young')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${ageFilter === 'young' ? 'bg-green-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              젊은
+                            </button>
+                            <button type="button" onClick={() => setAgeFilter('middle')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${ageFilter === 'middle' ? 'bg-yellow-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              중년
+                            </button>
+                            <button type="button" onClick={() => setAgeFilter('old')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${ageFilter === 'old' ? 'bg-orange-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              시니어
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 음성 목록 */}
+                        <div className="overflow-y-auto flex-1">
+                          {/* 기본값 옵션 */}
+                          <button
+                            type="button"
+                            onClick={() => { setElVoiceId(''); setShowVoiceDropdown(false); }}
+                            className={`w-full px-4 py-2.5 text-left hover:bg-slate-800 transition-colors border-b border-slate-800 ${!elVoiceId ? 'bg-purple-600/20' : ''}`}
+                          >
+                            <div className="font-bold text-sm text-slate-300">기본값 (Rachel)</div>
+                            <div className="text-xs text-slate-500">가장 안정적인 여성 음성</div>
+                          </button>
+
+                          {filteredDefaultVoices.length === 0 && (
+                            <div className="px-4 py-6 text-center text-slate-500 text-xs">
+                              검색 결과가 없습니다<br/>
+                              <span className="text-slate-600">어린이 음성은 [커뮤니티 라이브러리] 탭에서 "child"로 검색하세요</span>
+                            </div>
+                          )}
+
+                          {filteredDefaultVoices.map((voice) => (
+                            <div
+                              key={voice.id}
+                              className={`flex items-center gap-2 px-3 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800/50 ${elVoiceId === voice.id ? 'bg-purple-600/20' : ''}`}
+                            >
+                              {/* 미리듣기 버튼 */}
+                              <button
+                                type="button"
+                                onClick={(e) => playDefaultVoicePreview(e, voice)}
+                                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                  playingVoiceId === voice.id
+                                    ? 'bg-purple-500 text-white animate-pulse'
+                                    : 'bg-slate-700 text-slate-400 hover:bg-purple-600 hover:text-white'
+                                }`}
+                                title="미리듣기"
+                              >
+                                {playingVoiceId === voice.id ? (
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                                ) : (
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                )}
+                              </button>
+
+                              {/* 음성 정보 */}
+                              <button
+                                type="button"
+                                onClick={() => { setElVoiceId(voice.id); setShowVoiceDropdown(false); }}
+                                className="flex-1 text-left min-w-0"
+                              >
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-sm text-white">{voice.name}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                    voice.gender === 'female' ? 'bg-pink-500/20 text-pink-400' : 'bg-blue-500/20 text-blue-400'
+                                  }`}>
+                                    {voice.gender === 'female' ? '여' : '남'}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700/50 text-slate-400">
+                                    {voice.accent}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{voice.description}</div>
+                              </button>
+
+                              {elVoiceId === voice.id && (
+                                <div className="text-purple-400 flex-shrink-0">
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* 내 음성 라이브러리 (API 음성) */}
+                          {filteredApiVoices.length > 0 && (
+                            <>
+                              <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-800">
+                                <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                                  내 커스텀 음성
+                                </div>
+                              </div>
+                              {filteredApiVoices.map((voice) => (
+                                <div
+                                  key={voice.voice_id}
+                                  className={`flex items-center gap-2 px-3 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800/50 ${elVoiceId === voice.voice_id ? 'bg-purple-600/20' : ''}`}
+                                >
+                                  <button type="button" onClick={(e) => playVoicePreview(e, voice)}
+                                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                      playingVoiceId === voice.voice_id ? 'bg-amber-500 text-white animate-pulse' : 'bg-slate-700 text-slate-400 hover:bg-amber-600 hover:text-white'
+                                    }`}>
+                                    {playingVoiceId === voice.voice_id ? (
+                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                                    ) : (
+                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                    )}
+                                  </button>
+                                  <button type="button" onClick={() => selectVoice(voice)} className="flex-1 text-left">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-sm text-white">{voice.name}</span>
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400">{voice.category}</span>
+                                    </div>
+                                  </button>
+                                  {elVoiceId === voice.voice_id && (
+                                    <div className="text-purple-400"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg></div>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* 라이브러리 탭 */}
+                    {voiceTab === 'library' && (
+                      <>
+                        {/* 라이브러리 검색 */}
+                        <div className="p-2 bg-slate-800/80 border-b border-slate-700 space-y-2">
+                          <form onSubmit={(e) => { e.preventDefault(); searchLibrary(librarySearch); }} className="flex gap-2">
+                            <input
+                              type="text"
+                              value={librarySearch}
+                              onChange={(e) => setLibrarySearch(e.target.value)}
+                              placeholder="음성 이름, 억양, 언어 검색..."
+                              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-amber-500 focus:outline-none"
+                            />
+                            <button type="submit" disabled={libraryLoading}
+                              className="px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap">
+                              {libraryLoading ? '...' : '검색'}
+                            </button>
+                          </form>
+                          {/* 성별 필터 */}
+                          <div className="flex gap-1">
+                            <button type="button" onClick={() => { setGenderFilter(null); searchLibrary(librarySearch, 0, null); }}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === null ? 'bg-amber-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              전체
+                            </button>
+                            <button type="button" onClick={() => { setGenderFilter('female'); searchLibrary(librarySearch, 0, 'female'); }}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'female' ? 'bg-pink-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              여성
+                            </button>
+                            <button type="button" onClick={() => { setGenderFilter('male'); searchLibrary(librarySearch, 0, 'male'); }}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'male' ? 'bg-blue-600 text-white' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}>
+                              남성
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 라이브러리 결과 목록 */}
+                        <div className="overflow-y-auto flex-1">
+                          {libraryLoading && libraryVoices.length === 0 && (
+                            <div className="px-4 py-6 text-center text-slate-500 text-xs">검색 중...</div>
+                          )}
+                          {!libraryLoading && libraryVoices.length === 0 && (
+                            <div className="px-4 py-6 text-center space-y-2">
+                              <div className="text-slate-400 text-xs font-bold">ElevenLabs 커뮤니티 음성 검색</div>
+                              <div className="text-slate-500 text-[11px] leading-relaxed">
+                                수천 개의 커뮤니티 음성을 검색하세요.<br/>
+                                예: "child", "kid", "korean", "anime", "narrator"<br/>
+                                성별 필터도 함께 사용할 수 있습니다.
+                              </div>
+                            </div>
+                          )}
+                          {libraryVoices.map((voice) => (
+                            <div
+                              key={voice.voice_id}
+                              className={`flex items-center gap-2 px-3 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800/50 ${elVoiceId === voice.voice_id ? 'bg-amber-600/20' : ''}`}
+                            >
+                              {/* 미리듣기 (preview_url 사용) */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (voice.preview_url) {
+                                    if (playingVoiceId === voice.voice_id) {
+                                      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+                                      setPlayingVoiceId(null);
+                                    } else {
+                                      if (audioRef.current) audioRef.current.pause();
+                                      setPlayingVoiceId(voice.voice_id);
+                                      const audio = new Audio(voice.preview_url);
+                                      audioRef.current = audio;
+                                      audio.play().catch(() => setPlayingVoiceId(null));
+                                      audio.onended = () => { setPlayingVoiceId(null); audioRef.current = null; };
+                                    }
+                                  }
+                                }}
+                                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                  playingVoiceId === voice.voice_id ? 'bg-amber-500 text-white animate-pulse' : voice.preview_url ? 'bg-slate-700 text-slate-400 hover:bg-amber-600 hover:text-white' : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                                }`}
+                                disabled={!voice.preview_url}
+                                title={voice.preview_url ? '미리듣기' : '미리듣기 없음'}
+                              >
+                                {playingVoiceId === voice.voice_id ? (
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                                ) : (
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                )}
+                              </button>
+
+                              <button type="button" onClick={() => selectSharedVoice(voice)} className="flex-1 text-left min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-sm text-white">{voice.name}</span>
+                                  {voice.gender && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                      voice.gender === 'female' ? 'bg-pink-500/20 text-pink-400' : 'bg-blue-500/20 text-blue-400'
+                                    }`}>
+                                      {voice.gender === 'female' ? '여' : '남'}
+                                    </span>
+                                  )}
+                                  {voice.accent && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700/50 text-slate-400">{voice.accent}</span>
+                                  )}
+                                  {voice.language && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">{voice.language}</span>
+                                  )}
+                                </div>
+                                {voice.description && (
+                                  <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{voice.description}</div>
+                                )}
+                              </button>
+
+                              {elVoiceId === voice.voice_id && (
+                                <div className="text-amber-400 flex-shrink-0">
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* 더 불러오기 */}
+                          {libraryHasMore && (
+                            <button
+                              type="button"
+                              onClick={() => searchLibrary(librarySearch, libraryPage + 1)}
+                              disabled={libraryLoading}
+                              className="w-full px-4 py-3 text-center text-xs font-bold text-amber-400 hover:bg-slate-800 transition-colors disabled:opacity-50"
+                            >
+                              {libraryLoading ? '로딩 중...' : '더 불러오기'}
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* 직접 입력 */}
+                    <div className="p-2 bg-slate-800/80 border-t border-slate-700">
+                      <input
+                        type="text"
+                        value={elVoiceId}
+                        onChange={(e) => setElVoiceId(e.target.value)}
+                        placeholder="Voice ID 직접 입력..."
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* TTS 모델 선택 - 자막 지원 모델만 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-2">
+                  TTS 모델 <span className="text-green-400 font-normal">(✅ 자막 지원만)</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ELEVENLABS_MODELS.filter(m => m.supportsTimestamp).map((model) => (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() => setElModelId(model.id)}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        elModelId === model.id
+                          ? 'bg-purple-600/20 border-purple-500 text-white'
+                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs">{model.name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">자막OK</span>
+                      </div>
+                      <div className="text-[10px] opacity-70 mt-0.5">{model.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 음성 속도 슬라이더 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-400">음성 속도</label>
+                  <span className="text-xs font-black text-purple-400">{elSpeed.toFixed(2)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.7"
+                  max="1.3"
+                  step="0.05"
+                  value={elSpeed}
+                  onChange={(e) => setElSpeed(parseFloat(e.target.value))}
+                  className="w-full accent-purple-500"
+                />
+                <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+                  <span>0.7x (느림)</span>
+                  <span>1.0x (기본)</span>
+                  <span>1.3x (빠름)</span>
+                </div>
+              </div>
+
+              {/* 리듬 안정성 슬라이더 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-400">리듬 안정성</label>
+                  <span className="text-xs font-black text-purple-400">{Math.round(elStability * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="0.9"
+                  step="0.05"
+                  value={elStability}
+                  onChange={(e) => setElStability(parseFloat(e.target.value))}
+                  className="w-full accent-purple-500"
+                />
+                <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+                  <span>낮음 (자연스러운 강약)</span>
+                  <span>높음 (일정한 속도)</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1.5">
+                  ※ 낮추면 감정 표현 풍부, 높이면 문장 간 포즈가 명확해짐
+                </p>
+              </div>
+
+              {/* 저장 버튼 */}
+              <button
+                type="button"
+                onClick={saveElevenLabsSettings}
+                className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+              >
+                설정 저장
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 영상 방향 선택 (가로 / 세로) */}
+        <div className="p-4 bg-slate-900/50 border border-slate-800 rounded-2xl backdrop-blur-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-sm">영상 방향</h3>
+              <p className="text-slate-500 text-xs">이미지·영상 비율이 함께 변경됩니다</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => handleOrientationChange('landscape')}
+              className={`p-4 rounded-xl border text-left transition-all ${
+                videoOrientation === 'landscape'
+                  ? 'bg-violet-600/20 border-violet-500 text-white'
+                  : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                {/* 가로 화면 아이콘 */}
+                <div className="w-8 h-5 border-2 border-current rounded-sm flex-shrink-0" />
+                <span className="font-bold text-sm">가로 (16:9)</span>
+              </div>
+              <p className="text-xs opacity-60">유튜브·일반 영상</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOrientationChange('portrait')}
+              className={`p-4 rounded-xl border text-left transition-all ${
+                videoOrientation === 'portrait'
+                  ? 'bg-violet-600/20 border-violet-500 text-white'
+                  : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                {/* 세로 화면 아이콘 */}
+                <div className="w-5 h-8 border-2 border-current rounded-sm flex-shrink-0" />
+                <span className="font-bold text-sm">세로 (9:16)</span>
+              </div>
+              <p className="text-xs opacity-60">쇼츠·릴스·틱톡</p>
+            </button>
           </div>
         </div>
 
@@ -503,66 +1351,41 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
             ))}
           </div>
 
-          {/* Flux 스타일 선택 (Flux 모델 선택 시에만 표시) */}
-          {imageModelId === 'fal-ai/flux/schnell' && (
+          {/* Gemini 화풍 선택 */}
+          {imageModelId === 'gemini-2.5-flash-image' && (
             <div className="mt-4 pt-4 border-t border-slate-700">
-              {/* 기본 캐릭터 설정 */}
-              <div className="mb-4 p-3 bg-slate-800/50 rounded-xl border border-slate-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🧑</span>
-                    <span className="text-xs font-bold text-slate-300">기본 캐릭터</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowCharacterEdit(!showCharacterEdit)}
-                      className="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white transition-colors"
-                    >
-                      {showCharacterEdit ? '접기' : '수정'}
-                    </button>
-                    {characterPrompt !== CONFIG.DEFAULT_CHARACTER_PROMPT && (
-                      <button
-                        type="button"
-                        onClick={resetCharacterPrompt}
-                        className="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white transition-colors"
-                      >
-                        초기화
-                      </button>
-                    )}
-                  </div>
+              {/* 화풍 선택 헤더 */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎨</span>
+                  <label className="text-xs font-bold text-slate-400">Gemini 화풍 선택</label>
                 </div>
-
-                {!showCharacterEdit ? (
-                  <p className="text-[11px] text-slate-500 line-clamp-2">
-                    {characterPrompt.slice(0, 100)}...
-                  </p>
-                ) : (
-                  <div className="mt-2">
-                    <textarea
-                      value={characterPrompt}
-                      onChange={(e) => saveCharacterPrompt(e.target.value)}
-                      className="w-full h-28 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none resize-none"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      이 캐릭터 설명이 모든 이미지에 적용됩니다. 선택한 화풍과 합쳐집니다.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* 화풍 선택 */}
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-xs font-bold text-slate-400">화풍 선택</label>
-                {getSelectedFluxStyle() && (
-                  <span className="text-xs text-blue-400">
-                    {getSelectedFluxStyle()?.category} &gt; {getSelectedFluxStyle()?.name}
+                {selectedGeminiStyle && selectedGeminiStyle.id !== 'gemini-none' && (
+                  <span className="text-xs text-emerald-400">
+                    {selectedGeminiStyle?.category} &gt; {selectedGeminiStyle?.name}
                   </span>
                 )}
               </div>
 
-              {FLUX_STYLE_CATEGORIES.map((category) => (
-                <div key={category.id} className="mb-3">
+              {/* 화풍 없음 옵션 */}
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => selectGeminiStyle('gemini-none')}
+                  className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+                    geminiStyleId === 'gemini-none'
+                      ? 'bg-slate-600 text-white ring-2 ring-slate-400'
+                      : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  🚫 화풍 없음 (기본)
+                </button>
+                <span className="text-[10px] text-slate-500 ml-2">프롬프트에만 의존</span>
+              </div>
+
+              {/* 카테고리별 스타일 버튼 */}
+              {GEMINI_STYLE_CATEGORIES.map((category) => (
+                <div key={category.id} className="mb-4">
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                     {category.name}
                   </div>
@@ -571,10 +1394,10 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                       <button
                         key={style.id}
                         type="button"
-                        onClick={() => selectFluxStyle(style.id as FluxStyleId)}
+                        onClick={() => selectGeminiStyle(style.id as GeminiStyleId)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          fluxStyleId === style.id
-                            ? 'bg-blue-500 text-white'
+                          geminiStyleId === style.id
+                            ? 'bg-emerald-500 text-white'
                             : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white'
                         }`}
                       >
@@ -590,236 +1413,32 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                 <div className="flex items-center gap-2 mb-2">
                   <button
                     type="button"
-                    onClick={() => selectFluxStyle('custom')}
+                    onClick={() => selectGeminiStyle('gemini-custom')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      fluxStyleId === 'custom'
-                        ? 'bg-purple-500 text-white'
+                      geminiStyleId === 'gemini-custom'
+                        ? 'bg-teal-500 text-white'
                         : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white'
                     }`}
                   >
-                    ✏️ 커스텀 스타일
+                    ✏️ 커스텀 화풍
                   </button>
-                  <span className="text-[10px] text-slate-500">직접 페르소나/스타일 설명 입력</span>
+                  <span className="text-[10px] text-slate-500">직접 화풍 설명 입력</span>
                 </div>
 
-                {fluxStyleId === 'custom' && (
+                {geminiStyleId === 'gemini-custom' && (
                   <div className="mt-2">
                     <textarea
-                      value={customStylePrompt}
-                      onChange={(e) => saveCustomStyle(e.target.value)}
-                      placeholder="예: Simple stick figure with black outlines, minimalist Korean comic style, expressive round face, thin limbs..."
-                      className="w-full h-24 bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-none"
+                      value={geminiCustomStylePrompt}
+                      onChange={(e) => saveGeminiCustomStyle(e.target.value)}
+                      placeholder="예: Watercolor painting style with soft edges, pastel colors, dreamy atmosphere..."
+                      className="w-full h-24 bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none resize-none"
                     />
                     <p className="text-[10px] text-slate-500 mt-1">
-                      영어로 스타일을 상세히 설명하세요. 이 설명이 모든 이미지 프롬프트 앞에 추가됩니다.
+                      영어로 화풍을 상세히 설명하세요. 이 설명이 Gemini 이미지 생성에 적용됩니다.
                     </p>
                   </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* ElevenLabs TTS 설정 */}
-        <div className="p-4 bg-slate-900/50 border border-slate-800 rounded-2xl backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => setShowElevenLabsSettings(!showElevenLabsSettings)}
-            className="w-full flex items-center justify-between text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-white font-bold text-sm">ElevenLabs TTS 설정</h3>
-                <p className="text-slate-500 text-xs">
-                  {elApiKey ? `모델: ${ELEVENLABS_MODELS.find(m => m.id === elModelId)?.name || elModelId}` : 'API Key 미설정 (Gemini 폴백)'}
-                </p>
-              </div>
-            </div>
-            <svg className={`w-5 h-5 text-slate-500 transition-transform ${showElevenLabsSettings ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {showElevenLabsSettings && (
-            <div className="mt-4 pt-4 border-t border-slate-800 space-y-4">
-              {/* API Key */}
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-2">API Key</label>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={elApiKey}
-                    onChange={(e) => setElApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => loadVoices()}
-                    disabled={!elApiKey || elApiKey.length < 10 || isLoadingVoices}
-                    className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
-                  >
-                    {isLoadingVoices ? '로딩...' : '음성 불러오기'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Voice ID Selection */}
-              <div ref={voiceDropdownRef} className="relative">
-                <label className="block text-xs font-bold text-slate-400 mb-2">
-                  Voice 선택 {voices.length > 0 && <span className="text-purple-400">({voices.length}개)</span>}
-                </label>
-
-                {/* 선택 버튼 */}
-                <button
-                  type="button"
-                  onClick={() => setShowVoiceDropdown(!showVoiceDropdown)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between hover:border-slate-600 transition-colors"
-                >
-                  <span className={elVoiceId ? 'text-white' : 'text-slate-500'}>
-                    {getSelectedVoiceName()}
-                  </span>
-                  <svg className={`w-4 h-4 text-slate-500 transition-transform ${showVoiceDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {/* 드롭다운 목록 */}
-                {showVoiceDropdown && (
-                  <div className="absolute z-50 w-full mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
-                    {/* 기본값 옵션 */}
-                    <button
-                      type="button"
-                      onClick={() => { setElVoiceId(''); setShowVoiceDropdown(false); }}
-                      className={`w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 ${!elVoiceId ? 'bg-purple-600/20' : ''}`}
-                    >
-                      <div className="font-bold text-sm text-slate-300">기본값 사용</div>
-                      <div className="text-xs text-slate-500">시스템 기본 음성</div>
-                    </button>
-
-                    {voices.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-slate-500 text-sm">
-                        {isLoadingVoices ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent animate-spin rounded-full"></div>
-                            음성 목록 로딩 중...
-                          </div>
-                        ) : (
-                          'API Key를 입력하고 "음성 불러오기" 버튼을 클릭하세요'
-                        )}
-                      </div>
-                    ) : (
-                      voices.map((voice) => (
-                        <div
-                          key={voice.voice_id}
-                          className={`flex items-center gap-2 px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-b-0 ${elVoiceId === voice.voice_id ? 'bg-purple-600/20' : ''}`}
-                        >
-                          {/* 미리듣기 버튼 */}
-                          {voice.preview_url && (
-                            <button
-                              type="button"
-                              onClick={(e) => playVoicePreview(e, voice)}
-                              className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                                playingVoiceId === voice.voice_id
-                                  ? 'bg-purple-500 text-white'
-                                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
-                              }`}
-                              title="미리듣기"
-                            >
-                              {playingVoiceId === voice.voice_id ? (
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <rect x="6" y="5" width="4" height="14" rx="1" />
-                                  <rect x="14" y="5" width="4" height="14" rx="1" />
-                                </svg>
-                              ) : (
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
-                              )}
-                            </button>
-                          )}
-
-                          {/* 음성 정보 (클릭하면 선택) */}
-                          <button
-                            type="button"
-                            onClick={() => selectVoice(voice)}
-                            className="flex-1 text-left"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="font-bold text-sm text-white">{voice.name}</div>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">
-                                {voice.category}
-                              </span>
-                            </div>
-                            {voice.labels && (
-                              <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-1">
-                                {voice.labels.gender && <span>{voice.labels.gender}</span>}
-                                {voice.labels.accent && <span>• {voice.labels.accent}</span>}
-                                {voice.labels.age && <span>• {voice.labels.age}</span>}
-                              </div>
-                            )}
-                            <div className="text-[10px] text-slate-600 mt-1 font-mono">{voice.voice_id}</div>
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-
-                {/* 직접 입력 옵션 */}
-                <div className="mt-2">
-                  <input
-                    type="text"
-                    value={elVoiceId}
-                    onChange={(e) => setElVoiceId(e.target.value)}
-                    placeholder="또는 Voice ID 직접 입력..."
-                    className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Model Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-2">TTS 모델</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {ELEVENLABS_MODELS.map((model) => (
-                    <button
-                      key={model.id}
-                      type="button"
-                      onClick={() => setElModelId(model.id)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        elModelId === model.id
-                          ? 'bg-purple-600/20 border-purple-500 text-white'
-                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm">{model.name}</span>
-                        {model.supportsTimestamp ? (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">자막</span>
-                        ) : (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">자막X</span>
-                        )}
-                      </div>
-                      <div className="text-xs opacity-70 mt-1">{model.description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <button
-                type="button"
-                onClick={saveElevenLabsSettings}
-                className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
-              >
-                설정 저장
-              </button>
             </div>
           )}
         </div>
@@ -846,6 +1465,44 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
           <div className="flex flex-col gap-4">
             <div className="bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden">
               <textarea value={manualScript} onChange={(e) => setManualScript(e.target.value)} placeholder="직접 작성한 대본을 입력하세요. AI가 시각적 연출안을 생성합니다." className="w-full h-80 bg-transparent text-slate-100 p-8 focus:ring-0 focus:outline-none placeholder-slate-600 resize-none" disabled={isProcessing} />
+
+              {/* 글자 수 카운터 및 청크 분할 안내 */}
+              <div className="px-8 pb-4 flex items-center justify-between border-t border-slate-800 pt-3">
+                <div className="flex items-center gap-3">
+                  {/* 글자 수 표시 */}
+                  <span className={`text-xs font-mono ${
+                    manualScript.length > 10000 ? 'text-amber-400' :
+                    manualScript.length > 3000 ? 'text-blue-400' :
+                    'text-slate-500'
+                  }`}>
+                    {manualScript.length.toLocaleString()}자
+                  </span>
+
+                  {/* 예상 씬 개수 (100자당 약 1씬) */}
+                  {manualScript.length > 100 && (
+                    <span className="text-[10px] text-slate-600">
+                      (예상 씬: ~{Math.max(5, Math.ceil(manualScript.length / 100))}개)
+                    </span>
+                  )}
+                </div>
+
+                {/* 청크 분할 안내 */}
+                <div className="text-[10px]">
+                  {manualScript.length > 10000 ? (
+                    <span className="text-amber-400 font-medium">
+                      ⚡ 대용량 모드: 자동 청크 분할 (최대 15,000자)
+                    </span>
+                  ) : manualScript.length > 3000 ? (
+                    <span className="text-blue-400 font-medium">
+                      📦 청크 분할 처리됨 (3,000자+)
+                    </span>
+                  ) : (
+                    <span className="text-slate-600">
+                      일반 처리 (~3,000자)
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <button type="submit" disabled={isProcessing || !manualScript.trim()} className="w-full bg-slate-100 hover:bg-white text-slate-950 font-black py-5 rounded-2xl transition-all disabled:opacity-50 uppercase tracking-widest text-sm">스토리보드 생성</button>
           </div>

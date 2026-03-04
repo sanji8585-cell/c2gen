@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { SavedProject } from '../types';
 import { formatKRW } from '../config';
+import { getProjectById } from '../services/projectService';
 
 interface ProjectGalleryProps {
   projects: SavedProject[];
@@ -9,6 +10,7 @@ interface ProjectGalleryProps {
   onDelete: (id: string) => void;
   onRefresh: () => void;
   onLoad: (project: SavedProject) => void;
+  onImport?: (project: SavedProject) => void;
 }
 
 const ProjectGallery: React.FC<ProjectGalleryProps> = ({
@@ -16,10 +18,56 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   onBack,
   onDelete,
   onRefresh,
-  onLoad
+  onLoad,
+  onImport,
 }) => {
   const [selectedProject, setSelectedProject] = useState<SavedProject | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // 프로젝트 상세 보기 (클라우드에서 전체 데이터 로드)
+  const handleSelectProject = async (project: SavedProject) => {
+    setDetailLoading(true);
+    try {
+      const full = await getProjectById(project.id);
+      setSelectedProject(full || project);
+    } catch {
+      setSelectedProject(project);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleExportProject = (project: SavedProject) => {
+    const json = JSON.stringify(project, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name.replace(/[\/\\:*?"<>|]/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError(null);
+    try {
+      const text = await file.text();
+      const project = JSON.parse(text) as SavedProject;
+      // 최소한의 유효성 검사
+      if (!project.id || !project.name || !Array.isArray(project.assets)) {
+        throw new Error('올바른 프로젝트 파일이 아닙니다');
+      }
+      await onImport?.(project);
+      onRefresh();
+    } catch (e: any) {
+      setImportError(e.message || '가져오기 실패');
+    }
+    e.target.value = '';
+  };
 
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -45,6 +93,18 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
       setTimeout(() => setConfirmDelete(null), 3000);
     }
   };
+
+  // 로딩 중
+  if (detailLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8 text-center">
+        <div className="inline-flex items-center gap-3 px-6 py-4 bg-slate-900 rounded-2xl border border-slate-800">
+          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent animate-spin rounded-full"></div>
+          <span className="text-slate-300 font-medium">프로젝트 불러오는 중...</span>
+        </div>
+      </div>
+    );
+  }
 
   // 프로젝트 상세 보기
   if (selectedProject) {
@@ -82,15 +142,15 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <span className="text-slate-400">{formatDate(selectedProject.createdAt)}</span>
             <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
-              {selectedProject.settings.imageModel?.includes('flux') ? 'Flux' : 'Gemini'}
+              {selectedProject.settings?.imageModel?.includes('flux') ? 'Flux' : 'Gemini'}
             </span>
-            {selectedProject.settings.imageModel?.includes('flux') && (
+            {selectedProject.settings?.imageModel?.includes('flux') && (
               <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
-                {selectedProject.settings.fluxStyle}
+                {(selectedProject.settings as any)?.fluxStyle}
               </span>
             )}
             <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
-              {selectedProject.settings.elevenLabsModel}
+              {selectedProject.settings?.elevenLabsModel}
             </span>
             <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full">
               {assets.filter(a => a.imageData).length}/{assets.length} 이미지
@@ -204,10 +264,26 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
         <h2 className="text-xl font-bold text-white">저장된 프로젝트</h2>
 
-        <span className="text-sm text-slate-400">
-          {projects.length}개 프로젝트
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-400">{projects.length}개 프로젝트</span>
+          {/* JSON 가져오기 버튼 */}
+          <label className="flex items-center gap-2 px-3 py-2 bg-blue-800/50 hover:bg-blue-700/50 border border-blue-700/50 text-blue-300 text-xs font-bold rounded-lg cursor-pointer transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            JSON 가져오기
+            <input type="file" accept=".json,application/json" className="hidden" onChange={handleImportFile} />
+          </label>
+        </div>
       </div>
+
+      {/* 가져오기 오류 */}
+      {importError && (
+        <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-500/50 rounded-xl text-red-400 text-sm flex items-center justify-between">
+          <span>⚠️ {importError}</span>
+          <button onClick={() => setImportError(null)} className="text-red-500 hover:text-red-300 ml-4">✕</button>
+        </div>
+      )}
 
       {/* 프로젝트 목록 */}
       {projects.length === 0 ? (
@@ -228,7 +304,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               {/* 썸네일 */}
               <div
                 className="h-40 bg-slate-800 cursor-pointer relative overflow-hidden"
-                onClick={() => setSelectedProject(project)}
+                onClick={() => handleSelectProject(project)}
               >
                 {project.thumbnail ? (
                   <img
@@ -252,7 +328,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               <div className="p-4">
                 <h3
                   className="font-bold text-white mb-2 truncate cursor-pointer hover:text-brand-400 transition-colors"
-                  onClick={() => setSelectedProject(project)}
+                  onClick={() => handleSelectProject(project)}
                   title={project.name}
                 >
                   {project.name}
@@ -266,7 +342,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 {/* 모델 정보 */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {/* 이미지 모델 */}
-                  {project.settings.imageModel?.includes('flux') ? (
+                  {project.settings?.imageModel?.includes('flux') ? (
                     <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] font-bold rounded">
                       Flux
                     </span>
@@ -277,15 +353,15 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                   )}
 
                   {/* Flux 화풍 (Flux일 때만) */}
-                  {project.settings.imageModel?.includes('flux') && project.settings.fluxStyle && (
+                  {project.settings?.imageModel?.includes('flux') && (project.settings as any)?.fluxStyle && (
                     <span className="px-2 py-0.5 bg-slate-700 text-slate-300 text-[10px] rounded">
-                      {project.settings.fluxStyle === 'custom' ? '커스텀' : project.settings.fluxStyle}
+                      {(project.settings as any)?.fluxStyle === 'custom' ? '커스텀' : (project.settings as any)?.fluxStyle}
                     </span>
                   )}
 
                   {/* 씬 수 */}
                   <span className="px-2 py-0.5 bg-slate-800 text-slate-400 text-[10px] rounded">
-                    {(project.assets?.length || 0)}씬
+                    {(project.sceneCount || project.assets?.length || 0)}씬
                   </span>
 
                   {/* 비용 (있는 경우만) */}
@@ -305,6 +381,20 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                     className="flex-1 px-3 py-2 bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 text-xs font-bold rounded transition-colors"
                   >
                     불러오기
+                  </button>
+
+                  {/* JSON 내보내기 */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExportProject(project);
+                    }}
+                    className="p-2 rounded transition-colors bg-slate-800 text-slate-400 hover:bg-blue-900/50 hover:text-blue-400"
+                    title="JSON으로 내보내기 (다른 기기 이전용)"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
                   </button>
 
                   <button

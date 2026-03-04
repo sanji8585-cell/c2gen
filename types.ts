@@ -1,4 +1,20 @@
 
+// 참조 이미지 타입 (캐릭터/스타일 분리 + 강도 조절)
+export interface ReferenceImages {
+  character: string[];      // 캐릭터 참조 이미지 (최대 2장) - 캐릭터 외모/스타일 참조
+  style: string[];          // 스타일 참조 이미지 (최대 2장) - 화풍/분위기 참조
+  characterStrength: number; // 캐릭터 참조 강도 (0~100, 기본 70)
+  styleStrength: number;     // 스타일 참조 강도 (0~100, 기본 70)
+}
+
+// 기본 참조 이미지 설정
+export const DEFAULT_REFERENCE_IMAGES: ReferenceImages = {
+  character: [],
+  style: [],
+  characterStrength: 70,
+  styleStrength: 70
+};
+
 export interface SceneAnalysis {
   composition_type: 'MICRO' | 'STANDARD' | 'MACRO';
   composition_explanation: string; // 구도_설명
@@ -34,6 +50,7 @@ export interface SceneAnalysis {
   differentiation_point: string; // 차별화포인트
   motion_type: '정적' | '동적';
   motion_detail: string; // 동작디테일
+  sentiment?: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'; // 감정 (선택적)
 }
 
 export interface ScriptScene {
@@ -66,12 +83,13 @@ export interface SubtitleData {
 // 자막 설정 옵션
 export interface SubtitleConfig {
   wordsPerLine: number;      // 한 줄당 단어 수 (기본: 5)
-  maxLines: number;          // 최대 줄 수 (기본: 2)
-  fontSize: number;          // 폰트 크기 (기본: 32)
+  maxLines: number;          // 최대 줄 수 (기본: 1)
+  fontSize: number;          // 폰트 크기 (기본: 40)
   fontFamily: string;        // 폰트 (기본: Noto Sans KR)
-  bottomMargin: number;      // 하단 여백 (기본: 60)
+  bottomMargin: number;      // 하단/상단 여백 (기본: 80)
   backgroundColor: string;   // 배경색 (기본: rgba(0,0,0,0.75))
   textColor: string;         // 텍스트 색상 (기본: #FFFFFF)
+  position: 'top' | 'center' | 'bottom'; // 자막 위치 (기본: bottom)
 }
 
 // 기본 자막 설정
@@ -82,17 +100,24 @@ export const DEFAULT_SUBTITLE_CONFIG: SubtitleConfig = {
   fontFamily: '"Noto Sans KR", "Malgun Gothic", sans-serif',
   bottomMargin: 80,
   backgroundColor: 'rgba(0, 0, 0, 0.75)',
-  textColor: '#FFFFFF'
+  textColor: '#FFFFFF',
+  position: 'bottom'
 };
 
 export interface GeneratedAsset extends ScriptScene {
   imageData: string | null;
   audioData: string | null;
+  imageUrl?: string | null;      // Supabase Storage URL (저장용)
+  audioUrl?: string | null;      // Supabase Storage URL (저장용)
   audioDuration: number | null;  // 실제 오디오 길이 (초) - SRT 싱크용
   subtitleData: SubtitleData | null;  // 자막 타임스탬프 데이터
   videoData: string | null;      // 애니메이션 영상 URL (앞 N개 씬만)
   videoDuration: number | null;  // 영상 길이 (초) - 보통 4~5초 고정
   status: 'pending' | 'generating' | 'completed' | 'error';
+  errorMessage?: string;         // 생성 실패 시 오류 메시지 (정책 위반, API 오류 등)
+  customDuration?: number;       // 사용자 지정 재생 시간 (초) - 없으면 오디오 길이 사용
+  zoomEffect?: 'zoomIn' | 'zoomOut' | 'panLeft' | 'panRight' | 'none'; // 씬별 줌/팬 효과 (기본: zoomIn)
+  transition?: 'crossfade' | 'fadeBlack' | 'wipeLeft' | 'wipeRight' | 'none'; // 씬 전환 효과 (이 씬→다음 씬, 기본: none)
 }
 
 export enum GenerationStep {
@@ -123,9 +148,6 @@ export interface ProjectSettings {
 
   // 이미지 모델 설정
   imageModel: string;
-  fluxStyle: string;
-  fluxCustomStyle: string;
-  fluxCharacter: string;
 
   // TTS 설정
   elevenLabsVoiceId: string;
@@ -142,8 +164,6 @@ export interface SavedProject {
   // 설정
   settings: {
     imageModel: string;
-    fluxStyle: string;
-    fluxCharacter: string;
     elevenLabsModel: string;
   };
 
@@ -155,4 +175,10 @@ export interface SavedProject {
 
   // 비용 정보 (선택적 - 이전 버전 호환)
   cost?: CostBreakdown;
+
+  // 클라우드 저장 시 씬 수 (갤러리 목록용 - assets 없이도 씬 수 표시)
+  sceneCount?: number;
+
+  // Storage 버전 (2 = Supabase Storage, 없으면 레거시 base64)
+  storageVersion?: number;
 }

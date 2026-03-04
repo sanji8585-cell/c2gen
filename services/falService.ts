@@ -1,184 +1,118 @@
 
 /**
  * fal.ai API 서비스
- * - Flux.1 Schnell 이미지 생성 (~$0.003/이미지)
- * - PixVerse v5.5 이미지→영상 변환 (~$0.15/영상)
+ * 서버 프록시(/api/fal, /api/fal-poll)를 통해 API 호출
  */
 
 import { CONFIG } from '../config';
 
-interface PixVerseVideoResponse {
-  video: {
-    url: string;
-  };
-  seed?: number;
-}
-
 /**
- * FAL API 키 가져오기 (환경변수 우선)
+ * FAL API 키 가져오기 (localStorage, 커스텀 키용)
  */
 export function getFalApiKey(): string | null {
-  return process.env.FAL_API_KEY || localStorage.getItem(CONFIG.STORAGE_KEYS.FAL_API_KEY);
+  return localStorage.getItem(CONFIG.STORAGE_KEYS.FAL_API_KEY) || null;
 }
 
 /**
- * FAL API 키 저장 (localStorage에 백업)
+ * FAL API 키 저장
  */
 export function setFalApiKey(key: string): void {
   localStorage.setItem(CONFIG.STORAGE_KEYS.FAL_API_KEY, key);
 }
 
-/**
- * Flux.1 Schnell 이미지 생성
- * - 초고속 이미지 생성 (~1-2초)
- * - 가격: ~$0.003/이미지
- * - 참조 이미지 미지원 → imageService에서 스타일 프롬프트로 대체
- *
- * @param prompt - 이미지 생성 프롬프트 (영어, 스타일 설명 포함)
- * @param apiKey - FAL API 키 (선택)
- * @returns base64 인코딩된 이미지 또는 null
- */
-export async function generateImageWithFlux(
-  prompt: string,
-  apiKey?: string
-): Promise<string | null> {
-  const key = apiKey || getFalApiKey();
+/** 프록시 헤더 빌드 */
+function buildFalHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const customKey = getFalApiKey();
+  if (customKey) headers['x-custom-api-key'] = customKey;
+  const sessionToken = localStorage.getItem('c2gen_session_token');
+  if (sessionToken) headers['x-session-token'] = sessionToken;
+  return headers;
+}
 
-  if (!key) {
-    console.warn('[FAL] API 키가 설정되지 않았습니다.');
-    return null;
+/** /api/fal 프록시 호출 */
+async function callFalProxy(action: string, params: Record<string, any>): Promise<any> {
+  const res = await fetch('/api/fal', {
+    method: 'POST',
+    headers: buildFalHeaders(),
+    body: JSON.stringify({ action, ...params }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(errBody.error || `FAL API error: ${res.status}`);
   }
-
-  try {
-    console.log(`[Flux.1 Schnell] 이미지 생성 시작: "${prompt.slice(0, 50)}..."`);
-
-    const response = await fetch('https://fal.run/fal-ai/flux/schnell', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Key ${key}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        image_size: {
-          width: 1280,
-          height: 720
-        },
-        num_inference_steps: 4,  // Schnell은 4 스텝
-        num_images: 1,
-        enable_safety_checker: false
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Flux.1 Schnell] API 오류 (${response.status}):`, errorText);
-      throw new Error(`Flux API 오류: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.images && result.images.length > 0) {
-      const imageUrl = result.images[0].url;
-      console.log(`[Flux.1 Schnell] 이미지 생성 완료`);
-
-      // URL에서 base64로 변환
-      const imageResponse = await fetch(imageUrl);
-      const blob = await imageResponse.blob();
-
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      });
-    }
-
-    return null;
-  } catch (error: any) {
-    console.error('[Flux.1 Schnell] 이미지 생성 실패:', error.message);
-    return null;
-  }
+  return res.json();
 }
 
 /**
- * base64 이미지를 URL로 변환 (fal.ai는 URL 필요)
- * 임시로 data URL 사용 - fal.ai가 지원하는지 확인 필요
- */
-function base64ToDataUrl(base64: string, mimeType: string = 'image/png'): string {
-  return `data:${mimeType};base64,${base64}`;
-}
-
-/**
- * 이미지를 영상으로 변환 (LTX Video v0.9.5)
- *
- * @param imageBase64 - base64 인코딩된 이미지
- * @param motionPrompt - 움직임을 설명하는 프롬프트
- * @param apiKey - FAL API 키 (선택, 없으면 로컬스토리지에서 가져옴)
- * @returns 생성된 영상 URL 또는 null
+ * 이미지를 영상으로 변환 (PixVerse v5.5)
+ * submit → poll 패턴 (서버 타임아웃 회피)
  */
 export async function generateVideoFromImage(
   imageBase64: string,
   motionPrompt: string,
-  apiKey?: string
+  _apiKey?: string
 ): Promise<string | null> {
-  const key = apiKey || getFalApiKey();
-
-  if (!key) {
-    console.warn('[FAL] API 키가 설정되지 않았습니다.');
-    return null;
-  }
-
   try {
-    // base64를 Blob으로 변환 후 fal.ai에 업로드
-    const imageUrl = await uploadImageToFal(imageBase64, key);
-
+    // Step 1: 이미지 업로드
+    console.log('[FAL] 이미지 업로드 중...');
+    const uploadResult = await callFalProxy('uploadImage', { imageBase64 });
+    const imageUrl = uploadResult.url;
     if (!imageUrl) {
       console.error('[FAL] 이미지 업로드 실패');
       return null;
     }
 
-    console.log(`[FAL] PixVerse v5.5 영상 생성 시작: "${motionPrompt.slice(0, 50)}..."`);
-
-    console.log('[FAL] API 요청 시작...');
-    console.log('[FAL] 이미지 URL:', imageUrl?.slice(0, 100) + '...');
-
-    const requestBody = {
-      prompt: motionPrompt,
-      image_url: imageUrl,
-      duration: 5,              // 5초 영상
-      aspect_ratio: '16:9',
-      resolution: '720p',       // 720p 품질
-      negative_prompt: 'blurry, low quality, low resolution, pixelated, noisy, grainy, distorted, static'
-    };
-
-    console.log('[FAL] 요청 바디:', JSON.stringify(requestBody).slice(0, 200) + '...');
-
-    const response = await fetch('https://fal.run/fal-ai/pixverse/v5.5/image-to-video', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Key ${key}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
+    // Step 2: 비디오 생성 제출 (비동기 큐)
+    console.log('[FAL] PixVerse v5.5 영상 생성 제출...');
+    const submitResult = await callFalProxy('submitVideo', {
+      imageUrl,
+      motionPrompt,
+      duration: 5,
+      aspectRatio: '16:9',
+      resolution: '720p',
     });
 
-    console.log('[FAL] 응답 상태:', response.status, response.statusText);
+    const requestId = submitResult.requestId;
+    if (!requestId) {
+      console.error('[FAL] 비디오 제출 실패');
+      return null;
+    }
+    console.log('[FAL] 요청 ID:', requestId);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[FAL] API 오류 (${response.status}):`, errorText);
-      throw new Error(`FAL API 오류: ${response.status} - ${errorText.slice(0, 200)}`);
+    // Step 3: 완료까지 폴링
+    const POLL_INTERVAL = 4000;
+    const MAX_POLLS = 45; // 최대 3분
+
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL));
+
+      const pollRes = await fetch(`/api/fal-poll?requestId=${encodeURIComponent(requestId)}`, {
+        headers: buildFalHeaders(),
+      });
+
+      if (!pollRes.ok) {
+        console.warn('[FAL] 폴링 실패:', pollRes.status);
+        continue;
+      }
+
+      const statusData = await pollRes.json();
+      console.log(`[FAL] 폴링 ${i + 1}/${MAX_POLLS}: ${statusData.status}`);
+
+      if (statusData.status === 'COMPLETED' && statusData.result?.video?.url) {
+        console.log('[FAL] 영상 생성 완료:', statusData.result.video.url);
+        return statusData.result.video.url;
+      }
+
+      if (statusData.status === 'FAILED') {
+        console.error('[FAL] 영상 생성 실패');
+        return null;
+      }
     }
 
-    const result: PixVerseVideoResponse = await response.json();
-    console.log(`[FAL] 영상 생성 완료: ${result.video.url}`);
-
-    return result.video.url;
-
+    console.error('[FAL] 타임아웃 (3분 초과)');
+    return null;
   } catch (error: any) {
     console.error('[FAL] 영상 생성 실패:', error.message);
     return null;
@@ -186,60 +120,16 @@ export async function generateVideoFromImage(
 }
 
 /**
- * base64 이미지를 fal.ai 스토리지에 업로드
- */
-async function uploadImageToFal(imageBase64: string, apiKey: string): Promise<string | null> {
-  try {
-    // base64를 Blob으로 변환
-    const binaryString = atob(imageBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: 'image/png' });
-
-    // fal.ai 파일 업로드 엔드포인트
-    const formData = new FormData();
-    formData.append('file', blob, 'image.png');
-
-    const uploadResponse = await fetch('https://fal.run/fal-ai/storage/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Key ${apiKey}`
-      },
-      body: formData
-    });
-
-    if (!uploadResponse.ok) {
-      // 업로드 실패 시 data URL 폴백 시도
-      console.warn('[FAL] 파일 업로드 실패, data URL 사용 시도');
-      return base64ToDataUrl(imageBase64);
-    }
-
-    const uploadResult = await uploadResponse.json();
-    return uploadResult.url;
-
-  } catch (error) {
-    console.warn('[FAL] 이미지 업로드 실패, data URL 사용');
-    return base64ToDataUrl(imageBase64);
-  }
-}
-
-/**
- * 영상 URL에서 base64 데이터로 변환 (로컬 저장용)
+ * 영상 URL → base64 (로컬 저장용)
  */
 export async function fetchVideoAsBase64(videoUrl: string): Promise<string | null> {
   try {
     const response = await fetch(videoUrl);
     if (!response.ok) return null;
-
     const blob = await response.blob();
     return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        resolve(base64);
-      };
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
@@ -249,31 +139,19 @@ export async function fetchVideoAsBase64(videoUrl: string): Promise<string | nul
 }
 
 /**
- * 여러 이미지를 순차적으로 영상 변환 (rate limit 고려)
+ * 여러 이미지 순차 영상 변환
  */
 export async function batchGenerateVideos(
   assets: Array<{ imageData: string; visualPrompt: string }>,
-  apiKey?: string,
+  _apiKey?: string,
   onProgress?: (index: number, total: number) => void
 ): Promise<(string | null)[]> {
   const results: (string | null)[] = [];
-  const key = apiKey || getFalApiKey();
-
   for (let i = 0; i < assets.length; i++) {
     onProgress?.(i + 1, assets.length);
-
-    const videoUrl = await generateVideoFromImage(
-      assets[i].imageData,
-      assets[i].visualPrompt,
-      key
-    );
+    const videoUrl = await generateVideoFromImage(assets[i].imageData, assets[i].visualPrompt);
     results.push(videoUrl);
-
-    // API rate limit 방지 (1초 대기)
-    if (i < assets.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    if (i < assets.length - 1) await new Promise(r => setTimeout(r, 1000));
   }
-
   return results;
 }

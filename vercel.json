@@ -11,6 +11,7 @@
     "api/elevenlabs.ts": { "maxDuration": 30 },
     "api/fal.ts": { "maxDuration": 30 },
     "api/fal-poll.ts": { "maxDuration": 10 },
-    "api/auth.ts": { "maxDuration": 10 }
+    "api/auth.ts": { "maxDuration": 10 },
+    "api/projects.ts": { "maxDuration": 15 }
   }
 }

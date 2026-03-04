@@ -1,6 +1,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import AuthGate from './components/AuthGate';
+import AdminDashboard from './components/admin/AdminDashboard';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultTable from './components/ResultTable';
@@ -11,7 +12,8 @@ import { generateImage, getSelectedImageModel } from './services/imageService';
 import { generateAudioWithElevenLabs } from './services/elevenLabsService';
 import { generateVideo } from './services/videoService';
 import { generateVideoFromImage } from './services/falService';
-import { saveProject, getSavedProjects, deleteProject, importProject, migrateFromLocalStorage } from './services/projectService';
+import { saveProject, getSavedProjects, getProjectById, deleteProject, importProject } from './services/projectService';
+
 import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW } from './config';
 import ProjectGallery from './components/ProjectGallery';
@@ -55,10 +57,23 @@ type ViewMode = 'main' | 'gallery';
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminToken, setAdminToken] = useState<string | null>(null);
 
   const handleAuthSuccess = useCallback((name: string) => {
     setIsAuthenticated(true);
     setUserName(name);
+  }, []);
+
+  const handleAdminSuccess = useCallback((token: string) => {
+    setIsAdmin(true);
+    setAdminToken(token);
+  }, []);
+
+  const handleAdminLogout = useCallback(() => {
+    setIsAdmin(false);
+    setAdminToken(null);
+    localStorage.removeItem('c2gen_admin_token');
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -78,8 +93,13 @@ const App: React.FC = () => {
     setUserName(null);
   }, []);
 
+  // 관리자 대시보드
+  if (isAdmin && adminToken) {
+    return <AdminDashboard adminToken={adminToken} onLogout={handleAdminLogout} />;
+  }
+
   if (!isAuthenticated) {
-    return <AuthGate onSuccess={handleAuthSuccess} />;
+    return <AuthGate onSuccess={handleAuthSuccess} onAdminSuccess={handleAdminSuccess} />;
   }
 
   return <AppContent userName={userName} onLogout={handleLogout} />;
@@ -136,9 +156,8 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
 
   useEffect(() => {
     checkApiKeyStatus();
-    // localStorage → IndexedDB 마이그레이션 및 프로젝트 로드
+    // 클라우드에서 프로젝트 목록 로드
     (async () => {
-      await migrateFromLocalStorage(); // 기존 데이터 이전
       const projects = await getSavedProjects();
       setSavedProjects(projects);
     })();
@@ -270,6 +289,9 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
       let targetTopic = topic;
 
       if (topic === "Manual Script Input" && sourceText) {
+        // 수동 대본: 대본 첫 줄/첫 부분을 프로젝트명으로 사용
+        const firstLine = sourceText.split('\n').find(l => l.trim().length > 0)?.trim() || '수동 대본';
+        targetTopic = firstLine.slice(0, 50);
         setProgressMessage('대본 분석 및 시각화 설계 중...');
       } else if (sourceText) {
         setProgressMessage('외부 콘텐츠 분석 중...');
@@ -314,26 +336,23 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
       setStep(GenerationStep.ASSETS);
 
       const runAudio = async () => {
-          const TTS_DELAY = 1500; // ElevenLabs API Rate Limit 대응: 1.5초 딜레이
-          const MAX_TTS_RETRIES = 2; // 최대 재시도 횟수
+          const TTS_CONCURRENCY = 5; // 동시 TTS 생성 수 (ElevenLabs Pro)
+          const MAX_TTS_RETRIES = 2;
+          let completedCount = 0;
 
-          for (let i = 0; i < initialAssets.length; i++) {
-              if (isAbortedRef.current) break;
-
-              setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 음성 생성 중...`);
+          const generateSingleAudio = async (i: number) => {
+              if (isAbortedRef.current) return;
               let success = false;
 
-              // 재시도 로직
               for (let attempt = 0; attempt <= MAX_TTS_RETRIES && !success; attempt++) {
                   if (isAbortedRef.current) break;
 
                   try {
                       if (attempt > 0) {
                           console.log(`[TTS] 씬 ${i + 1} 재시도 중... (${attempt}/${MAX_TTS_RETRIES})`);
-                          await wait(3000); // 재시도 시 3초 대기
+                          await wait(3000);
                       }
 
-                      // ElevenLabs에서 오디오 + 자막 타임스탬프 동시 획득
                       const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
                       const elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
                       const elResult = await generateAudioWithElevenLabs(
@@ -344,45 +363,47 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
                       if (isAbortedRef.current) break;
 
                       if (elResult.audioData) {
-                        // ElevenLabs 성공: 오디오 + 자막 + 길이 데이터 저장
                         updateAssetAt(i, {
                           audioData: elResult.audioData,
                           subtitleData: elResult.subtitleData,
                           audioDuration: elResult.estimatedDuration
                         });
-                        // TTS 비용 추가
                         const charCount = assetsRef.current[i].narration.length;
                         addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
                         success = true;
-                        console.log(`[TTS] 씬 ${i + 1} 음성 생성 완료`);
+                        completedCount++;
+                        console.log(`[TTS] 씬 ${i + 1} 음성 생성 완료 (${completedCount}/${initialAssets.length})`);
                       } else {
                         throw new Error('ElevenLabs 응답 없음');
                       }
                   } catch (e: any) {
                       console.error(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, e.message);
-
-                      // Rate Limit 에러인 경우 더 긴 대기
                       if (e.message?.includes('429') || e.message?.includes('rate')) {
-                          await wait(5000); // 5초 대기 후 재시도
+                          await wait(5000);
                       }
                   }
               }
 
-              // 모든 재시도 실패 시 Gemini 폴백
               if (!success && !isAbortedRef.current) {
                   try {
                       console.log(`[TTS] 씬 ${i + 1} Gemini 폴백 시도...`);
                       const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
                       updateAssetAt(i, { audioData: fallbackAudio });
+                      completedCount++;
                   } catch (fallbackError) {
                       console.error(`[TTS] 씬 ${i + 1} Gemini 폴백도 실패:`, fallbackError);
                   }
               }
+          };
 
-              // 다음 씬 전에 딜레이 (Rate Limit 방지)
-              if (i < initialAssets.length - 1 && !isAbortedRef.current) {
-                  await wait(TTS_DELAY);
-              }
+          // 동시성 풀: TTS_CONCURRENCY개씩 병렬 처리
+          const indices = initialAssets.map((_, i) => i);
+          for (let start = 0; start < indices.length; start += TTS_CONCURRENCY) {
+              if (isAbortedRef.current) break;
+              const batch = indices.slice(start, start + TTS_CONCURRENCY);
+              const batchEnd = Math.min(start + TTS_CONCURRENCY, indices.length);
+              setProgressMessage(`음성 생성 중... (${start + 1}~${batchEnd}/${indices.length})`);
+              await Promise.all(batch.map(i => generateSingleAudio(i)));
           }
       };
 
@@ -463,11 +484,13 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
 
       // 자동 저장 (비용 정보 포함)
       try {
+        console.log(`[App] 프로젝트 저장 시도: topic="${targetTopic}", assets=${assetsRef.current.length}개`);
         const savedProject = await saveProject(targetTopic, assetsRef.current, undefined, costRef.current);
         refreshProjects();
         setProgressMessage(`"${savedProject.name}" 저장됨 | ${costMsg}`);
-      } catch (e) {
+      } catch (e: any) {
         console.error('프로젝트 자동 저장 실패:', e);
+        setProgressMessage(`생성 완료! (저장 실패: ${e.message}) | ${costMsg}`);
       }
 
     } catch (error: any) {
@@ -805,15 +828,29 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
     await refreshProjects();
   };
 
-  // 프로젝트 불러오기 핸들러
-  const handleLoadProject = (project: SavedProject) => {
-    // 저장된 에셋을 현재 상태로 로드
-    assetsRef.current = project.assets;
-    setGeneratedData([...project.assets]);
-    setCurrentTopic(project.topic);
+  // 프로젝트 불러오기 핸들러 (클라우드에서 전체 데이터 로드)
+  const handleLoadProject = async (project: SavedProject) => {
+    setProgressMessage(`"${project.name}" 불러오는 중...`);
+
+    // 목록에서는 assets가 비어있으므로 전체 데이터 조회
+    const fullProject = await getProjectById(project.id);
+    if (!fullProject) {
+      setProgressMessage(`"${project.name}" 불러오기 실패`);
+      return;
+    }
+
+    assetsRef.current = fullProject.assets;
+    setGeneratedData([...fullProject.assets]);
+    setCurrentTopic(fullProject.topic);
     setStep(GenerationStep.COMPLETED);
-    setProgressMessage(`"${project.name}" 프로젝트 불러옴`);
-    setViewMode('main'); // 메인 뷰로 전환
+
+    const hasAudio = fullProject.assets.some(a => a.audioData);
+    if (!hasAudio) {
+      setProgressMessage(`"${project.name}" 불러옴 (클라우드 저장본 - TTS 재생성 필요)`);
+    } else {
+      setProgressMessage(`"${project.name}" 프로젝트 불러옴`);
+    }
+    setViewMode('main');
   };
 
   return (

@@ -1,5 +1,6 @@
 
 import { GeneratedAsset, SubtitleData, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
+import { getVideoOrientation, VIDEO_DIMENSIONS } from '../config';
 
 /**
  * 고정밀 오디오 디코딩: ElevenLabs(MP3)와 Gemini(PCM) 통합 처리
@@ -32,12 +33,18 @@ interface SubtitleChunk {
   endTime: number;    // 끝 시간
 }
 
+type ZoomEffect = 'zoomIn' | 'zoomOut' | 'panLeft' | 'panRight' | 'none';
+
+type TransitionType = 'crossfade' | 'fadeBlack' | 'wipeLeft' | 'wipeRight' | 'none';
+
 interface PreparedScene {
   img: HTMLImageElement;
   video: HTMLVideoElement | null;  // 애니메이션 영상 (있으면 이미지 대신 사용)
   isAnimated: boolean;             // 애니메이션 씬 여부
   audioBuffer: AudioBuffer | null;
   subtitleChunks: SubtitleChunk[];  // 미리 계산된 자막 청크들
+  zoomEffect: ZoomEffect;          // 줌/팬 효과
+  transition: TransitionType;      // 이 씬→다음 씬 전환 효과
   startTime: number;
   endTime: number;
   duration: number;
@@ -178,11 +185,18 @@ function renderSubtitle(
   }
 
   const boxX = Math.max(safeMargin, (canvas.width - boxWidth) / 2);
-  let boxY = canvas.height - config.bottomMargin - boxHeight;
 
-  // 상단 경계 체크
-  if (boxY < safeMargin) {
-    boxY = safeMargin;
+  // position에 따른 Y 좌표 계산
+  const position = config.position ?? 'bottom';
+  let boxY: number;
+  if (position === 'top') {
+    boxY = config.bottomMargin;
+  } else if (position === 'center') {
+    boxY = Math.max(safeMargin, (canvas.height - boxHeight) / 2);
+  } else {
+    // bottom (기본)
+    boxY = canvas.height - config.bottomMargin - boxHeight;
+    if (boxY < safeMargin) boxY = safeMargin;
   }
 
   // 반투명 배경 박스
@@ -206,9 +220,152 @@ function renderSubtitle(
   });
 }
 
+/**
+ * 줌/팬 효과 좌표 계산 (모듈 레벨 - 재사용 가능)
+ */
+function calcZoomPan(
+  canvasW: number, canvasH: number,
+  srcW: number, srcH: number,
+  effect: ZoomEffect, progress: number, intensity: number
+): { x: number; y: number; w: number; h: number } {
+  const baseRatio = Math.max(canvasW / srcW, canvasH / srcH); // cover fit
+  let scale: number;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  switch (effect) {
+    case 'zoomOut':
+      scale = (1.0 + intensity) - intensity * progress;
+      break;
+    case 'panLeft':
+      scale = 1.0 + intensity * 0.3;
+      offsetX = intensity * srcW * baseRatio * 0.05 * (1 - 2 * progress);
+      break;
+    case 'panRight':
+      scale = 1.0 + intensity * 0.3;
+      offsetX = intensity * srcW * baseRatio * 0.05 * (2 * progress - 1);
+      break;
+    case 'none':
+      scale = 1.0;
+      break;
+    case 'zoomIn':
+    default:
+      scale = 1.0 + intensity * progress;
+      break;
+  }
+
+  const nw = srcW * baseRatio * scale;
+  const nh = srcH * baseRatio * scale;
+  return { x: (canvasW - nw) / 2 + offsetX, y: (canvasH - nh) / 2 + offsetY, w: nw, h: nh };
+}
+
+/**
+ * 씬 이미지/비디오를 캔버스에 그리는 헬퍼
+ * - 항상 무언가를 그려서 검은 프레임 방지
+ */
+function drawSceneFrame(
+  ctx: CanvasRenderingContext2D,
+  canvasW: number, canvasH: number,
+  scene: PreparedScene, sceneProgress: number
+) {
+  let rendered = false;
+
+  // 1순위: 애니메이션 영상
+  if (scene.isAnimated && scene.video && scene.video.readyState >= 2) {
+    const v = scene.video;
+    if (v.videoWidth > 0 && v.videoHeight > 0) {
+      const { x, y, w, h } = calcZoomPan(canvasW, canvasH, v.videoWidth, v.videoHeight, scene.zoomEffect, sceneProgress, 0.05);
+      ctx.drawImage(v, x, y, w, h);
+      rendered = true;
+    }
+  }
+
+  // 2순위: 정적 이미지
+  if (!rendered && scene.img.width > 0 && scene.img.height > 0) {
+    const { x, y, w, h } = calcZoomPan(canvasW, canvasH, scene.img.width, scene.img.height, scene.zoomEffect, sceneProgress, 0.1);
+    ctx.drawImage(scene.img, x, y, w, h);
+    rendered = true;
+  }
+
+  // 3순위: 최소 폴백 (검은 화면 방지 - 어두운 배경 + 씬 번호)
+  if (!rendered) {
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+  }
+}
+
+/**
+ * 씬 전환 효과 렌더링 (갭 구간에서 호출)
+ */
+function renderTransition(
+  ctx: CanvasRenderingContext2D,
+  canvasW: number, canvasH: number,
+  prevScene: PreparedScene,
+  nextScene: PreparedScene,
+  progress: number // 0~1
+) {
+  const transition = prevScene.transition;
+
+  switch (transition) {
+    case 'crossfade':
+      drawSceneFrame(ctx, canvasW, canvasH, prevScene, 1);
+      ctx.save();
+      ctx.globalAlpha = progress;
+      drawSceneFrame(ctx, canvasW, canvasH, nextScene, 0);
+      ctx.restore();
+      break;
+
+    case 'fadeBlack':
+      if (progress < 0.5) {
+        drawSceneFrame(ctx, canvasW, canvasH, prevScene, 1);
+        ctx.fillStyle = `rgba(0, 0, 0, ${progress * 2})`;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+      } else {
+        drawSceneFrame(ctx, canvasW, canvasH, nextScene, 0);
+        ctx.fillStyle = `rgba(0, 0, 0, ${(1 - progress) * 2})`;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+      }
+      break;
+
+    case 'wipeLeft': {
+      const boundary = canvasW * (1 - progress);
+      drawSceneFrame(ctx, canvasW, canvasH, nextScene, 0);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, boundary, canvasH);
+      ctx.clip();
+      drawSceneFrame(ctx, canvasW, canvasH, prevScene, 1);
+      ctx.restore();
+      break;
+    }
+
+    case 'wipeRight': {
+      const boundary = canvasW * progress;
+      drawSceneFrame(ctx, canvasW, canvasH, prevScene, 1);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, boundary, canvasH);
+      ctx.clip();
+      drawSceneFrame(ctx, canvasW, canvasH, nextScene, 0);
+      ctx.restore();
+      break;
+    }
+
+    case 'none':
+    default:
+      drawSceneFrame(ctx, canvasW, canvasH, prevScene, 1);
+      break;
+  }
+}
+
 export interface VideoExportOptions {
   enableSubtitles?: boolean;  // 자막 활성화 여부 (기본: true)
   subtitleConfig?: Partial<SubtitleConfig>;
+  bgmData?: string | null;    // BGM base64 오디오 데이터
+  bgmVolume?: number;         // BGM 볼륨 (0.0~1.0, 기본 0.25)
+  sceneGap?: number;          // 씬 전환 사이 무음 간격 (초, 기본 0.3)
+  bgmDuckingEnabled?: boolean;   // BGM 자동 볼륨 조절 (기본: false)
+  bgmDuckingAmount?: number;     // 덕킹 시 볼륨 비율 (0.1~0.5, 기본 0.3 = 30%)
 }
 
 // 실제 렌더링된 자막 타이밍 기록용 인터페이스
@@ -233,7 +390,14 @@ export const generateVideo = async (
 ): Promise<VideoGenerationResult | null> => {
   // 옵션 기본값
   const enableSubtitles = options?.enableSubtitles ?? true;
+  const sceneGap = options?.sceneGap ?? 0.3; // 씬 간 기본 0.3초 간격
   const config: SubtitleConfig = { ...DEFAULT_SUBTITLE_CONFIG, ...options?.subtitleConfig };
+
+  // 세로 영상 자막 자동 최적화 (사용자가 명시하지 않은 경우에만)
+  if (getVideoOrientation() === 'portrait') {
+    if (!options?.subtitleConfig?.fontSize) config.fontSize = Math.round(DEFAULT_SUBTITLE_CONFIG.fontSize * 1.2);
+    if (!options?.subtitleConfig?.bottomMargin) config.bottomMargin = Math.round(DEFAULT_SUBTITLE_CONFIG.bottomMargin * 1.5);
+  }
 
   // 이미지가 있는 모든 씬 포함 (오디오 없으면 기본 3초)
   const validAssets = assets.filter(a => a.imageData);
@@ -286,16 +450,17 @@ export const generateVideo = async (
       console.warn(`[Video] 씬 ${i + 1}: ${e.message}, 플레이스홀더 사용`);
       // 플레이스홀더 이미지 생성
       const placeholderCanvas = document.createElement('canvas');
-      placeholderCanvas.width = 1280;
-      placeholderCanvas.height = 720;
+      const pDims = VIDEO_DIMENSIONS[getVideoOrientation()];
+      placeholderCanvas.width = pDims.width;
+      placeholderCanvas.height = pDims.height;
       const pCtx = placeholderCanvas.getContext('2d');
       if (pCtx) {
         pCtx.fillStyle = '#1a1a2e';
-        pCtx.fillRect(0, 0, 1280, 720);
+        pCtx.fillRect(0, 0, pDims.width, pDims.height);
         pCtx.fillStyle = '#fff';
         pCtx.font = 'bold 48px sans-serif';
         pCtx.textAlign = 'center';
-        pCtx.fillText(`씬 ${i + 1}`, 640, 360);
+        pCtx.fillText(`씬 ${i + 1}`, pDims.width / 2, pDims.height / 2);
       }
       img.src = placeholderCanvas.toDataURL();
     });
@@ -343,6 +508,11 @@ export const generateVideo = async (
       console.log(`[Video] 씬 ${i + 1} 오디오 없음, 기본 ${DEFAULT_DURATION}초 사용`);
     }
 
+    // 사용자 지정 재생 시간 우선 적용
+    if (asset.customDuration && asset.customDuration > 0) {
+      duration = asset.customDuration;
+    }
+
     // 자막 청크 미리 계산 (자막 비활성화시 빈 배열)
     const subtitleChunks = enableSubtitles ? createSubtitleChunks(asset.subtitleData, config) : [];
     if (subtitleChunks.length > 0) {
@@ -358,19 +528,36 @@ export const generateVideo = async (
       isAnimated,
       audioBuffer,
       subtitleChunks,
+      zoomEffect: (asset.zoomEffect || 'zoomIn') as ZoomEffect,
+      transition: (asset.transition || 'none') as TransitionType,
       startTime,
       endTime,
       duration
     });
-    timelinePointer = endTime;
+    // 씬 사이에 간격 삽입 (마지막 씬 제외)
+    timelinePointer = endTime + (i < validAssets.length - 1 ? sceneGap : 0);
   }
 
   const totalDuration = timelinePointer;
 
+  // BGM 미리 디코딩 (있는 경우)
+  let bgmBuffer: AudioBuffer | null = null;
+  if (options?.bgmData) {
+    try {
+      onProgress("BGM 로딩 중...");
+      bgmBuffer = await decodeAudio(options.bgmData, audioCtx);
+      console.log(`[Video] BGM 로드 완료: ${bgmBuffer.duration.toFixed(1)}s → 전체 ${totalDuration.toFixed(1)}s에 루프 재생`);
+    } catch (e) {
+      console.warn('[Video] BGM 로드 실패, 건너뜀:', e);
+    }
+  }
+
   // 2. 캔버스 및 미디어 레코더 설정
+  const orientation = getVideoOrientation();
+  const dims = VIDEO_DIMENSIONS[orientation];
   const canvas = document.createElement('canvas');
-  canvas.width = 1280;
-  canvas.height = 720;
+  canvas.width = dims.width;
+  canvas.height = dims.height;
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error("캔버스 초기화 실패");
 
@@ -400,8 +587,10 @@ export const generateVideo = async (
 
   return new Promise(async (resolve, reject) => {
     let isFinished = false;
+    let frameTimer: ReturnType<typeof setInterval> | null = null;
 
     recorder.onstop = async () => {
+      if (frameTimer) clearInterval(frameTimer); // 타이머 정리
       await audioCtx.close(); // 오디오 컨텍스트 정리
 
       // 마지막 자막 청크 종료 처리
@@ -435,11 +624,49 @@ export const generateVideo = async (
         const source = audioCtx.createBufferSource();
         source.buffer = scene.audioBuffer;
         source.connect(destination);
-        source.connect(audioCtx.destination);
+        // 렌더링 중 스피커 출력 음소거 (MP4에는 정상 포함)
         source.start(masterStartTime + scene.startTime);
         source.stop(masterStartTime + scene.endTime);
       }
     });
+
+    // BGM 스케줄링 (나레이션과 함께 믹싱 + 자동 덕킹)
+    if (bgmBuffer) {
+      const baseVolume = options?.bgmVolume ?? 0.25;
+      const bgmGain = audioCtx.createGain();
+      bgmGain.gain.value = baseVolume;
+      bgmGain.connect(destination);
+
+      const bgmSource = audioCtx.createBufferSource();
+      bgmSource.buffer = bgmBuffer;
+      bgmSource.loop = true;
+      bgmSource.connect(bgmGain);
+      bgmSource.start(masterStartTime);
+      bgmSource.stop(masterStartTime + totalDuration);
+
+      // 자동 덕킹: 나레이션 구간에서 BGM 볼륨 자동 감소
+      const duckingEnabled = options?.bgmDuckingEnabled ?? false;
+      if (duckingEnabled) {
+        const duckingAmount = options?.bgmDuckingAmount ?? 0.3;
+        const duckVolume = baseVolume * duckingAmount;
+        const RAMP_TIME = 0.3;
+
+        preparedScenes.forEach(scene => {
+          if (scene.audioBuffer) {
+            const duckStart = masterStartTime + scene.startTime;
+            bgmGain.gain.setValueAtTime(baseVolume, duckStart);
+            bgmGain.gain.linearRampToValueAtTime(duckVolume, duckStart + RAMP_TIME);
+
+            const duckEnd = masterStartTime + scene.endTime;
+            bgmGain.gain.setValueAtTime(duckVolume, duckEnd);
+            bgmGain.gain.linearRampToValueAtTime(baseVolume, duckEnd + RAMP_TIME);
+          }
+        });
+        console.log(`[Video] BGM 덕킹: 나레이션 중 ${Math.round(duckingAmount * 100)}%, 램프 ${RAMP_TIME}s`);
+      }
+
+      console.log(`[Video] BGM 믹싱: 볼륨 ${Math.round(baseVolume * 100)}%`);
+    }
 
     // 애니메이션 영상 재생 스케줄링
     preparedScenes.forEach((scene, idx) => {
@@ -456,12 +683,18 @@ export const generateVideo = async (
 
     recorder.start();
 
-    // 4. 고정밀 프레임 루프 (Master Clock Tracking)
-    const renderLoop = () => {
+    // 4. 고정밀 프레임 루프 (타이머 기반 - 브라우저 탭 전환 시에도 안정적)
+    // requestAnimationFrame은 탭이 비활성화되면 1fps 이하로 스로틀링됨
+    // setInterval은 백그라운드에서도 안정적으로 동작 (최소 ~4ms 간격)
+    const TARGET_FPS = 30;
+    const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+    const renderFrame = () => {
       if (isFinished) return;
 
       if (abortRef?.current) {
         isFinished = true;
+        clearInterval(frameTimer);
         recorder.stop();
         return;
       }
@@ -472,73 +705,71 @@ export const generateVideo = async (
       // 모든 장면 완료 체크
       if (elapsed >= totalDuration) {
         isFinished = true;
+        clearInterval(frameTimer);
         onProgress("렌더링 완료! 파일 생성 중...");
         setTimeout(() => recorder.stop(), 500); // 마지막 프레임 유지를 위해 0.5초 대기
         return;
       }
 
       // 현재 오디오 타임스탬프에 '절대 동기화'된 장면 찾기 (경계값 포함)
-      let currentScene = preparedScenes.find(s =>
+      let currentScene: PreparedScene | undefined = preparedScenes.find(s =>
         elapsed >= s.startTime && elapsed <= s.endTime
       );
 
-      // 씬을 못 찾으면 가장 가까운 씬 선택
+      // 갭 구간 감지 (전환 효과용)
+      let isInGap = false;
+      let gapProgress = 0;
+      let prevSceneForGap: PreparedScene | null = null;
+      let nextSceneForGap: PreparedScene | null = null;
+
       if (!currentScene) {
-        if (elapsed < 0 || elapsed < preparedScenes[0].startTime) {
+        if (elapsed < preparedScenes[0].startTime) {
           currentScene = preparedScenes[0];
         } else {
-          // elapsed 이후로 시작하는 가장 가까운 씬 또는 마지막 씬
-          currentScene = preparedScenes.find(s => elapsed < s.startTime) || preparedScenes[preparedScenes.length - 1];
+          // 갭 구간: 이전 씬과 다음 씬 사이
+          isInGap = true;
+          for (let si = 0; si < preparedScenes.length - 1; si++) {
+            if (elapsed >= preparedScenes[si].endTime && elapsed < preparedScenes[si + 1].startTime) {
+              prevSceneForGap = preparedScenes[si];
+              nextSceneForGap = preparedScenes[si + 1];
+              const gapDuration = nextSceneForGap.startTime - prevSceneForGap.endTime;
+              gapProgress = gapDuration > 0 ? (elapsed - prevSceneForGap.endTime) / gapDuration : 1;
+              break;
+            }
+          }
+          if (!prevSceneForGap) {
+            // 마지막 씬 이후
+            currentScene = preparedScenes[preparedScenes.length - 1];
+            isInGap = false;
+          }
         }
       }
 
-      if (ctx && currentScene) {
+      if (ctx) {
         // 배경 클리어
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 씬 진행률 계산
-        const sceneProgress = Math.min(1, Math.max(0, (elapsed - currentScene.startTime) / currentScene.duration));
-
-        let rendered = false;
-
-        // 애니메이션 씬: 비디오 프레임 렌더링
-        if (currentScene.isAnimated && currentScene.video && currentScene.video.readyState >= 2) {
-          const video = currentScene.video;
-          if (video.videoWidth > 0 && video.videoHeight > 0) {
-            const ratio = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
-
-            // 부드러운 줌인 효과 (정적 이미지보다 약하게)
-            const scale = 1.0 + 0.05 * sceneProgress;
-
-            const nw = video.videoWidth * ratio * scale;
-            const nh = video.videoHeight * ratio * scale;
-            ctx.drawImage(video, (canvas.width - nw) / 2, (canvas.height - nh) / 2, nw, nh);
-            rendered = true;
-          }
+        if (isInGap && prevSceneForGap && nextSceneForGap) {
+          // 갭 구간: 전환 효과 렌더링
+          renderTransition(ctx, canvas.width, canvas.height, prevSceneForGap, nextSceneForGap, gapProgress);
+        } else if (currentScene) {
+          // 일반 씬 렌더링
+          const sceneProgress = Math.min(1, Math.max(0, (elapsed - currentScene.startTime) / currentScene.duration));
+          drawSceneFrame(ctx, canvas.width, canvas.height, currentScene, sceneProgress);
         }
 
-        // 정적 이미지 렌더링 (비디오 실패 시 또는 기본)
-        if (!rendered) {
-          const img = currentScene.img;
-          if (img.width > 0 && img.height > 0) {
-            const ratio = Math.min(canvas.width / img.width, canvas.height / img.height);
+        // 씬 갭 구간이 아닐 때만 자막/타이밍 처리
+        const activeScene = isInGap ? null : currentScene;
+        const sceneElapsed = activeScene ? elapsed - activeScene.startTime : 0;
 
-            // 줌인 효과: 씬 진행률에 따라 1.0 → 1.1 (10% 확대)
-            const scale = 1.0 + 0.1 * sceneProgress;
-
-            const nw = img.width * ratio * scale;
-            const nh = img.height * ratio * scale;
-            ctx.drawImage(img, (canvas.width - nw) / 2, (canvas.height - nh) / 2, nw, nh);
-          }
+        // 자막 렌더링 (갭 구간에는 표시 안 함)
+        if (activeScene) {
+          renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config);
         }
 
-        // 자막 렌더링 (청크 기반)
-        const sceneElapsed = elapsed - currentScene.startTime;
-        renderSubtitle(ctx, canvas, currentScene.subtitleChunks, sceneElapsed, config);
-
-        // 자막 타이밍 기록 (실제 표시되는 것과 동일하게)
-        const currentChunk = getCurrentChunk(currentScene.subtitleChunks, sceneElapsed);
+        // 자막 타이밍 기록
+        const currentChunk = activeScene ? getCurrentChunk(activeScene.subtitleChunks, sceneElapsed) : null;
         const currentChunkText = currentChunk?.text || null;
 
         if (currentChunkText !== lastRecordedChunkText) {
@@ -565,10 +796,8 @@ export const generateVideo = async (
             onProgress(`동기화 렌더링 가동 중: ${percent}%`);
         }
       }
-
-      requestAnimationFrame(renderLoop);
     };
 
-    renderLoop();
+    frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
   });
 };

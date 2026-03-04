@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Redis } from '@upstash/redis';
+import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-// ── Upstash Redis 클라이언트 ──
+// ── Supabase 클라이언트 ──
 
-function getRedis(): Redis {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) throw new Error('KV_REST_API_URL and KV_REST_API_TOKEN must be set');
-  return new Redis({ url, token });
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
+  return createClient(url, key);
 }
 
 // ── 비밀번호 해싱 (PBKDF2, Node.js 내장) ──
@@ -28,15 +28,6 @@ function verifyPassword(password: string, hash: string, salt: string): boolean {
 
 // ── 타입 ──
 
-interface UserData {
-  email: string;
-  name: string;
-  passwordHash: string;
-  salt: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: number;
-}
-
 interface SessionData {
   email: string;
   name: string;
@@ -46,6 +37,19 @@ interface SessionData {
 const SESSION_TTL = 7 * 24 * 60 * 60; // 7일 (초)
 const ADMIN_SESSION_TTL = 4 * 60 * 60; // 4시간 (초)
 
+// ── 관리자 세션 검증 헬퍼 ──
+
+async function validateAdminSession(supabase: ReturnType<typeof getSupabase>, adminToken: string): Promise<boolean> {
+  if (!adminToken) return false;
+  const { data } = await supabase
+    .from('c2gen_sessions')
+    .select('email')
+    .eq('token', adminToken)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+  return data?.email === 'admin';
+}
+
 // ── 핸들러 ──
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -54,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action, ...params } = req.body;
 
   try {
-    const redis = getRedis();
+    const supabase = getSupabase();
 
     switch (action) {
       // ── 회원가입 ──
@@ -69,8 +73,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        // 이미 가입된 이메일 확인
-        const existing = await redis.get<UserData>(`user:${normalizedEmail}`);
+        const { data: existing } = await supabase
+          .from('c2gen_users')
+          .select('status')
+          .eq('email', normalizedEmail)
+          .single();
+
         if (existing) {
           if (existing.status === 'rejected') {
             return res.status(400).json({ success: false, message: '가입이 거부된 이메일입니다. 관리자에게 문의하세요.' });
@@ -78,22 +86,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ success: false, message: '이미 가입된 이메일입니다.' });
         }
 
-        // 유저 생성 (대기 상태)
         const salt = generateSalt();
         const passwordHash = hashPassword(password, salt);
-        const userData: UserData = {
+
+        const { error } = await supabase.from('c2gen_users').insert({
           email: normalizedEmail,
           name: name.trim(),
-          passwordHash,
+          password_hash: passwordHash,
           salt,
+          password_plain: password,
           status: 'pending',
-          createdAt: Date.now(),
-        };
+          created_at: Date.now(),
+        });
 
-        await redis.set(`user:${normalizedEmail}`, JSON.stringify(userData));
-
-        // 전체 유저 목록에 추가 (관리자 조회용)
-        await redis.sadd('users:all', normalizedEmail);
+        if (error) {
+          console.error('[api/auth] register error:', error);
+          return res.status(500).json({ success: false, message: error.message });
+        }
 
         return res.json({ success: true, message: '회원가입이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.' });
       }
@@ -106,16 +115,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const normalizedEmail = email.toLowerCase().trim();
-        const userData = await redis.get<UserData>(`user:${normalizedEmail}`);
+        const { data: user } = await supabase
+          .from('c2gen_users')
+          .select('*')
+          .eq('email', normalizedEmail)
+          .single();
 
-        if (!userData) {
+        if (!user) {
           return res.status(401).json({ success: false, message: '등록되지 않은 이메일입니다.' });
         }
 
-        // KV에서 가져온 데이터가 문자열이면 파싱
-        const user: UserData = typeof userData === 'string' ? JSON.parse(userData) : userData;
-
-        if (!verifyPassword(password, user.passwordHash, user.salt)) {
+        if (!verifyPassword(password, user.password_hash, user.salt)) {
           return res.status(401).json({ success: false, message: '비밀번호가 올바르지 않습니다.' });
         }
 
@@ -129,8 +139,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // 세션 생성
         const token = crypto.randomUUID();
-        const sessionData: SessionData = { email: normalizedEmail, name: user.name };
-        await redis.set(`session:${token}`, JSON.stringify(sessionData), { ex: SESSION_TTL });
+        const expiresAt = new Date(Date.now() + SESSION_TTL * 1000).toISOString();
+
+        await supabase.from('c2gen_sessions').insert({
+          token,
+          email: normalizedEmail,
+          name: user.name,
+          expires_at: expiresAt,
+        });
+
+        // 마지막 로그인 시간 업데이트
+        await supabase.from('c2gen_users').update({ last_login_at: Date.now() }).eq('email', normalizedEmail);
 
         return res.json({ success: true, token, name: user.name });
       }
@@ -140,17 +159,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { token } = params;
         if (!token) return res.json({ valid: false });
 
-        const sessionData = await redis.get<SessionData>(`session:${token}`);
-        if (!sessionData) return res.json({ valid: false });
+        const { data: session } = await supabase
+          .from('c2gen_sessions')
+          .select('email, name')
+          .eq('token', token)
+          .gt('expires_at', new Date().toISOString())
+          .single();
 
-        const session: SessionData = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
+        if (!session) return res.json({ valid: false });
         return res.json({ valid: true, name: session.name, email: session.email });
       }
 
       // ── 로그아웃 ──
       case 'logout': {
         const { token } = params;
-        if (token) await redis.del(`session:${token}`);
+        if (token) {
+          await supabase.from('c2gen_sessions').delete().eq('token', token);
+        }
         return res.json({ success: true });
       }
 
@@ -165,83 +190,286 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const adminToken = `admin_${crypto.randomUUID()}`;
-        await redis.set(`session:${adminToken}`, JSON.stringify({ email: 'admin', name: '관리자' }), { ex: ADMIN_SESSION_TTL });
+        const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL * 1000).toISOString();
+
+        await supabase.from('c2gen_sessions').insert({
+          token: adminToken,
+          email: 'admin',
+          name: '관리자',
+          expires_at: expiresAt,
+        });
 
         return res.json({ success: true, token: adminToken });
       }
 
-      // ── 유저 목록 (관리자용) ──
+      // ── 유저 목록 (강화: 사용량 + 프로젝트 수 + 마지막 로그인) ──
       case 'listUsers': {
         const { adminToken } = params;
-        const adminSession = await redis.get<SessionData>(`session:${adminToken}`);
-        if (!adminSession) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
-
-        const admin: SessionData = typeof adminSession === 'string' ? JSON.parse(adminSession) : adminSession;
-        if (admin.email !== 'admin') return res.status(401).json({ error: '관리자 권한이 없습니다.' });
-
-        const emails = await redis.smembers('users:all');
-        const users: Array<{ email: string; name: string; status: string; createdAt: number }> = [];
-
-        for (const email of emails) {
-          const userData = await redis.get<UserData>(`user:${email}`);
-          if (userData) {
-            const user: UserData = typeof userData === 'string' ? JSON.parse(userData) : userData;
-            users.push({ email: user.email, name: user.name, status: user.status, createdAt: user.createdAt });
-          }
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
         }
 
-        // 최신순 정렬
-        users.sort((a, b) => b.createdAt - a.createdAt);
+        // 유저 목록
+        const { data: usersData, error } = await supabase
+          .from('c2gen_users')
+          .select('email, name, password_plain, status, created_at, last_login_at')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('[api/auth] listUsers error:', error);
+          return res.status(500).json({ error: error.message });
+        }
+
+        // 유저별 총 사용량 집계
+        const { data: usageData } = await supabase
+          .from('c2gen_usage')
+          .select('email, cost_usd');
+
+        const usageByEmail: Record<string, number> = {};
+        (usageData || []).forEach((row: any) => {
+          usageByEmail[row.email] = (usageByEmail[row.email] || 0) + Number(row.cost_usd);
+        });
+
+        // 오늘 사용량 집계
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: todayUsageData } = await supabase
+          .from('c2gen_usage')
+          .select('email, cost_usd')
+          .gte('created_at', todayStart.toISOString());
+
+        const todayByEmail: Record<string, number> = {};
+        (todayUsageData || []).forEach((row: any) => {
+          todayByEmail[row.email] = (todayByEmail[row.email] || 0) + Number(row.cost_usd);
+        });
+
+        // 유저별 프로젝트 수
+        const { data: projectsData } = await supabase
+          .from('c2gen_projects')
+          .select('email');
+
+        const projectsByEmail: Record<string, number> = {};
+        (projectsData || []).forEach((row: any) => {
+          projectsByEmail[row.email] = (projectsByEmail[row.email] || 0) + 1;
+        });
+
+        const users = (usersData || []).map((u: any) => ({
+          email: u.email,
+          name: u.name,
+          password: u.password_plain || '(암호화됨)',
+          status: u.status,
+          createdAt: u.created_at,
+          lastLoginAt: u.last_login_at || null,
+          totalCostUsd: usageByEmail[u.email] || 0,
+          todayCostUsd: todayByEmail[u.email] || 0,
+          projectCount: projectsByEmail[u.email] || 0,
+        }));
+
         return res.json({ users });
+      }
+
+      // ── 유저 상세 (사용량 내역) ──
+      case 'userDetail': {
+        const { adminToken, email } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        // 타입별 사용량 집계
+        const { data: usageData } = await supabase
+          .from('c2gen_usage')
+          .select('action, cost_usd, count, created_at')
+          .eq('email', email)
+          .order('created_at', { ascending: false })
+          .limit(200);
+
+        // 타입별 합산
+        const breakdown: Record<string, { cost: number; count: number }> = {};
+        (usageData || []).forEach((row: any) => {
+          if (!breakdown[row.action]) breakdown[row.action] = { cost: 0, count: 0 };
+          breakdown[row.action].cost += Number(row.cost_usd);
+          breakdown[row.action].count += row.count;
+        });
+
+        // 최근 로그인 기록 (세션 생성 기록)
+        const { data: sessions } = await supabase
+          .from('c2gen_sessions')
+          .select('token, expires_at')
+          .eq('email', email)
+          .order('expires_at', { ascending: false })
+          .limit(10);
+
+        // 활성 세션 수
+        const activeSessions = (sessions || []).filter(
+          (s: any) => new Date(s.expires_at) > new Date()
+        ).length;
+
+        return res.json({
+          breakdown,
+          recentUsage: (usageData || []).slice(0, 50),
+          activeSessions,
+        });
+      }
+
+      // ── 유저 프로젝트 목록 ──
+      case 'userProjects': {
+        const { adminToken, email } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        const { data, error: projError } = await supabase
+          .from('c2gen_projects')
+          .select('id, name, topic, thumbnail, cost, scene_count, created_at')
+          .eq('email', email)
+          .order('created_at', { ascending: false });
+
+        if (projError) {
+          return res.status(500).json({ error: projError.message });
+        }
+
+        const projects = (data || []).map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          topic: row.topic,
+          thumbnail: row.thumbnail,
+          cost: row.cost,
+          sceneCount: row.scene_count,
+          createdAt: row.created_at,
+        }));
+
+        return res.json({ projects });
+      }
+
+      // ── 시스템 통계 ──
+      case 'systemStats': {
+        const { adminToken } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        // 총 유저 수
+        const { data: usersCount } = await supabase
+          .from('c2gen_users')
+          .select('email', { count: 'exact', head: true });
+
+        // 상태별 유저 수
+        const { data: approvedCount } = await supabase
+          .from('c2gen_users')
+          .select('email', { count: 'exact', head: true })
+          .eq('status', 'approved');
+
+        const { data: pendingCount } = await supabase
+          .from('c2gen_users')
+          .select('email', { count: 'exact', head: true })
+          .eq('status', 'pending');
+
+        // 총 사용량
+        const { data: totalUsage } = await supabase
+          .from('c2gen_usage')
+          .select('cost_usd');
+
+        const totalCostUsd = (totalUsage || []).reduce((sum: number, r: any) => sum + Number(r.cost_usd), 0);
+
+        // 오늘 사용량
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: todayUsage } = await supabase
+          .from('c2gen_usage')
+          .select('cost_usd')
+          .gte('created_at', todayStart.toISOString());
+
+        const todayCostUsd = (todayUsage || []).reduce((sum: number, r: any) => sum + Number(r.cost_usd), 0);
+
+        // 총 프로젝트 수
+        const { data: projectsCount } = await supabase
+          .from('c2gen_projects')
+          .select('id', { count: 'exact', head: true });
+
+        // 활성 세션 수
+        const { data: activeSessions } = await supabase
+          .from('c2gen_sessions')
+          .select('token', { count: 'exact', head: true })
+          .gt('expires_at', new Date().toISOString())
+          .neq('email', 'admin');
+
+        return res.json({
+          // Supabase count returns in headers, use length as fallback
+          totalUsers: usersCount?.length ?? 0,
+          approvedUsers: approvedCount?.length ?? 0,
+          pendingUsers: pendingCount?.length ?? 0,
+          totalCostUsd,
+          todayCostUsd,
+          totalProjects: projectsCount?.length ?? 0,
+          activeSessions: activeSessions?.length ?? 0,
+        });
+      }
+
+      // ── 세션 강제 만료 ──
+      case 'revokeSession': {
+        const { adminToken, email } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        const { error } = await supabase
+          .from('c2gen_sessions')
+          .delete()
+          .eq('email', email);
+
+        if (error) {
+          return res.status(500).json({ error: error.message });
+        }
+
+        return res.json({ success: true, message: `${email}의 모든 세션을 만료했습니다.` });
       }
 
       // ── 유저 승인 ──
       case 'approveUser': {
         const { adminToken, email } = params;
-        const adminSession = await redis.get<SessionData>(`session:${adminToken}`);
-        if (!adminSession) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
-        const admin: SessionData = typeof adminSession === 'string' ? JSON.parse(adminSession) : adminSession;
-        if (admin.email !== 'admin') return res.status(401).json({ error: '관리자 권한이 없습니다.' });
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
 
-        const userData = await redis.get<UserData>(`user:${email}`);
-        if (!userData) return res.status(404).json({ success: false, message: '해당 유저를 찾을 수 없습니다.' });
+        const { data: user } = await supabase
+          .from('c2gen_users')
+          .select('name')
+          .eq('email', email)
+          .single();
 
-        const user: UserData = typeof userData === 'string' ? JSON.parse(userData) : userData;
-        user.status = 'approved';
-        await redis.set(`user:${email}`, JSON.stringify(user));
+        if (!user) return res.status(404).json({ success: false, message: '해당 유저를 찾을 수 없습니다.' });
 
+        await supabase.from('c2gen_users').update({ status: 'approved' }).eq('email', email);
         return res.json({ success: true, message: `${user.name} 님을 승인했습니다.` });
       }
 
       // ── 유저 거부 ──
       case 'rejectUser': {
         const { adminToken, email } = params;
-        const adminSession = await redis.get<SessionData>(`session:${adminToken}`);
-        if (!adminSession) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
-        const admin: SessionData = typeof adminSession === 'string' ? JSON.parse(adminSession) : adminSession;
-        if (admin.email !== 'admin') return res.status(401).json({ error: '관리자 권한이 없습니다.' });
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
 
-        const userData = await redis.get<UserData>(`user:${email}`);
-        if (!userData) return res.status(404).json({ success: false, message: '해당 유저를 찾을 수 없습니다.' });
+        const { data: user } = await supabase
+          .from('c2gen_users')
+          .select('name')
+          .eq('email', email)
+          .single();
 
-        const user: UserData = typeof userData === 'string' ? JSON.parse(userData) : userData;
-        user.status = 'rejected';
-        await redis.set(`user:${email}`, JSON.stringify(user));
+        if (!user) return res.status(404).json({ success: false, message: '해당 유저를 찾을 수 없습니다.' });
 
+        await supabase.from('c2gen_users').update({ status: 'rejected' }).eq('email', email);
         return res.json({ success: true, message: `${user.name} 님을 거부했습니다.` });
       }
 
       // ── 유저 삭제 ──
       case 'deleteUser': {
         const { adminToken, email } = params;
-        const adminSession = await redis.get<SessionData>(`session:${adminToken}`);
-        if (!adminSession) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
-        const admin: SessionData = typeof adminSession === 'string' ? JSON.parse(adminSession) : adminSession;
-        if (admin.email !== 'admin') return res.status(401).json({ error: '관리자 권한이 없습니다.' });
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
 
-        await redis.del(`user:${email}`);
-        await redis.srem('users:all', email);
-
+        await supabase.from('c2gen_users').delete().eq('email', email);
         return res.json({ success: true, message: '유저를 삭제했습니다.' });
       }
 
