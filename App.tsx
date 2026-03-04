@@ -1,16 +1,17 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import AuthGate from './components/AuthGate';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultTable from './components/ResultTable';
-import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown } from './types';
-import { generateScript, findTrendingTopics, generateAudioForScene, generateMotionPrompt } from './services/geminiService';
+import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig } from './types';
+import { useUndoRedo } from './hooks/useUndoRedo';
+import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt } from './services/geminiService';
 import { generateImage, getSelectedImageModel } from './services/imageService';
 import { generateAudioWithElevenLabs } from './services/elevenLabsService';
-import { generateVideo, VideoGenerationResult } from './services/videoService';
-import { downloadSrtFromRecorded } from './services/srtService';
-import { generateVideoFromImage, getFalApiKey } from './services/falService';
-import { saveProject, getSavedProjects, deleteProject } from './services/projectService';
+import { generateVideo } from './services/videoService';
+import { generateVideoFromImage } from './services/falService';
+import { saveProject, getSavedProjects, deleteProject, importProject, migrateFromLocalStorage } from './services/projectService';
 import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW } from './config';
 import ProjectGallery from './components/ProjectGallery';
@@ -19,28 +20,105 @@ import * as FileSaver from 'file-saver';
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// 에러 캐치용 ErrorBoundary
+class GalleryErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+          <div className="bg-red-900/30 border border-red-500/50 rounded-2xl p-8">
+            <h2 className="text-red-400 text-xl font-bold mb-4">갤러리 로딩 오류</h2>
+            <pre className="text-red-300 text-xs text-left bg-slate-900 p-4 rounded-xl overflow-auto max-h-64">
+              {this.state.error.message}{'\n'}{this.state.error.stack}
+            </pre>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 type ViewMode = 'main' | 'gallery';
 
+// 인증 래퍼
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
+  const handleAuthSuccess = useCallback((name: string) => {
+    setIsAuthenticated(true);
+    setUserName(name);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    const token = localStorage.getItem('c2gen_session_token');
+    if (token) {
+      try {
+        await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'logout', token }),
+        });
+      } catch { /* ignore */ }
+    }
+    localStorage.removeItem('c2gen_session_token');
+    localStorage.removeItem('c2gen_user_name');
+    setIsAuthenticated(false);
+    setUserName(null);
+  }, []);
+
+  if (!isAuthenticated) {
+    return <AuthGate onSuccess={handleAuthSuccess} />;
+  }
+
+  return <AppContent userName={userName} onLogout={handleLogout} />;
+};
+
+// 메인 앱 콘텐츠
+const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = ({ userName, onLogout }) => {
   const [step, setStep] = useState<GenerationStep>(GenerationStep.IDLE);
   const [generatedData, setGeneratedData] = useState<GeneratedAsset[]>([]);
   const [progressMessage, setProgressMessage] = useState('');
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
-  const [currentReferenceImages, setCurrentReferenceImages] = useState<string[]>([]);
+  // 참조 이미지 상태 (강도 포함)
+  const [currentReferenceImages, setCurrentReferenceImages] = useState<ReferenceImages>(DEFAULT_REFERENCE_IMAGES);
   const [needsKey, setNeedsKey] = useState(false);
   const [animatingIndices, setAnimatingIndices] = useState<Set<number>>(new Set());
 
   // 갤러리 뷰 관련
   const [viewMode, setViewMode] = useState<ViewMode>('main');
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
-  const [currentTopic, setCurrentTopic] = useState<string>('');
+  const [, setCurrentTopic] = useState<string>('');
+
+  // 씬 편집 관련
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // BGM 관련
+  const [bgmData, setBgmData] = useState<string | null>(null);
+  const [bgmVolume, setBgmVolume] = useState(0.25);
+  const [bgmDuckingEnabled, setBgmDuckingEnabled] = useState(false);
+  const [bgmDuckingAmount, setBgmDuckingAmount] = useState(0.3);
 
   // 비용 추적
-  const [currentCost, setCurrentCost] = useState<CostBreakdown | null>(null);
+  const [, setCurrentCost] = useState<CostBreakdown | null>(null);
   const costRef = useRef<CostBreakdown>({
     images: 0, tts: 0, videos: 0, total: 0,
     imageCount: 0, ttsCharacters: 0, videoCount: 0
   });
+
+  // Undo/Redo 시스템
+  const { pushState: pushUndoState, undo: undoState, redo: redoState, canUndo, canRedo, clear: clearHistory } = useUndoRedo<GeneratedAsset[]>(30, 300);
 
   const usedTopicsRef = useRef<string[]>([]);
   const assetsRef = useRef<GeneratedAsset[]>([]);
@@ -58,14 +136,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     checkApiKeyStatus();
-    // 저장된 프로젝트 로드
-    setSavedProjects(getSavedProjects());
+    // localStorage → IndexedDB 마이그레이션 및 프로젝트 로드
+    (async () => {
+      await migrateFromLocalStorage(); // 기존 데이터 이전
+      const projects = await getSavedProjects();
+      setSavedProjects(projects);
+    })();
     return () => { isAbortedRef.current = true; };
   }, [checkApiKeyStatus]);
 
   // 프로젝트 목록 새로고침
-  const refreshProjects = useCallback(() => {
-    setSavedProjects(getSavedProjects());
+  const refreshProjects = useCallback(async () => {
+    const projects = await getSavedProjects();
+    setSavedProjects(projects);
   }, []);
 
   const handleOpenKeySelector = async () => {
@@ -108,6 +191,46 @@ const App: React.FC = () => {
     setCurrentCost(null);
   };
 
+  // Undo용 에셋 스냅샷 (얕은 복제 - base64 문자열은 참조 공유)
+  const snapshotAssets = () => assetsRef.current.map(a => ({ ...a }));
+
+  // Undo/Redo 핸들러
+  const handleUndo = useCallback(() => {
+    const prev = undoState(snapshotAssets());
+    if (prev) {
+      assetsRef.current = prev;
+      setGeneratedData([...prev]);
+    }
+  }, [undoState]);
+
+  const handleRedo = useCallback(() => {
+    const next = redoState(snapshotAssets());
+    if (next) {
+      assetsRef.current = next;
+      setGeneratedData([...next]);
+    }
+  }, [redoState]);
+
+  // Ctrl+Z / Ctrl+Y 키보드 단축키
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // 입력 중(textarea/input)에는 무시
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
+
   const handleAbort = () => {
     isAbortedRef.current = true;
     isProcessingRef.current = false;
@@ -117,7 +240,7 @@ const App: React.FC = () => {
 
   const handleGenerate = useCallback(async (
     topic: string,
-    refImgs: string[],
+    refImgs: ReferenceImages,
     sourceText: string | null
   ) => {
     if (isProcessingRef.current) return;
@@ -138,6 +261,11 @@ const App: React.FC = () => {
       setCurrentReferenceImages(refImgs);
       setCurrentTopic(topic); // 저장용 토픽 기록
       resetCost(); // 비용 초기화
+      clearHistory(); // Undo 히스토리 초기화
+
+      // 참조 이미지 존재 여부 계산
+      const hasRefImages = (refImgs.character?.length || 0) + (refImgs.style?.length || 0) > 0;
+      console.log(`[App] 참조 이미지 - 캐릭터: ${refImgs.character?.length || 0}개, 스타일: ${refImgs.style?.length || 0}개`);
 
       let targetTopic = topic;
 
@@ -155,7 +283,27 @@ const App: React.FC = () => {
       }
 
       setProgressMessage(`스토리보드 및 메타포 생성 중...`);
-      const scriptScenes = await generateScript(targetTopic, refImgs.length > 0, sourceText);
+
+      // 긴 대본(3000자 초과) 감지 시 청크 분할 처리
+      const inputLength = sourceText?.length || 0;
+      const CHUNK_THRESHOLD = 3000; // 3000자 초과 시 청크 분할
+
+      let scriptScenes: ScriptScene[];
+      if (inputLength > CHUNK_THRESHOLD) {
+        // 긴 대본: 청크 분할 처리 (10,000자 이상 대응)
+        console.log(`[App] 긴 대본 감지: ${inputLength.toLocaleString()}자 → 청크 분할 처리`);
+        setProgressMessage(`긴 대본(${inputLength.toLocaleString()}자) 청크 분할 처리 중...`);
+        scriptScenes = await generateScriptChunked(
+          targetTopic,
+          hasRefImages,
+          sourceText!,
+          2500, // 청크당 2500자
+          setProgressMessage // 진행 상황 콜백
+        );
+      } else {
+        // 일반 대본: 기존 방식
+        scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText);
+      }
       if (isAbortedRef.current) return;
       
       const initialAssets = scriptScenes.map(scene => ({
@@ -166,138 +314,136 @@ const App: React.FC = () => {
       setStep(GenerationStep.ASSETS);
 
       const runAudio = async () => {
+          const TTS_DELAY = 1500; // ElevenLabs API Rate Limit 대응: 1.5초 딜레이
+          const MAX_TTS_RETRIES = 2; // 최대 재시도 횟수
+
           for (let i = 0; i < initialAssets.length; i++) {
               if (isAbortedRef.current) break;
-              try {
-                  // ElevenLabs에서 오디오 + 자막 타임스탬프 동시 획득
-                  const elResult = await generateAudioWithElevenLabs(
-                    assetsRef.current[i].narration
-                  );
+
+              setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 음성 생성 중...`);
+              let success = false;
+
+              // 재시도 로직
+              for (let attempt = 0; attempt <= MAX_TTS_RETRIES && !success; attempt++) {
                   if (isAbortedRef.current) break;
 
-                  if (elResult.audioData) {
-                    // ElevenLabs 성공: 오디오 + 자막 + 길이 데이터 저장
-                    updateAssetAt(i, {
-                      audioData: elResult.audioData,
-                      subtitleData: elResult.subtitleData,
-                      audioDuration: elResult.estimatedDuration
-                    });
-                    // TTS 비용 추가
-                    const charCount = assetsRef.current[i].narration.length;
-                    addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
-                  } else {
-                    // ElevenLabs 실패 시 Gemini 폴백 (자막 없음)
-                    const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
-                    updateAssetAt(i, { audioData: fallbackAudio });
+                  try {
+                      if (attempt > 0) {
+                          console.log(`[TTS] 씬 ${i + 1} 재시도 중... (${attempt}/${MAX_TTS_RETRIES})`);
+                          await wait(3000); // 재시도 시 3초 대기
+                      }
+
+                      // ElevenLabs에서 오디오 + 자막 타임스탬프 동시 획득
+                      const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
+                      const elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
+                      const elResult = await generateAudioWithElevenLabs(
+                        assetsRef.current[i].narration,
+                        undefined, undefined, undefined,
+                        { speed: elSpeed, stability: elStability }
+                      );
+                      if (isAbortedRef.current) break;
+
+                      if (elResult.audioData) {
+                        // ElevenLabs 성공: 오디오 + 자막 + 길이 데이터 저장
+                        updateAssetAt(i, {
+                          audioData: elResult.audioData,
+                          subtitleData: elResult.subtitleData,
+                          audioDuration: elResult.estimatedDuration
+                        });
+                        // TTS 비용 추가
+                        const charCount = assetsRef.current[i].narration.length;
+                        addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
+                        success = true;
+                        console.log(`[TTS] 씬 ${i + 1} 음성 생성 완료`);
+                      } else {
+                        throw new Error('ElevenLabs 응답 없음');
+                      }
+                  } catch (e: any) {
+                      console.error(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, e.message);
+
+                      // Rate Limit 에러인 경우 더 긴 대기
+                      if (e.message?.includes('429') || e.message?.includes('rate')) {
+                          await wait(5000); // 5초 대기 후 재시도
+                      }
                   }
-              } catch (e) { console.error(e); }
+              }
+
+              // 모든 재시도 실패 시 Gemini 폴백
+              if (!success && !isAbortedRef.current) {
+                  try {
+                      console.log(`[TTS] 씬 ${i + 1} Gemini 폴백 시도...`);
+                      const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
+                      updateAssetAt(i, { audioData: fallbackAudio });
+                  } catch (fallbackError) {
+                      console.error(`[TTS] 씬 ${i + 1} Gemini 폴백도 실패:`, fallbackError);
+                  }
+              }
+
+              // 다음 씬 전에 딜레이 (Rate Limit 방지)
+              if (i < initialAssets.length - 1 && !isAbortedRef.current) {
+                  await wait(TTS_DELAY);
+              }
           }
       };
 
       const runImages = async () => {
-          const MAX_RETRIES = 2; // 최대 재시도 횟수
+          const MAX_RETRIES = 2;
+          const CONCURRENCY = 5; // 동시 생성 수
           const imageModel = getSelectedImageModel();
           const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
 
-          for (let i = 0; i < initialAssets.length; i++) {
-              if (isAbortedRef.current) break;
+          const generateSingleImage = async (i: number) => {
+              if (isAbortedRef.current) return;
               updateAssetAt(i, { status: 'generating' });
 
               let success = false;
               let lastError: any = null;
 
-              // 재시도 로직 (최초 시도 + 재시도)
               for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
                   if (isAbortedRef.current) break;
 
                   try {
                       if (attempt > 0) {
                           setProgressMessage(`씬 ${i + 1} 이미지 재생성 시도 중... (${attempt}/${MAX_RETRIES})`);
-                          await wait(2000); // 재시도 전 대기
+                          await wait(2000);
                       }
 
-                      // Scene 객체 전체를 넘겨서 prompts.ts가 분석 정보를 활용하도록 함
                       const img = await generateImage(assetsRef.current[i], refImgs);
                       if (isAbortedRef.current) break;
 
                       if (img) {
                           updateAssetAt(i, { imageData: img, status: 'completed' });
-                          // 이미지 비용 추가
                           addCost('image', imagePrice, 1);
                           success = true;
                       } else {
                           throw new Error('이미지 데이터가 비어있습니다');
                       }
-                  } catch (e: any) { 
+                  } catch (e: any) {
                       lastError = e;
                       console.error(`씬 ${i + 1} 이미지 생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
-                      
-                      // API 키 오류는 재시도하지 않음
+
                       if (e.message?.includes("API key not valid") || e.status === 400) {
                           setNeedsKey(true);
                           break;
                       }
                   }
               }
-              
-              // 모든 시도 실패 시 에러 상태로 설정
+
               if (!success && !isAbortedRef.current) {
-                  updateAssetAt(i, { status: 'error' });
-                  console.error(`씬 ${i + 1} 이미지 생성 최종 실패:`, lastError?.message);
+                  const errMsg = lastError?.message || '알 수 없는 오류';
+                  updateAssetAt(i, { status: 'error', errorMessage: errMsg });
+                  console.error(`씬 ${i + 1} 이미지 생성 최종 실패:`, errMsg);
               }
-              
-              await wait(50);
+          };
+
+          // 동시성 풀: CONCURRENCY개씩 병렬 처리
+          const indices = initialAssets.map((_, i) => i);
+          for (let start = 0; start < indices.length; start += CONCURRENCY) {
+              if (isAbortedRef.current) break;
+              const batch = indices.slice(start, start + CONCURRENCY);
+              setProgressMessage(`이미지 생성 중... (${start + 1}~${Math.min(start + CONCURRENCY, indices.length)}/${indices.length})`);
+              await Promise.all(batch.map(i => generateSingleImage(i)));
           }
-      };
-
-      // 앞 N개 씬을 애니메이션으로 변환하는 함수
-      const runAnimations = async () => {
-        const falApiKey = getFalApiKey();
-        if (!falApiKey) {
-          console.log('[Animation] FAL API 키 없음, 애니메이션 변환 건너뜀');
-          return;
-        }
-
-        const animationCount = Math.min(CONFIG.ANIMATION.ENABLED_SCENES, initialAssets.length);
-        setProgressMessage(`앞 ${animationCount}개 씬 애니메이션 변환 중...`);
-
-        for (let i = 0; i < animationCount; i++) {
-          if (isAbortedRef.current) break;
-
-          // 이미지가 있어야 변환 가능
-          if (!assetsRef.current[i]?.imageData) {
-            console.log(`[Animation] 씬 ${i + 1} 이미지 없음, 건너뜀`);
-            continue;
-          }
-
-          try {
-            setProgressMessage(`씬 ${i + 1}/${animationCount} 애니메이션 생성 중...`);
-
-            // 시각적 프롬프트에서 움직임 힌트 추출
-            const motionPrompt = `Gentle subtle motion: ${assetsRef.current[i].visualPrompt.slice(0, 200)}`;
-
-            const videoUrl = await generateVideoFromImage(
-              assetsRef.current[i].imageData!,
-              motionPrompt,
-              falApiKey
-            );
-
-            if (videoUrl && !isAbortedRef.current) {
-              updateAssetAt(i, {
-                videoData: videoUrl,
-                videoDuration: CONFIG.ANIMATION.VIDEO_DURATION
-              });
-              console.log(`[Animation] 씬 ${i + 1} 영상 변환 완료`);
-            }
-          } catch (e: any) {
-            console.error(`[Animation] 씬 ${i + 1} 변환 실패:`, e.message);
-          }
-
-          // API rate limit 방지
-          if (i < animationCount - 1) {
-            await wait(1500);
-          }
-        }
       };
 
       setProgressMessage(`시각 에셋 및 오디오 합성 중...`);
@@ -334,7 +480,107 @@ const App: React.FC = () => {
     }
   }, [checkApiKeyStatus, refreshProjects]);
 
-  const triggerVideoExport = async (enableSubtitles: boolean = true) => {
+  // 이미지 재생성 핸들러 (useCallback으로 메모이제이션)
+  const handleRegenerateImage = useCallback(async (idx: number) => {
+    if (isProcessingRef.current) return;
+
+    const MAX_RETRIES = 2;
+    updateAssetAt(idx, { status: 'generating' });
+    setProgressMessage(`씬 ${idx + 1} 이미지 재생성 중...`);
+
+    let success = false;
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
+      if (isAbortedRef.current) break;
+
+      try {
+        if (attempt > 0) {
+          setProgressMessage(`씬 ${idx + 1} 이미지 재생성 재시도 중... (${attempt}/${MAX_RETRIES})`);
+          await wait(2000);
+        }
+
+        const img = await generateImage(assetsRef.current[idx], currentReferenceImages);
+
+        if (img && !isAbortedRef.current) {
+          updateAssetAt(idx, { imageData: img, status: 'completed', errorMessage: undefined });
+          // 이미지 비용 추가
+          const imageModel = getSelectedImageModel();
+          const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
+          addCost('image', imagePrice, 1);
+          setProgressMessage(`씬 ${idx + 1} 이미지 재생성 완료! (+${formatKRW(imagePrice)})`);
+          success = true;
+        } else if (!img) {
+          throw new Error('이미지 데이터가 비어있습니다');
+        }
+      } catch (e: any) {
+        lastError = e;
+        console.error(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
+
+        if (e.message?.includes("API key not valid") || e.status === 400) {
+          setNeedsKey(true);
+          break;
+        }
+      }
+    }
+
+    if (!success && !isAbortedRef.current) {
+      const errMsg = lastError?.message || '알 수 없는 오류';
+      updateAssetAt(idx, { status: 'error', errorMessage: errMsg });
+      setProgressMessage(`씬 ${idx + 1} 생성 실패: ${errMsg.slice(0, 60)}`);
+    }
+  }, [currentReferenceImages]);
+
+  // 애니메이션 생성 핸들러 (useCallback으로 메모이제이션)
+  const handleGenerateAnimation = useCallback(async (idx: number) => {
+    if (animatingIndices.has(idx)) return; // 이 씬은 이미 변환 중
+    if (!assetsRef.current[idx]?.imageData) {
+      alert('이미지가 먼저 생성되어야 합니다.');
+      return;
+    }
+
+    try {
+      // Set에 현재 인덱스 추가
+      setAnimatingIndices(prev => new Set(prev).add(idx));
+      setProgressMessage(`씬 ${idx + 1} 움직임 분석 중...`);
+
+      // AI가 대본과 이미지를 분석해서 움직임 프롬프트 생성
+      const motionPrompt = await generateMotionPrompt(
+        assetsRef.current[idx].narration,
+        assetsRef.current[idx].visualPrompt
+      );
+
+      setProgressMessage(`씬 ${idx + 1} 영상 변환 중...`);
+      const videoUrl = await generateVideoFromImage(
+        assetsRef.current[idx].imageData!,
+        motionPrompt
+      );
+
+      if (videoUrl) {
+        updateAssetAt(idx, {
+          videoData: videoUrl,
+          videoDuration: CONFIG.ANIMATION.VIDEO_DURATION
+        });
+        // 영상 비용 추가
+        addCost('video', PRICING.VIDEO.perVideo, 1);
+        setProgressMessage(`씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`);
+      } else {
+        setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
+      }
+    } catch (e: any) {
+      console.error('영상 변환 실패:', e);
+      setProgressMessage(`씬 ${idx + 1} 오류: ${e.message}`);
+    } finally {
+      // Set에서 현재 인덱스 제거
+      setAnimatingIndices(prev => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
+    }
+  }, [animatingIndices]);
+
+  const triggerVideoExport = async (enableSubtitles: boolean = true, subtitleConfig?: Partial<SubtitleConfig>, sceneGap?: number) => {
     if (isVideoGenerating) return;
     try {
       setIsVideoGenerating(true);
@@ -345,12 +591,12 @@ const App: React.FC = () => {
         assetsRef.current,
         (msg) => setProgressMessage(`[Render] ${msg}`),
         isAbortedRef,
-        { enableSubtitles }
+        { enableSubtitles, bgmData, bgmVolume, subtitleConfig, sceneGap, bgmDuckingEnabled, bgmDuckingAmount }
       );
 
       if (result) {
         // 영상 저장 (자막은 영상에 하드코딩됨)
-        saveAs(result.videoBlob, `tubegen_v92_${suffix}_${timestamp}.mp4`);
+        saveAs(result.videoBlob, `c2gen_${suffix}_${timestamp}.mp4`);
         setProgressMessage(`✨ MP4 렌더링 완료! (${enableSubtitles ? '자막 O' : '자막 X'})`);
       }
     } catch (error: any) {
@@ -360,10 +606,203 @@ const App: React.FC = () => {
     }
   };
 
+  // 씬 편집 저장 핸들러
+  const handleUpdateAsset = useCallback((idx: number, updates: Partial<GeneratedAsset>) => {
+    pushUndoState(snapshotAssets());
+    updateAssetAt(idx, updates);
+    setEditingIndex(null);
+  }, [pushUndoState]);
+
+  // 단일 씬 TTS 재생성 핸들러
+  const handleRegenerateAudio = useCallback(async (idx: number) => {
+    updateAssetAt(idx, { status: 'generating' });
+    setProgressMessage(`씬 ${idx + 1} 음성 재생성 중...`);
+    try {
+      const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
+      const elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
+      const result = await generateAudioWithElevenLabs(
+        assetsRef.current[idx].narration,
+        undefined, undefined, undefined,
+        { speed: elSpeed, stability: elStability }
+      );
+      if (result.audioData && !isAbortedRef.current) {
+        updateAssetAt(idx, {
+          audioData: result.audioData,
+          subtitleData: result.subtitleData,
+          audioDuration: result.estimatedDuration,
+          status: 'completed'
+        });
+        const chars = assetsRef.current[idx].narration.length;
+        addCost('tts', chars * PRICING.TTS.perCharacter, chars);
+        setProgressMessage(`씬 ${idx + 1} 음성 재생성 완료!`);
+      }
+    } catch (e: any) {
+      updateAssetAt(idx, { status: 'error' });
+      setProgressMessage(`씬 ${idx + 1} 음성 재생성 실패: ${e.message}`);
+    }
+  }, []);
+
+  // 씬 순서 변경 핸들러
+  const handleReorderScenes = useCallback((fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    pushUndoState(snapshotAssets());
+    const newAssets = [...assetsRef.current];
+    const [moved] = newAssets.splice(fromIdx, 1);
+    newAssets.splice(toIdx, 0, moved);
+    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
+    assetsRef.current = newAssets;
+    setGeneratedData([...newAssets]);
+  }, []);
+
+  // 씬 삭제 핸들러
+  const handleDeleteScene = useCallback((idx: number) => {
+    pushUndoState(snapshotAssets());
+    const newAssets = assetsRef.current.filter((_, i) => i !== idx);
+    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
+    assetsRef.current = newAssets;
+    setGeneratedData([...newAssets]);
+    setEditingIndex(null);
+  }, []);
+
+  // 씬 추가 핸들러 (afterIdx 위치 다음에 삽입, undefined면 맨 끝)
+  const handleAddScene = useCallback((afterIdx?: number) => {
+    pushUndoState(snapshotAssets());
+    const insertAt = afterIdx !== undefined ? afterIdx + 1 : assetsRef.current.length;
+    const newAsset: GeneratedAsset = {
+      sceneNumber: insertAt + 1,
+      narration: '',
+      visualPrompt: '',
+      imageData: null,
+      audioData: null,
+      audioDuration: null,
+      subtitleData: null,
+      videoData: null,
+      videoDuration: null,
+      status: 'pending',
+      customDuration: 5,
+    };
+    const newAssets = [...assetsRef.current];
+    newAssets.splice(insertAt, 0, newAsset);
+    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
+    assetsRef.current = newAssets;
+    setGeneratedData([...newAssets]);
+    setEditingIndex(insertAt);
+  }, []);
+
+  // 씬 이미지 직접 업로드 핸들러
+  const handleUploadSceneImage = useCallback((idx: number, base64: string) => {
+    updateAssetAt(idx, { imageData: base64, videoData: null, status: 'completed' });
+  }, []);
+
+  // 씬 재생 시간 조절 핸들러
+  const handleSetCustomDuration = useCallback((idx: number, duration: number) => {
+    pushUndoState(snapshotAssets());
+    updateAssetAt(idx, { customDuration: duration });
+  }, [pushUndoState]);
+
+  // 씬별 줌/팬 효과 핸들러
+  const handleSetZoomEffect = useCallback((idx: number, effect: string) => {
+    pushUndoState(snapshotAssets());
+    updateAssetAt(idx, { zoomEffect: effect as GeneratedAsset['zoomEffect'] });
+  }, [pushUndoState]);
+
+  // 씬 복제 핸들러
+  const handleDuplicateScene = useCallback((idx: number) => {
+    pushUndoState(snapshotAssets());
+    const original = assetsRef.current[idx];
+    const insertAt = idx + 1;
+    const newAsset: GeneratedAsset = { ...original, sceneNumber: insertAt + 1 };
+    const newAssets = [...assetsRef.current];
+    newAssets.splice(insertAt, 0, newAsset);
+    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
+    assetsRef.current = newAssets;
+    setGeneratedData([...newAssets]);
+  }, []);
+
+  // 자동 줌 패턴 일괄 적용 핸들러
+  const handleAutoZoom = useCallback((pattern: string) => {
+    pushUndoState(snapshotAssets());
+    const len = assetsRef.current.length;
+    const dynamicCycle: GeneratedAsset['zoomEffect'][] = ['zoomIn', 'panLeft', 'zoomOut', 'panRight'];
+
+    for (let i = 0; i < len; i++) {
+      let effect: GeneratedAsset['zoomEffect'];
+      switch (pattern) {
+        case 'alternating':
+          effect = i % 2 === 0 ? 'zoomIn' : 'zoomOut';
+          break;
+        case 'dynamic':
+          effect = dynamicCycle[i % 4];
+          break;
+        case 'sentiment': {
+          const asset = assetsRef.current[i];
+          const sentiment = asset.analysis?.sentiment;
+          const motionType = asset.analysis?.motion_type;
+          if (sentiment === 'POSITIVE' && motionType === '동적') effect = 'zoomIn';
+          else if (sentiment === 'NEGATIVE' && motionType === '정적') effect = 'zoomOut';
+          else if (motionType === '동적') effect = i % 2 === 0 ? 'panLeft' : 'panRight';
+          else effect = 'zoomIn';
+          break;
+        }
+        case 'static':
+          effect = 'none';
+          break;
+        default:
+          return;
+      }
+      assetsRef.current[i] = { ...assetsRef.current[i], zoomEffect: effect };
+    }
+    setGeneratedData([...assetsRef.current]);
+  }, [pushUndoState]);
+
+  // 씬별 전환 효과 핸들러
+  const handleSetTransition = useCallback((idx: number, transition: string) => {
+    pushUndoState(snapshotAssets());
+    updateAssetAt(idx, { transition: transition as GeneratedAsset['transition'] });
+  }, [pushUndoState]);
+
+  // 전체 씬 전환 효과 일괄 설정
+  const handleSetDefaultTransition = useCallback((transition: string) => {
+    pushUndoState(snapshotAssets());
+    assetsRef.current = assetsRef.current.map(a => ({
+      ...a,
+      transition: transition as GeneratedAsset['transition']
+    }));
+    setGeneratedData([...assetsRef.current]);
+  }, [pushUndoState]);
+
+  // 실패한 씬 일괄 재생성 핸들러
+  const handleRegenerateFailedScenes = useCallback(async () => {
+    const failedIndices = assetsRef.current
+      .map((asset, idx) => ({ asset, idx }))
+      .filter(({ asset }) => asset.status === 'error')
+      .map(({ idx }) => idx);
+
+    if (failedIndices.length === 0) return;
+    setProgressMessage(`실패한 ${failedIndices.length}개 씬 재생성 중...`);
+
+    for (const idx of failedIndices) {
+      if (isAbortedRef.current) break;
+      await handleRegenerateImage(idx);
+    }
+    setProgressMessage(`실패 씬 재생성 완료!`);
+  }, [handleRegenerateImage]);
+
+  // 프로젝트 JSON 가져오기 핸들러
+  const handleImportProject = async (project: SavedProject) => {
+    try {
+      await importProject(project);
+      await refreshProjects();
+      setProgressMessage(`"${project.name}" 프로젝트 가져오기 완료`);
+    } catch (e: any) {
+      setProgressMessage(`프로젝트 가져오기 실패: ${e.message}`);
+    }
+  };
+
   // 프로젝트 삭제 핸들러
-  const handleDeleteProject = (id: string) => {
-    deleteProject(id);
-    refreshProjects();
+  const handleDeleteProject = async (id: string) => {
+    await deleteProject(id);
+    await refreshProjects();
   };
 
   // 프로젝트 불러오기 핸들러
@@ -380,6 +819,23 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       <Header />
+
+      {/* 유저 정보 바 */}
+      {userName && (
+        <div className="bg-slate-900/50 border-b border-slate-800/50">
+          <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-end gap-3">
+            <span className="text-[11px] text-slate-400">
+              <span className="text-cyan-400 font-medium">{userName}</span> 님
+            </span>
+            <button
+              onClick={onLogout}
+              className="text-[10px] px-2.5 py-1 bg-slate-800/80 hover:bg-red-900/40 text-slate-500 hover:text-red-400 rounded-md border border-slate-700/50 transition-all"
+            >
+              로그아웃
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 네비게이션 탭 */}
       <div className="border-b border-slate-800">
@@ -427,13 +883,16 @@ const App: React.FC = () => {
 
       {/* 갤러리 뷰 */}
       {viewMode === 'gallery' && (
-        <ProjectGallery
-          projects={savedProjects}
-          onBack={() => setViewMode('main')}
-          onDelete={handleDeleteProject}
-          onRefresh={refreshProjects}
-          onLoad={handleLoadProject}
-        />
+        <GalleryErrorBoundary>
+          <ProjectGallery
+            projects={savedProjects}
+            onBack={() => setViewMode('main')}
+            onDelete={handleDeleteProject}
+            onRefresh={refreshProjects}
+            onLoad={handleLoadProject}
+            onImport={handleImportProject}
+          />
+        </GalleryErrorBoundary>
       )}
 
       {/* 메인 뷰 */}
@@ -455,110 +914,40 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <ResultTable 
-            data={generatedData} 
-            onRegenerateImage={async (idx) => {
-              if (isProcessingRef.current) return;
-              
-              const MAX_RETRIES = 2;
-              updateAssetAt(idx, { status: 'generating' });
-              setProgressMessage(`씬 ${idx + 1} 이미지 재생성 중...`);
-              
-              let success = false;
-              
-              for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
-                if (isAbortedRef.current) break;
-                
-                try {
-                  if (attempt > 0) {
-                    setProgressMessage(`씬 ${idx + 1} 이미지 재생성 재시도 중... (${attempt}/${MAX_RETRIES})`);
-                    await wait(2000);
-                  }
-                  
-                  const img = await generateImage(assetsRef.current[idx], currentReferenceImages);
-                  
-                  if (img && !isAbortedRef.current) {
-                    updateAssetAt(idx, { imageData: img, status: 'completed' });
-                    // 이미지 비용 추가
-                    const imageModel = getSelectedImageModel();
-                    const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
-                    addCost('image', imagePrice, 1);
-                    setProgressMessage(`씬 ${idx + 1} 이미지 재생성 완료! (+${formatKRW(imagePrice)})`);
-                    success = true;
-                  } else if (!img) {
-                    throw new Error('이미지 데이터가 비어있습니다');
-                  }
-                } catch (e: any) {
-                  console.error(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
-                  
-                  if (e.message?.includes("API key not valid") || e.status === 400) {
-                    setNeedsKey(true);
-                    break;
-                  }
-                }
-              }
-              
-              if (!success && !isAbortedRef.current) {
-                updateAssetAt(idx, { status: 'error' });
-                setProgressMessage(`씬 ${idx + 1} 이미지 생성 실패. 다시 시도해주세요.`);
-              }
-            }}
+        <ResultTable
+            data={generatedData}
+            editingIndex={editingIndex}
+            onEditToggle={setEditingIndex}
+            onUpdateAsset={handleUpdateAsset}
+            onRegenerateAudio={handleRegenerateAudio}
+            onReorderScenes={handleReorderScenes}
+            onDeleteScene={handleDeleteScene}
+            onAddScene={handleAddScene}
+            onUploadSceneImage={handleUploadSceneImage}
+            onSetCustomDuration={handleSetCustomDuration}
+            onSetZoomEffect={handleSetZoomEffect}
+            onSetTransition={handleSetTransition}
+            onSetDefaultTransition={handleSetDefaultTransition}
+            onAutoZoom={handleAutoZoom}
+            onRegenerateImage={handleRegenerateImage}
+            onDuplicateScene={handleDuplicateScene}
+            onRegenerateFailedScenes={handleRegenerateFailedScenes}
             onExportVideo={triggerVideoExport}
             isExporting={isVideoGenerating}
             animatingIndices={animatingIndices}
-            onGenerateAnimation={async (idx) => {
-              const falKey = getFalApiKey();
-              if (!falKey) {
-                alert('FAL API 키를 먼저 등록해주세요.\n설정 패널에서 "FAL.ai 애니메이션 엔진"을 열어 키를 입력하세요.');
-                return;
-              }
-              if (animatingIndices.has(idx)) return; // 이 씬은 이미 변환 중
-              if (!assetsRef.current[idx]?.imageData) {
-                alert('이미지가 먼저 생성되어야 합니다.');
-                return;
-              }
-
-              try {
-                // Set에 현재 인덱스 추가
-                setAnimatingIndices(prev => new Set(prev).add(idx));
-                setProgressMessage(`씬 ${idx + 1} 움직임 분석 중... (${animatingIndices.size + 1}개 진행중)`);
-
-                // AI가 대본과 이미지를 분석해서 움직임 프롬프트 생성
-                const motionPrompt = await generateMotionPrompt(
-                  assetsRef.current[idx].narration,
-                  assetsRef.current[idx].visualPrompt
-                );
-
-                setProgressMessage(`씬 ${idx + 1} 영상 변환 중...`);
-                const videoUrl = await generateVideoFromImage(
-                  assetsRef.current[idx].imageData!,
-                  motionPrompt,
-                  falKey
-                );
-
-                if (videoUrl) {
-                  updateAssetAt(idx, {
-                    videoData: videoUrl,
-                    videoDuration: CONFIG.ANIMATION.VIDEO_DURATION
-                  });
-                  // 영상 비용 추가
-                  addCost('video', PRICING.VIDEO.perVideo, 1);
-                  setProgressMessage(`씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`);
-                } else {
-                  setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
-                }
-              } catch (e: any) {
-                console.error('영상 변환 실패:', e);
-                setProgressMessage(`씬 ${idx + 1} 오류: ${e.message}`);
-              } finally {
-                // Set에서 현재 인덱스 제거
-                setAnimatingIndices(prev => {
-                  const next = new Set(prev);
-                  next.delete(idx);
-                  return next;
-                });
-              }
-            }}
+            onGenerateAnimation={handleGenerateAnimation}
+            bgmData={bgmData}
+            bgmVolume={bgmVolume}
+            onBgmChange={setBgmData}
+            onBgmVolumeChange={setBgmVolume}
+            bgmDuckingEnabled={bgmDuckingEnabled}
+            bgmDuckingAmount={bgmDuckingAmount}
+            onBgmDuckingToggle={setBgmDuckingEnabled}
+            onBgmDuckingAmountChange={setBgmDuckingAmount}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
         />
       </main>
       )}
