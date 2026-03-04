@@ -162,12 +162,11 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess }) => {
           <p className="text-slate-500 text-sm mt-1">AI 스토리보드 & 영상 자동 생성</p>
         </div>
 
-        {/* 탭 전환 */}
+        {/* 탭 전환 (로그인/회원가입만) */}
         <div className="flex rounded-xl overflow-hidden mb-6 bg-slate-900/50 border border-slate-800/50">
           {[
             { id: 'login' as Tab, label: '로그인' },
             { id: 'register' as Tab, label: '회원가입' },
-            { id: 'admin' as Tab, label: '관리자' },
           ].map(t => (
             <button
               key={t.id}
@@ -315,6 +314,24 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess }) => {
           </div>
         )}
       </div>
+
+      {/* 숨겨진 관리자 진입점 - 우하단 구석 */}
+      {tab !== 'admin' && (
+        <button
+          onClick={() => { setTab('admin'); clearMessages(); }}
+          className="fixed bottom-3 right-3 w-6 h-6 rounded-full opacity-0 hover:opacity-30 transition-opacity cursor-default"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+      )}
+      {tab === 'admin' && (
+        <button
+          onClick={() => { setTab('login'); clearMessages(); }}
+          className="fixed bottom-3 right-3 text-[10px] text-slate-700 hover:text-slate-500 transition-colors"
+        >
+          돌아가기
+        </button>
+      )}
     </div>
   );
 };
