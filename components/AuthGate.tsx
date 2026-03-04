@@ -44,6 +44,9 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess }) => {
   // 관리자
   const [adminPassword, setAdminPassword] = useState('');
 
+  // 공지사항
+  const [announcements, setAnnouncements] = useState<{id: string; title: string; content: string; type: string}[]>([]);
+
   // 마운트 시 기존 세션 확인
   useEffect(() => {
     (async () => {
@@ -78,6 +81,21 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess }) => {
       setLoading(false);
     })();
   }, [onSuccess, onAdminSuccess]);
+
+  // 공지사항 불러오기
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'getActiveAnnouncements' }),
+        });
+        const data = await res.json();
+        if (data.announcements?.length > 0) setAnnouncements(data.announcements);
+      } catch {}
+    })();
+  }, []);
 
   const clearMessages = () => { setError(null); setSuccess(null); };
 
@@ -191,6 +209,22 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess }) => {
         {success && (
           <div className="mb-4 p-3 rounded-lg bg-green-900/30 border border-green-700/50 text-green-300 text-sm">
             {success}
+          </div>
+        )}
+
+        {/* 공지사항 */}
+        {announcements.length > 0 && tab !== 'admin' && (
+          <div className="mb-4 space-y-2">
+            {announcements.map(ann => (
+              <div key={ann.id} className={`p-3 rounded-lg border text-sm ${
+                ann.type === 'urgent' ? 'bg-red-900/30 border-red-700/50 text-red-300'
+                : ann.type === 'warning' ? 'bg-yellow-900/30 border-yellow-700/50 text-yellow-300'
+                : 'bg-blue-900/30 border-blue-700/50 text-blue-300'
+              }`}>
+                <p className="font-medium text-[13px]">{ann.title}</p>
+                <p className="text-[12px] mt-0.5 opacity-80">{ann.content}</p>
+              </div>
+            ))}
           </div>
         )}
 

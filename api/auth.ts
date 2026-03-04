@@ -473,6 +473,294 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ success: true, message: '유저를 삭제했습니다.' });
       }
 
+      // ── 사용량 시계열 (관리자) ──
+      case 'usageTimeSeries': {
+        const { adminToken, startDate, endDate } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        let query = supabase
+          .from('c2gen_usage')
+          .select('action, cost_usd, count, created_at, email')
+          .order('created_at', { ascending: true });
+
+        if (startDate) query = query.gte('created_at', startDate);
+        if (endDate) query = query.lte('created_at', endDate);
+
+        const { data: tsData, error: tsError } = await query;
+        if (tsError) return res.status(500).json({ error: tsError.message });
+
+        const dailyMap: Record<string, Record<string, { cost: number; count: number }>> = {};
+        const userMap: Record<string, { cost: number; count: number }> = {};
+
+        (tsData || []).forEach((row: any) => {
+          const date = new Date(row.created_at).toISOString().split('T')[0];
+          if (!dailyMap[date]) dailyMap[date] = {};
+          if (!dailyMap[date][row.action]) dailyMap[date][row.action] = { cost: 0, count: 0 };
+          dailyMap[date][row.action].cost += Number(row.cost_usd);
+          dailyMap[date][row.action].count += row.count;
+
+          if (!userMap[row.email]) userMap[row.email] = { cost: 0, count: 0 };
+          userMap[row.email].cost += Number(row.cost_usd);
+          userMap[row.email].count += row.count;
+        });
+
+        const timeSeries = Object.entries(dailyMap).map(([date, actions]) => ({
+          date,
+          actions,
+          totalCost: Object.values(actions).reduce((s, a) => s + a.cost, 0),
+          totalCount: Object.values(actions).reduce((s, a) => s + a.count, 0),
+        }));
+
+        const userRanking = Object.entries(userMap)
+          .map(([email, d]) => ({ email, ...d }))
+          .sort((a, b) => b.cost - a.cost)
+          .slice(0, 20);
+
+        return res.json({ timeSeries, userRanking });
+      }
+
+      // ── 전체 활성 세션 (관리자) ──
+      case 'allSessions': {
+        const { adminToken } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        const { data: sessData, error: sessError } = await supabase
+          .from('c2gen_sessions')
+          .select('token, email, name, expires_at')
+          .gt('expires_at', new Date().toISOString())
+          .neq('email', 'admin')
+          .order('expires_at', { ascending: false });
+
+        if (sessError) return res.status(500).json({ error: sessError.message });
+        return res.json({ sessions: sessData || [] });
+      }
+
+      // ── 만료 세션 일괄 정리 (관리자) ──
+      case 'bulkRevokeSessions': {
+        const { adminToken } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        const { data: expired } = await supabase
+          .from('c2gen_sessions')
+          .select('token')
+          .lt('expires_at', new Date().toISOString());
+
+        const expiredCount = expired?.length || 0;
+        if (expiredCount > 0) {
+          await supabase.from('c2gen_sessions').delete().lt('expires_at', new Date().toISOString());
+        }
+
+        return res.json({ success: true, message: `만료된 세션 ${expiredCount}개를 정리했습니다.` });
+      }
+
+      // ── 특정 세션 강제 만료 (관리자) ──
+      case 'revokeSessionByToken': {
+        const { adminToken, sessionToken } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        await supabase.from('c2gen_sessions').delete().eq('token', sessionToken);
+        return res.json({ success: true, message: '세션이 만료되었습니다.' });
+      }
+
+      // ── 전체 프로젝트 검색 (관리자) ──
+      case 'searchProjects': {
+        const { adminToken, query: searchQuery, email: searchEmail } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        let q = supabase
+          .from('c2gen_projects')
+          .select('id, name, topic, thumbnail, cost, scene_count, created_at, email')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (searchEmail) q = q.eq('email', searchEmail);
+        if (searchQuery) q = q.or(`name.ilike.%${searchQuery}%,topic.ilike.%${searchQuery}%`);
+
+        const { data: searchData, error: searchError } = await q;
+        if (searchError) return res.status(500).json({ error: searchError.message });
+
+        const projects = (searchData || []).map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          topic: row.topic,
+          thumbnail: row.thumbnail,
+          cost: row.cost,
+          sceneCount: row.scene_count,
+          createdAt: row.created_at,
+          email: row.email,
+        }));
+
+        return res.json({ projects });
+      }
+
+      // ── 공지사항 목록 (관리자) ──
+      case 'listAnnouncements': {
+        const { adminToken } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        const { data: annData, error: annError } = await supabase
+          .from('c2gen_announcements')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (annError) {
+          if (annError.message?.includes('does not exist') || annError.code === '42P01') {
+            return res.json({ announcements: [], tableNotFound: true });
+          }
+          return res.status(500).json({ error: annError.message });
+        }
+        return res.json({ announcements: annData || [] });
+      }
+
+      // ── 활성 공지사항 (공개 - 로그인 페이지용) ──
+      case 'getActiveAnnouncements': {
+        const { data: activeAnn } = await supabase
+          .from('c2gen_announcements')
+          .select('id, title, content, type, created_at')
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        return res.json({ announcements: activeAnn || [] });
+      }
+
+      // ── 공지사항 등록 (관리자) ──
+      case 'createAnnouncement': {
+        const { adminToken, title, content: annContent, type: annType = 'info', active = true } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+        if (!title || !annContent) {
+          return res.status(400).json({ error: '제목과 내용을 입력해주세요.' });
+        }
+
+        const { error: createErr } = await supabase.from('c2gen_announcements').insert({
+          title, content: annContent, type: annType, active,
+          created_at: new Date().toISOString(),
+        });
+
+        if (createErr) {
+          if (createErr.message?.includes('does not exist') || createErr.code === '42P01') {
+            return res.status(500).json({
+              error: 'c2gen_announcements 테이블이 없습니다. Supabase SQL Editor에서 테이블을 생성해주세요.',
+              sql: `CREATE TABLE c2gen_announcements (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  title text NOT NULL,
+  content text NOT NULL,
+  type text DEFAULT 'info',
+  active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);`,
+            });
+          }
+          return res.status(500).json({ error: createErr.message });
+        }
+        return res.json({ success: true, message: '공지사항이 등록되었습니다.' });
+      }
+
+      // ── 공지사항 삭제 (관리자) ──
+      case 'deleteAnnouncement': {
+        const { adminToken, id: annId } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        await supabase.from('c2gen_announcements').delete().eq('id', annId);
+        return res.json({ success: true, message: '공지사항이 삭제되었습니다.' });
+      }
+
+      // ── 공지사항 활성/비활성 토글 (관리자) ──
+      case 'toggleAnnouncement': {
+        const { adminToken, id: toggleId, active: isActive } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        await supabase.from('c2gen_announcements').update({ active: isActive }).eq('id', toggleId);
+        return res.json({ success: true });
+      }
+
+      // ── 에러 로그 조회 (관리자) ──
+      case 'getErrorLogs': {
+        const { adminToken, service, startDate: logStart, endDate: logEnd, limit: logLimit = 100 } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        let logQuery = supabase
+          .from('c2gen_error_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(logLimit);
+
+        if (service) logQuery = logQuery.eq('service', service);
+        if (logStart) logQuery = logQuery.gte('created_at', logStart);
+        if (logEnd) logQuery = logQuery.lte('created_at', logEnd);
+
+        const { data: logData, error: logError } = await logQuery;
+        if (logError) {
+          if (logError.message?.includes('does not exist') || logError.code === '42P01') {
+            return res.json({ logs: [], tableNotFound: true });
+          }
+          return res.status(500).json({ error: logError.message });
+        }
+        return res.json({ logs: logData || [] });
+      }
+
+      // ── API 키 상태 확인 (관리자) ──
+      case 'apiKeyStatus': {
+        const { adminToken } = params;
+        if (!(await validateAdminSession(supabase, adminToken))) {
+          return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
+        }
+
+        const keyStatus: Record<string, any> = {};
+
+        // ElevenLabs
+        const elevenKey = process.env.ELEVENLABS_API_KEY;
+        const elevenKey2 = process.env.ELEVENLABS_API_KEY_2;
+        keyStatus.elevenlabs = { configured: !!elevenKey, keyCount: [elevenKey, elevenKey2].filter(Boolean).length };
+        if (elevenKey) {
+          try {
+            const subResp = await fetch('https://api.elevenlabs.io/v1/user/subscription', {
+              headers: { 'xi-api-key': elevenKey },
+            });
+            if (subResp.ok) {
+              const sub = await subResp.json();
+              keyStatus.elevenlabs.subscription = {
+                tier: sub.tier,
+                characterCount: sub.character_count,
+                characterLimit: sub.character_limit,
+                remaining: sub.character_limit - sub.character_count,
+              };
+            }
+          } catch {}
+        }
+
+        // Gemini
+        const gKey = process.env.GEMINI_API_KEY;
+        const gKey2 = process.env.GEMINI_API_KEY_2;
+        keyStatus.gemini = { configured: !!gKey, keyCount: [gKey, gKey2].filter(Boolean).length };
+
+        // fal.ai
+        const fKey = process.env.FAL_API_KEY;
+        keyStatus.fal = { configured: !!fKey, keyCount: fKey ? 1 : 0 };
+
+        return res.json({ status: keyStatus, checkedAt: new Date().toISOString() });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }

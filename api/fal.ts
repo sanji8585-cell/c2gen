@@ -34,6 +34,19 @@ async function logUsage(req: VercelRequest, action: string, costUsd: number) {
   }
 }
 
+async function logError(action: string, errorMessage: string) {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) return;
+    const supabase = createClient(url, key);
+    await supabase.from('c2gen_error_logs').insert({
+      service: 'fal', action, error_message: errorMessage,
+      created_at: new Date().toISOString(),
+    });
+  } catch {}
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -122,6 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error: any) {
     console.error(`[api/fal] ${action} 실패:`, error.message);
+    logError(action, error.message || 'Unknown error');
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }

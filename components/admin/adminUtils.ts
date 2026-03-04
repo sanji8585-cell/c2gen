@@ -55,6 +55,61 @@ export interface ProjectAsset {
   status?: string;
 }
 
+// ── 새 기능 타입 ──
+
+export interface TimeSeriesEntry {
+  date: string;
+  actions: Record<string, { cost: number; count: number }>;
+  totalCost: number;
+  totalCount: number;
+}
+
+export interface UserRanking {
+  email: string;
+  cost: number;
+  count: number;
+}
+
+export interface SessionInfo {
+  token: string;
+  email: string;
+  name: string;
+  expires_at: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  type: 'info' | 'warning' | 'urgent';
+  active: boolean;
+  created_at: string;
+}
+
+export interface ErrorLogEntry {
+  id: string;
+  service: string;
+  action: string;
+  error_message: string;
+  email?: string;
+  created_at: string;
+}
+
+export interface ApiKeyServiceStatus {
+  configured: boolean;
+  keyCount: number;
+  subscription?: {
+    tier: string;
+    characterCount: number;
+    characterLimit: number;
+    remaining: number;
+  };
+}
+
+export interface SearchProject extends UserProject {
+  email: string;
+}
+
 // ── 상수 ──
 
 export const ADMIN_STORAGE_KEY = 'c2gen_admin_token';

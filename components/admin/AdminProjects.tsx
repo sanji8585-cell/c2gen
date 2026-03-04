@@ -13,12 +13,18 @@ interface Props {
   onToast: (type: 'success' | 'error', message: string) => void;
 }
 
+interface ProjectWithEmail extends UserProject {
+  email?: string;
+}
+
 const AdminProjects: React.FC<Props> = ({ users, adminToken, initialUserEmail, onRefresh, onToast }) => {
   const [selectedEmail, setSelectedEmail] = useState<string>(initialUserEmail || '');
-  const [projects, setProjects] = useState<UserProject[]>([]);
+  const [projects, setProjects] = useState<ProjectWithEmail[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [viewProject, setViewProject] = useState<UserProject | null>(null);
+  const [viewProject, setViewProject] = useState<ProjectWithEmail | null>(null);
+  const [searchMode, setSearchMode] = useState<'user' | 'global'>('user');
+  const [globalQuery, setGlobalQuery] = useState('');
 
   const loadProjects = useCallback(async (email: string) => {
     if (!email) { setProjects([]); return; }
@@ -34,12 +40,28 @@ const AdminProjects: React.FC<Props> = ({ users, adminToken, initialUserEmail, o
   }, [adminToken, onToast]);
 
   useEffect(() => {
-    if (selectedEmail) loadProjects(selectedEmail);
-  }, [selectedEmail, loadProjects]);
+    if (searchMode === 'user' && selectedEmail) loadProjects(selectedEmail);
+  }, [selectedEmail, loadProjects, searchMode]);
 
   useEffect(() => {
-    if (initialUserEmail) setSelectedEmail(initialUserEmail);
+    if (initialUserEmail) {
+      setSelectedEmail(initialUserEmail);
+      setSearchMode('user');
+    }
   }, [initialUserEmail]);
+
+  const handleGlobalSearch = useCallback(async () => {
+    if (!globalQuery.trim()) { setProjects([]); return; }
+    setLoading(true);
+    try {
+      const { ok, data } = await authFetch({ action: 'searchProjects', adminToken, query: globalQuery.trim() });
+      if (ok) setProjects(data.projects || []);
+      else onToast('error', data.message || '검색에 실패했습니다.');
+    } catch {
+      onToast('error', '서버 연결에 실패했습니다.');
+    }
+    setLoading(false);
+  }, [adminToken, globalQuery, onToast]);
 
   const handleDeleteProject = useCallback(async (projectId: string, projectName: string) => {
     if (!confirm(`"${projectName}" 프로젝트를 삭제하시겠습니까?`)) return;
@@ -70,36 +92,79 @@ const AdminProjects: React.FC<Props> = ({ users, adminToken, initialUserEmail, o
 
   const usersWithProjects = users.filter(u => u.projectCount > 0);
 
+  const showEmpty = searchMode === 'user'
+    ? !selectedEmail
+    : projects.length === 0 && !loading && !globalQuery.trim();
+
   return (
     <div className="space-y-4">
       {/* 필터 바 */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={selectedEmail}
-          onChange={e => setSelectedEmail(e.target.value)}
-          className="min-w-[220px] px-4 py-2 bg-slate-900/80 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-cyan-500/50"
-        >
-          <option value="">회원 선택...</option>
-          {usersWithProjects.map(u => (
-            <option key={u.email} value={u.email}>
-              {u.name} ({u.email}) - {u.projectCount}개
-            </option>
-          ))}
-        </select>
+        <div className="flex rounded-lg overflow-hidden border border-slate-800">
+          <button
+            onClick={() => { setSearchMode('user'); setProjects([]); setGlobalQuery(''); }}
+            className={`px-3 py-1.5 text-[11px] font-medium transition-all ${
+              searchMode === 'user' ? 'bg-cyan-600 text-white' : 'bg-slate-900/80 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            사용자별
+          </button>
+          <button
+            onClick={() => { setSearchMode('global'); setProjects([]); setSelectedEmail(''); setSearch(''); }}
+            className={`px-3 py-1.5 text-[11px] font-medium transition-all ${
+              searchMode === 'global' ? 'bg-cyan-600 text-white' : 'bg-slate-900/80 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            전체 검색
+          </button>
+        </div>
 
-        {selectedEmail && (
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="프로젝트 이름/주제 검색..."
-            className="flex-1 min-w-[200px] px-4 py-2 bg-slate-900/80 border border-slate-800 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
-          />
+        {searchMode === 'user' ? (
+          <>
+            <select
+              value={selectedEmail}
+              onChange={e => setSelectedEmail(e.target.value)}
+              className="min-w-[220px] px-4 py-2 bg-slate-900/80 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-cyan-500/50"
+            >
+              <option value="">회원 선택...</option>
+              {usersWithProjects.map(u => (
+                <option key={u.email} value={u.email}>
+                  {u.name} ({u.email}) - {u.projectCount}개
+                </option>
+              ))}
+            </select>
+            {selectedEmail && (
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="프로젝트 이름/주제 검색..."
+                className="flex-1 min-w-[200px] px-4 py-2 bg-slate-900/80 border border-slate-800 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+              />
+            )}
+          </>
+        ) : (
+          <form onSubmit={e => { e.preventDefault(); handleGlobalSearch(); }} className="flex-1 flex gap-2 min-w-[300px]">
+            <input
+              type="text"
+              value={globalQuery}
+              onChange={e => setGlobalQuery(e.target.value)}
+              placeholder="프로젝트 이름 또는 주제로 전체 검색..."
+              className="flex-1 px-4 py-2 bg-slate-900/80 border border-slate-800 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+            />
+            <button
+              type="submit"
+              disabled={loading || !globalQuery.trim()}
+              className="px-4 py-2 bg-cyan-600/20 border border-cyan-600/30 rounded-lg text-[11px] text-cyan-400 hover:bg-cyan-600/30 transition-all disabled:opacity-50"
+            >
+              {loading ? '검색 중...' : '검색'}
+            </button>
+          </form>
         )}
 
-        {selectedEmail && (
+        {((searchMode === 'user' && selectedEmail) || (searchMode === 'global' && projects.length > 0)) && (
           <button
-            onClick={() => loadProjects(selectedEmail)}
+            onClick={() => searchMode === 'user' ? loadProjects(selectedEmail) : handleGlobalSearch()}
             disabled={loading}
             className="px-3 py-2 bg-slate-900/80 border border-slate-800 rounded-lg text-[11px] text-slate-400 hover:text-slate-200 transition-all disabled:opacity-50"
           >
@@ -107,20 +172,20 @@ const AdminProjects: React.FC<Props> = ({ users, adminToken, initialUserEmail, o
           </button>
         )}
 
-        {selectedEmail && (
-          <span className="text-[11px] text-slate-600">
-            {filteredProjects.length}개 프로젝트
-          </span>
-        )}
+        <span className="text-[11px] text-slate-600">
+          {filteredProjects.length}개 프로젝트
+        </span>
       </div>
 
       {/* 프로젝트 그리드 */}
-      {!selectedEmail ? (
+      {showEmpty ? (
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-12 text-center">
           <div className="text-slate-600 text-3xl mb-3">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto opacity-30"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           </div>
-          <p className="text-sm text-slate-500">왼쪽에서 회원을 선택하면 프로젝트 목록이 표시됩니다.</p>
+          <p className="text-sm text-slate-500">
+            {searchMode === 'user' ? '위에서 회원을 선택하면 프로젝트 목록이 표시됩니다.' : '검색어를 입력하고 검색 버튼을 클릭하세요.'}
+          </p>
           <p className="text-[11px] text-slate-600 mt-1">프로젝트가 있는 회원: {usersWithProjects.length}명</p>
         </div>
       ) : loading ? (
@@ -170,6 +235,9 @@ const AdminProjects: React.FC<Props> = ({ users, adminToken, initialUserEmail, o
               <div className="p-3">
                 <p className="text-sm font-medium text-slate-200 truncate">{proj.name}</p>
                 <p className="text-[11px] text-slate-500 truncate mt-0.5">{proj.topic}</p>
+                {searchMode === 'global' && proj.email && (
+                  <p className="text-[10px] text-cyan-400/60 truncate mt-0.5">{proj.email}</p>
+                )}
                 <div className="flex items-center gap-3 mt-2 text-[10px]">
                   <span className="text-slate-600">{proj.sceneCount || '?'}씬</span>
                   <span className="text-cyan-400/70">{formatCost(getProjectCost(proj.cost))}</span>

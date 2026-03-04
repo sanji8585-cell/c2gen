@@ -172,6 +172,19 @@ async function logUsage(req: VercelRequest, action: string, costUsd: number) {
   }
 }
 
+async function logError(action: string, errorMessage: string) {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) return;
+    const supabase = createClient(url, key);
+    await supabase.from('c2gen_error_logs').insert({
+      service: 'gemini', action, error_message: errorMessage,
+      created_at: new Date().toISOString(),
+    });
+  } catch {}
+}
+
 // ── 핸들러 ─────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -420,6 +433,7 @@ Return ONLY the motion prompt, no explanation.`;
     }
   } catch (error: any) {
     console.error(`[api/gemini] ${action} 실패:`, error.message);
+    logError(action, error.message || 'Unknown error');
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }
