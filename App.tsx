@@ -528,6 +528,15 @@ const AppContent: React.FC<{
         } catch {}
         setTimeout(() => { setKonamiActive(false); document.documentElement.classList.remove('retro-mode'); document.getElementById('konami-scanline')?.remove(); }, 10000);
         konamiRef.current = [];
+        // 업적 트리거
+        if (isAuthenticated && game.synced) {
+          game.recordAction('special_konami', 1).then(result => {
+            if (result?.achievementsUnlocked?.length > 0) {
+              const a = result.achievementsUnlocked[0];
+              setTimeout(() => setOverlayAchievement({ name: a.name, icon: a.icon, description: a.description, category: a.category, rewardXp: a.rewardXp, rewardCredits: a.rewardCredits }), 1000);
+            }
+          });
+        }
       }
     };
     window.addEventListener('keydown', handler);
@@ -1517,7 +1526,16 @@ const AppContent: React.FC<{
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={game.synced ? game.userState?.streakCount ?? genStats.streak : genStats.streak} totalGenerations={game.synced ? game.userState?.totalGenerations ?? genStats.total : genStats.total} level={game.synced ? game.levelInfo.level : funLevel} title={game.synced ? '' : (['','초보 크리에이터','아이디어 탐험가','스토리 위버','아이디어 뱅크','비주얼 아키텍트','영감의 마법사','AI 파트너','마스터 크리에이터','레전드 프로듀서','다이아몬드 아티스트'])[funLevel]||''} xpPercent={game.synced ? game.levelInfo.progress : (() => { const T=[0,50,120,200,350,500,750,1000,1500,2500]; const cur=T[funLevel-1]||0; const nxt=T[funLevel]||T[T.length-1]; return nxt>cur?Math.min(100,((funXp-cur)/(nxt-cur))*100):100; })()} sessionCombo={sessionCombo} levelInfo={game.synced ? game.levelInfo : null} equipped={game.synced ? game.equipped : null} />
+      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={game.synced ? game.userState?.streakCount ?? genStats.streak : genStats.streak} totalGenerations={game.synced ? game.userState?.totalGenerations ?? genStats.total : genStats.total} level={game.synced ? game.levelInfo.level : funLevel} title={game.synced ? '' : (['','초보 크리에이터','아이디어 탐험가','스토리 위버','아이디어 뱅크','비주얼 아키텍트','영감의 마법사','AI 파트너','마스터 크리에이터','레전드 프로듀서','다이아몬드 아티스트'])[funLevel]||''} xpPercent={game.synced ? game.levelInfo.progress : (() => { const T=[0,50,120,200,350,500,750,1000,1500,2500]; const cur=T[funLevel-1]||0; const nxt=T[funLevel]||T[T.length-1]; return nxt>cur?Math.min(100,((funXp-cur)/(nxt-cur))*100):100; })()} sessionCombo={sessionCombo} levelInfo={game.synced ? game.levelInfo : null} equipped={game.synced ? game.equipped : null} onLogoAchievement={() => {
+        if (isAuthenticated && game.synced) {
+          game.recordAction('special_logo_click', 1).then(result => {
+            if (result?.achievementsUnlocked?.length > 0) {
+              const a = result.achievementsUnlocked[0];
+              setTimeout(() => setOverlayAchievement({ name: a.name, icon: a.icon, description: a.description, category: a.category, rewardXp: a.rewardXp, rewardCredits: a.rewardCredits }), 500);
+            }
+          });
+        }
+      }} />
 
       {/* 유저 정보 바 */}
       <div className="border-b" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 50%, transparent)', borderColor: 'var(--border-default)' }}>

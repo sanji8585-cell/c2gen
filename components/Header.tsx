@@ -73,9 +73,10 @@ interface HeaderProps {
   // 게이미피케이션 v2
   levelInfo?: LevelInfo | null;
   equipped?: EquippedItems | null;
+  onLogoAchievement?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, totalGenerations = 0, level = 1, title = '', xpPercent = 0, sessionCombo = 0, levelInfo, equipped }) => {
+const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, totalGenerations = 0, level = 1, title = '', xpPercent = 0, sessionCombo = 0, levelInfo, equipped, onLogoAchievement }) => {
   // 이스터에그: 로고 5회 빠른 클릭 → 무지개 회전
   const [easterEgg, setEasterEgg] = useState(false);
   const clickCountRef = useRef(0);
@@ -88,6 +89,7 @@ const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, tota
       clickCountRef.current = 0;
       setEasterEgg(true);
       setTimeout(() => setEasterEgg(false), 2000);
+      onLogoAchievement?.();
     } else {
       clickTimerRef.current = setTimeout(() => { clickCountRef.current = 0; }, 1200);
     }

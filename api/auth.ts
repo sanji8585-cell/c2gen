@@ -2032,6 +2032,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             case 'combo_count': currentValue = sessionCombo; break;
             case 'gacha_pulls': currentValue = newGachaPulls; break;
             case 'total_xp': currentValue = newXp; break;
+            case 'special_konami': currentValue = (actionType === 'special_konami') ? 1 : 0; break;
+            case 'special_logo_click': currentValue = (actionType === 'special_logo_click') ? 1 : 0; break;
             default: continue;
           }
 
