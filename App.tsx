@@ -1010,6 +1010,7 @@ const AppContent: React.FC<{
           imageCount: imgCount, audioCount, videoCount,
           sessionCombo: sessionCombo + 1,
         });
+        console.log('[App] recordAction result:', result, 'synced:', game.synced, 'isAuthenticated:', isAuthenticated);
         if (result) {
           // 레벨 정보 동기화
           setFunXp(result.totalXp);

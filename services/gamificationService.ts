@@ -33,7 +33,16 @@ async function gameApiFetch(body: Record<string, any>): Promise<any> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return res.json();
+  if (!res.ok) {
+    console.error(`[game] API error ${res.status} for action=${body.action}`);
+  }
+  const data = await res.json();
+  if (data?.error) {
+    console.error(`[game] API returned error for action=${body.action}:`, data.error);
+  } else {
+    console.log(`[game] API ok for action=${body.action}`, data);
+  }
+  return data;
 }
 
 function getToken(): string | null {
@@ -145,18 +154,21 @@ export function calculateLevel(xp: number, config?: GameConfig | null): LevelInf
 
 export async function syncGameState(): Promise<GameSyncResponse | null> {
   const token = getToken();
-  if (!token) return null;
+  if (!token) { console.warn('[game] syncGameState: no token'); return null; }
 
   try {
     const data = await gameApiFetch({ action: 'game-syncState', token });
+    if (data?.error) { console.error('[game] syncGameState failed:', data.error); return null; }
     if (data.config) {
       // 설정 캐시 업데이트
       cachedConfig = data.config;
       configLoadedAt = Date.now();
       localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({ config: cachedConfig, timestamp: configLoadedAt }));
     }
+    console.log('[game] syncGameState ok, user:', data.user);
     return data;
-  } catch {
+  } catch (e) {
+    console.error('[game] syncGameState exception:', e);
     return null;
   }
 }
@@ -169,7 +181,7 @@ export async function recordGameAction(
   metadata?: Record<string, any>,
 ): Promise<RecordActionResponse | null> {
   const token = getToken();
-  if (!token) return null;
+  if (!token) { console.warn('[game] recordAction: no token'); return null; }
 
   try {
     const data = await gameApiFetch({
@@ -179,8 +191,11 @@ export async function recordGameAction(
       count,
       metadata,
     });
+    if (data?.error) return null;
+    console.log('[game] recordAction result:', { actionType, xpGained: data?.xpGained, achievementsUnlocked: data?.achievementsUnlocked });
     return data;
-  } catch {
+  } catch (e) {
+    console.error('[game] recordAction exception:', e);
     return null;
   }
 }
