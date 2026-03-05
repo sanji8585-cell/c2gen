@@ -1801,11 +1801,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const milestoneSettings = cfg.milestone_settings || { generation_milestones: [] };
         const streakSettings = cfg.streak_settings || { milestones: [], milestone_rewards: [] };
 
-        // 유저 현재 데이터
-        const { data: usr } = await supabase.from('c2gen_users')
-          .select('xp, level, total_generations, total_images, total_audio, total_videos, streak_count, streak_last_date, gacha_count, gacha_tickets, gacha_pity_epic, gacha_pity_legendary, total_gacha_pulls, max_combo, prestige_level, prestige_xp_bonus, credits')
-          .eq('email', email).single();
-
+        // 유저 현재 데이터 (컬럼이 없으면 폴백)
+        let usr: Record<string, any> | null = null;
+        {
+          const { data: d1, error: e1 } = await supabase.from('c2gen_users')
+            .select('xp, level, total_generations, total_images, total_audio, total_videos, streak_count, streak_last_date, gacha_count, gacha_tickets, gacha_pity_epic, gacha_pity_legendary, total_gacha_pulls, max_combo, prestige_level, prestige_xp_bonus, credits')
+            .eq('email', email).single();
+          if (d1) {
+            usr = d1;
+          } else {
+            // 컬럼 누락 시 최소 컬럼으로 폴백
+            const { data: d2 } = await supabase.from('c2gen_users')
+              .select('xp, level, total_generations, streak_count, streak_last_date, gacha_count, credits')
+              .eq('email', email).single();
+            if (d2) usr = d2;
+          }
+        }
         if (!usr) return res.status(404).json({ error: 'user not found' });
 
         const { imageCount = 0, audioCount = 0, videoCount = 0, sessionCombo = 0 } = metadata;
