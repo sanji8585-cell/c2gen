@@ -686,11 +686,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
               className="px-3 py-2.5 rounded-xl bg-amber-900/30 border border-amber-700/50 text-amber-300 font-bold text-[10px] hover:bg-amber-800/30 transition-all cursor-pointer"
               title="전체 씬에 줌 효과 일괄 적용"
             >
-              <option value="" disabled>자동 줌</option>
-              <option value="alternating">교차 (In/Out)</option>
-              <option value="dynamic">다이나믹 (4종)</option>
-              <option value="sentiment">감정 기반 (AI)</option>
-              <option value="static">정적 (없음)</option>
+              <option value="" disabled style={{ backgroundColor: '#1a1a2e', color: '#fbbf24' }}>자동 줌</option>
+              <option value="alternating" style={{ backgroundColor: '#1a1a2e', color: '#fbbf24' }}>교차 (In/Out)</option>
+              <option value="dynamic" style={{ backgroundColor: '#1a1a2e', color: '#fbbf24' }}>다이나믹 (4종)</option>
+              <option value="sentiment" style={{ backgroundColor: '#1a1a2e', color: '#fbbf24' }}>감정 기반 (AI)</option>
+              <option value="static" style={{ backgroundColor: '#1a1a2e', color: '#fbbf24' }}>정적 (없음)</option>
             </select>
             <button onClick={() => downloadProjectZip(data)} className="px-4 py-2.5 rounded-xl border font-bold text-[10px] hover:bg-[var(--bg-hover)] transition-all flex items-center gap-2" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -730,9 +730,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 }}
                 title="BGM 라이브러리에서 선택"
               >
-                <option value="">{bgmData ? 'BGM ✓' : 'BGM 선택'}</option>
+                <option value="" style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>{bgmData ? 'BGM ✓' : 'BGM 선택'}</option>
                 {BGM_LIBRARY.map(track => (
-                  <option key={track.id} value={track.id}>
+                  <option key={track.id} value={track.id} style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>
                     {BGM_MOODS[track.mood]?.emoji} {track.name}
                   </option>
                 ))}
@@ -965,11 +965,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   className="px-2 py-1 rounded-lg border text-[9px] font-bold cursor-pointer"
                   style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
                 >
-                  <option value="none">없음</option>
-                  <option value="crossfade">크로스페이드</option>
-                  <option value="fadeBlack">페이드 블랙</option>
-                  <option value="wipeLeft">좌 와이프</option>
-                  <option value="wipeRight">우 와이프</option>
+                  <option value="none" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>없음</option>
+                  <option value="crossfade" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>크로스페이드</option>
+                  <option value="fadeBlack" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>페이드 블랙</option>
+                  <option value="wipeLeft" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>좌 와이프</option>
+                  <option value="wipeRight" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>우 와이프</option>
                 </select>
               </div>
               {sceneGap === 0 && (
