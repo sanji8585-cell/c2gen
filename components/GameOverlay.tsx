@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import type { GachaSettings, Rarity } from '../types/gamification';
 import { playSFX, getGachaSoundType } from '../services/soundService';
 
@@ -157,6 +157,15 @@ const OVERLAY_KEYFRAMES = `
   50% { transform: rotate(180deg) scale(1.2); opacity: 1; }
   100% { transform: rotate(360deg) scale(1); opacity: 0.8; }
 }
+@keyframes overlay-bounce-in {
+  0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60% { transform: scale(1.3) rotate(5deg); opacity: 1; }
+  80% { transform: scale(0.9) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.overlay-bounce-in {
+  animation: overlay-bounce-in 0.6s ease-out forwards;
+}
 `;
 
 // Slot machine emoji pool for spinning animation
@@ -181,6 +190,8 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
 }) => {
   const [visible, setVisible] = useState(false);
   const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => { onDismissRef.current = onDismiss; });
 
   // Gacha animation phases: 'spinning' → 'slowing' → 'revealed'
   const [gachaPhase, setGachaPhase] = useState<'spinning' | 'slowing' | 'revealed'>('spinning');
@@ -290,11 +301,11 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
     const duration = activeType === 'levelUp' ? 5000 : activeType === 'gacha' ? 7000 : 4000;
     const dismissTimeout = setTimeout(() => {
       setVisible(false);
-      setTimeout(onDismiss, 400);
+      setTimeout(() => onDismissRef.current(), 400);
     }, duration);
 
     return () => clearTimeout(dismissTimeout);
-  }, [activeType, onDismiss]);
+  }, [activeType]);
 
   if (!activeType) return null;
 
@@ -314,7 +325,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
 
   const handleBackdropClick = () => {
     setVisible(false);
-    setTimeout(onDismiss, 400);
+    setTimeout(() => onDismissRef.current(), 400);
   };
 
   return (
@@ -393,7 +404,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                 </p>
 
                 {/* Emoji */}
-                <div className="text-5xl mb-2 animate-bounce-in">
+                <div className="text-5xl mb-2 overlay-bounce-in">
                   {levelUp.emoji}
                 </div>
 
@@ -468,7 +479,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                 </div>
 
                 {/* Icon */}
-                <div className="text-5xl mt-4 mb-3 animate-bounce-in">
+                <div className="text-5xl mt-4 mb-3 overlay-bounce-in">
                   {achievementUnlock.icon}
                 </div>
 
@@ -784,7 +795,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
               </div>
 
               {/* Emoji */}
-              <div className="text-5xl mt-4 mb-3 animate-bounce-in">
+              <div className="text-5xl mt-4 mb-3 overlay-bounce-in">
                 {milestone.emoji}
               </div>
 
