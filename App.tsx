@@ -1828,7 +1828,7 @@ const AppContent: React.FC<{
                 스크립트 검토
               </h3>
               <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
-                아래 {generatedData.length}개 씬의 나레이션과 시각 연출을 확인하세요. 편집/추가/삭제 후 생성을 시작하세요.
+                아래 {generatedData.length}개 씬의 나레이션(대사) / 이미지 프롬프트를 확인 후 생성시작을 눌러주세요.
               </p>
               <div className="flex justify-center gap-3">
                 <button
@@ -1841,9 +1841,9 @@ const AppContent: React.FC<{
                 </button>
                 <button
                   onClick={handleApproveScript}
-                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black py-2.5 px-8 rounded-xl transition-all text-sm"
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-black py-3 px-12 rounded-xl transition-all text-base shadow-lg shadow-cyan-500/40 hover:shadow-cyan-400/60 hover:scale-105 animate-pulse"
                 >
-                  생성 시작
+                  🚀 생성 시작
                 </button>
                 <button
                   onClick={() => {

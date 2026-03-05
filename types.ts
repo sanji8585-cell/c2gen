@@ -118,6 +118,7 @@ export interface GeneratedAsset extends ScriptScene {
   customDuration?: number;       // 사용자 지정 재생 시간 (초) - 없으면 오디오 길이 사용
   zoomEffect?: 'zoomIn' | 'zoomOut' | 'panLeft' | 'panRight' | 'none'; // 씬별 줌/팬 효과 (기본: zoomIn)
   transition?: 'crossfade' | 'fadeBlack' | 'wipeLeft' | 'wipeRight' | 'none'; // 씬 전환 효과 (이 씬→다음 씬, 기본: none)
+  audioMuted?: boolean; // 음성 뮤트 (영상만 사용하는 연장 씬에 사용)
 }
 
 export enum GenerationStep {

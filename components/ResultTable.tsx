@@ -217,7 +217,7 @@ const TableRow: React.FC<TableRowProps> = memo(({
           </div>
 
           {/* 씬 번호 */}
-          <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>#{row.sceneNumber.toString().padStart(2, '0')}</span>
+          <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>#{row.sceneNumber.toString().padStart(2, '0')}</span>
 
           {/* 편집/저장/취소 */}
           {isEditing ? (
@@ -289,11 +289,11 @@ const TableRow: React.FC<TableRowProps> = memo(({
         <div className="space-y-3">
           {isEditing ? (
             <textarea ref={narrationRef} defaultValue={row.narration}
-              className="w-full border focus:border-brand-500 rounded-lg p-2 text-[11px] leading-relaxed resize-none focus:outline-none transition-colors"
+              className="w-full border focus:border-brand-500 rounded-lg p-2 text-sm leading-relaxed resize-none focus:outline-none transition-colors"
               style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
               rows={6} onClick={(e) => e.stopPropagation()} />
           ) : (
-            <p className="text-[11px] leading-relaxed font-medium tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-sm leading-relaxed font-medium tracking-tight" style={{ color: 'var(--text-primary)' }}>
               {row.narration || <span className="italic" style={{ color: 'var(--text-muted)' }}>나레이션 없음</span>}
             </p>
           )}
@@ -320,11 +320,11 @@ const TableRow: React.FC<TableRowProps> = memo(({
       <td className="py-5 px-6 align-top">
         {isEditing ? (
           <textarea ref={promptRef} defaultValue={row.visualPrompt}
-            className="w-full border focus:border-brand-500 rounded-lg p-2 text-[9px] font-mono leading-tight resize-none focus:outline-none transition-colors"
+            className="w-full border focus:border-brand-500 rounded-lg p-2 text-xs font-mono leading-tight resize-none focus:outline-none transition-colors"
             style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
             rows={10} onClick={(e) => e.stopPropagation()} />
         ) : (
-          <div className="rounded-lg p-3 border text-[9px] font-mono leading-tight whitespace-pre-wrap" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 30%, transparent)', borderColor: 'color-mix(in srgb, var(--border-default) 50%, transparent)', color: 'var(--text-muted)' }}>
+          <div className="rounded-lg p-3 border text-xs font-mono leading-tight whitespace-pre-wrap" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 30%, transparent)', borderColor: 'color-mix(in srgb, var(--border-default) 50%, transparent)', color: 'var(--text-muted)' }}>
             {row.visualPrompt || <span className="italic">프롬프트 없음</span>}
           </div>
         )}
@@ -515,16 +515,35 @@ const TableRow: React.FC<TableRowProps> = memo(({
           <div className="flex flex-col items-center gap-1.5">
             <AudioPlayer base64={row.audioData} />
             {!isEditing && (
-              <button
-                onClick={() => onRegenerateAudio?.(index)}
-                className="p-1 hover:bg-blue-900/50 hover:text-blue-400 rounded transition-colors"
-                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
-                title="음성 재생성"
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
+              <>
+                <button
+                  onClick={() => onRegenerateAudio?.(index)}
+                  className="p-1 hover:bg-blue-900/50 hover:text-blue-400 rounded transition-colors"
+                  style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
+                  title="음성 재생성"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onUpdateAsset?.(index, { audioMuted: !row.audioMuted })}
+                  className={`p-1 rounded transition-colors ${row.audioMuted ? 'bg-red-600/30 text-red-400 hover:bg-red-600/50' : 'hover:bg-red-900/50 hover:text-red-400'}`}
+                  style={row.audioMuted ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
+                  title={row.audioMuted ? '음성 뮤트 중 (클릭하여 해제)' : '음성 뮤트 (영상만 사용)'}
+                >
+                  {row.audioMuted ? (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-9.536a5 5 0 000 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                  )}
+                </button>
+              </>
             )}
           </div>
         ) : (
@@ -981,11 +1000,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <table className="w-full text-left border-collapse min-w-[1200px] table-fixed">
             <thead className="border-b" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 80%, transparent)', borderColor: 'var(--border-default)' }}>
               <tr>
-                <th className="py-4 px-3 text-[9px] font-black uppercase tracking-widest w-16 text-center" style={{ color: 'var(--text-muted)' }}>순서</th>
-                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-[30%]" style={{ color: 'var(--text-muted)' }}>나레이션 / CEO 프로토콜</th>
-                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-[30%]" style={{ color: 'var(--text-muted)' }}>V9.2 통합 영문 프롬프트</th>
-                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-56 text-center" style={{ color: 'var(--text-muted)' }}>생성 결과물</th>
-                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-20 text-center" style={{ color: 'var(--text-muted)' }}>음성</th>
+                <th className="py-4 px-3 text-xs font-black uppercase tracking-widest w-16 text-center" style={{ color: 'var(--text-muted)' }}>순서</th>
+                <th className="py-4 px-6 text-xs font-black uppercase tracking-widest w-[30%]" style={{ color: 'var(--text-muted)' }}>나레이션 / CEO 프로토콜</th>
+                <th className="py-4 px-6 text-xs font-black uppercase tracking-widest w-[30%]" style={{ color: 'var(--text-muted)' }}>V9.2 통합 영문 프롬프트</th>
+                <th className="py-4 px-6 text-xs font-black uppercase tracking-widest w-56 text-center" style={{ color: 'var(--text-muted)' }}>생성 결과물</th>
+                <th className="py-4 px-6 text-xs font-black uppercase tracking-widest w-20 text-center" style={{ color: 'var(--text-muted)' }}>음성</th>
               </tr>
             </thead>
             <tbody className="divide-y" style={{ '--tw-divide-color': 'color-mix(in srgb, var(--border-default) 40%, transparent)' } as React.CSSProperties}>

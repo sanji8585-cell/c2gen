@@ -527,6 +527,8 @@ export const generateVideo = async (
       try {
         audioBuffer = await decodeAudio(asset.audioData, audioCtx);
         duration = audioBuffer.duration;
+        // 뮤트 씬: duration은 유지하되 오디오는 출력하지 않음
+        if (asset.audioMuted) audioBuffer = null;
       } catch (e) {
         console.warn(`[Video] 씬 ${i + 1} 오디오 디코딩 실패, 기본 ${DEFAULT_DURATION}초 사용`);
       }
