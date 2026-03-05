@@ -123,6 +123,7 @@ export interface GeneratedAsset extends ScriptScene {
 export enum GenerationStep {
   IDLE = 'IDLE',
   SCRIPTING = 'SCRIPTING',
+  SCRIPT_REVIEW = 'SCRIPT_REVIEW',
   ASSETS = 'ASSETS',
   COMPLETED = 'COMPLETED',
   ERROR = 'ERROR'
@@ -181,4 +182,53 @@ export interface SavedProject {
 
   // Storage 버전 (2 = Supabase Storage, 없으면 레거시 base64)
   storageVersion?: number;
+}
+
+// ── 크레딧/결제 시스템 타입 ──
+
+export type PlanType = 'free' | 'basic' | 'pro' | 'operator';
+export type CreditTransactionType = 'charge' | 'deduct' | 'subscription' | 'bonus' | 'refund' | 'admin';
+export type PaymentProvider = 'toss' | 'stripe';
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+
+export interface CreditInfo {
+  credits: number;
+  plan: PlanType;
+}
+
+export interface CreditTransaction {
+  id: string;
+  email: string;
+  amount: number;
+  balance_after: number;
+  type: CreditTransactionType;
+  description: string | null;
+  reference_id: string | null;
+  created_at: string;
+}
+
+export interface SubscriptionInfo {
+  plan: PlanType;
+  status: 'active' | 'cancelled' | 'expired';
+  payment_provider: PaymentProvider | null;
+  current_period_end: string | null;
+  monthly_credits: number;
+}
+
+export interface PaymentRecord {
+  id: string;
+  email: string;
+  provider: PaymentProvider;
+  amount: number;
+  credits: number;
+  type: 'credit_pack' | 'subscription';
+  status: PaymentStatus;
+  created_at: string;
+}
+
+export interface CreditPack {
+  id: string;
+  credits: number;
+  price_krw: number;
+  label: string;
 }

@@ -358,15 +358,18 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
           if (cancelled) return;
           const asset = validAssets[i];
 
-          // 이미지 로드
+          // 이미지 로드 (URL, data URI, raw base64 모두 지원)
           const img = new Image();
           img.crossOrigin = 'anonymous';
           await new Promise<void>((resolve, reject) => {
             img.onload = () => resolve();
             img.onerror = () => reject(new Error(`씬 ${i + 1} 이미지 로드 실패`));
-            img.src = asset.imageData!.startsWith('data:')
-              ? asset.imageData!
-              : `data:image/png;base64,${asset.imageData}`;
+            const src = asset.imageUrl || asset.imageData!;
+            if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
+              img.src = src;
+            } else {
+              img.src = `data:image/png;base64,${src}`;
+            }
           });
 
           // 비디오 로드 (있으면)
@@ -390,11 +393,21 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
             }
           }
 
-          // 오디오 디코딩
+          // 오디오 디코딩 (URL, data URI, raw base64 모두 지원)
           let audioBuffer: AudioBuffer | null = null;
-          if (asset.audioData) {
+          const audioSrc = asset.audioUrl || asset.audioData;
+          if (audioSrc) {
             try {
-              audioBuffer = await decodeAudio(asset.audioData, ctx);
+              if (audioSrc.startsWith('http://') || audioSrc.startsWith('https://')) {
+                const resp = await fetch(audioSrc);
+                const arrBuf = await resp.arrayBuffer();
+                audioBuffer = await ctx.decodeAudioData(arrBuf);
+              } else if (audioSrc.startsWith('data:')) {
+                const b64 = audioSrc.split(',')[1];
+                audioBuffer = await decodeAudio(b64, ctx);
+              } else {
+                audioBuffer = await decodeAudio(audioSrc, ctx);
+              }
             } catch {
               // 오디오 없이 진행
             }
@@ -486,21 +499,22 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // 반응형 캔버스 크기
+  // 반응형 캔버스 크기 (세로형일 때 높이도 제한)
   const maxDisplayWidth = 800;
-  const scale = Math.min(maxDisplayWidth / dims.width, 1);
+  const maxDisplayHeight = 600;
+  const scale = Math.min(maxDisplayWidth / dims.width, maxDisplayHeight / dims.height, 1);
   const displayW = Math.round(dims.width * scale);
   const displayH = Math.round(dims.height * scale);
 
   return (
-    <div className="mb-6 bg-slate-900/95 backdrop-blur-md rounded-3xl border border-cyan-800/50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+    <div className="mb-6 backdrop-blur-md rounded-3xl border border-cyan-800/50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 95%, transparent)' }}>
       {/* 캔버스 영역 */}
       <div className="flex justify-center bg-black p-4 pb-2">
         {isLoading ? (
           <div className="flex items-center justify-center" style={{ width: displayW, height: displayH }}>
             <div className="text-center">
               <div className="w-8 h-8 border-3 border-cyan-500 border-t-transparent animate-spin rounded-full mx-auto mb-3"></div>
-              <p className="text-slate-400 text-xs">에셋 로딩 중...</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>에셋 로딩 중...</p>
             </div>
           </div>
         ) : loadError ? (
@@ -519,7 +533,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
       </div>
 
       {/* 컨트롤 바 */}
-      <div className="px-5 py-3 flex items-center gap-3 border-t border-slate-800/50">
+      <div className="px-5 py-3 flex items-center gap-3 border-t" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 50%, transparent)' }}>
         {/* 재생/일시정지 */}
         <button
           onClick={() => isPlaying ? pause() : play()}
@@ -538,14 +552,15 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         <button
           onClick={stop}
           disabled={isLoading || !!loadError}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
           title="정지"
         >
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
         </button>
 
         {/* 시간 표시 */}
-        <span className="text-[11px] font-mono text-slate-400 w-20 text-center whitespace-nowrap">
+        <span className="text-[11px] font-mono w-20 text-center whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
           {formatTime(currentTime)} / {formatTime(totalDuration)}
         </span>
 
@@ -569,7 +584,8 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         {/* 닫기 */}
         <button
           onClick={() => { stop(); onClose(); }}
-          className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-800 hover:bg-red-900/50 text-slate-500 hover:text-red-400 transition-all"
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-900/50 hover:text-red-400 transition-all"
+          style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
           title="미리보기 닫기"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

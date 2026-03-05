@@ -1,6 +1,6 @@
 
 import { ScriptScene, ReferenceImages } from "../types";
-import { CONFIG, GeminiStyleId, getVideoOrientation } from "../config";
+import { CONFIG, GeminiStyleId, getVideoOrientation, type Language } from "../config";
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -65,9 +65,9 @@ const retryGeminiRequest = async <T>(
 
 // ── 내보내기 함수들 (프록시 호출) ──
 
-export const findTrendingTopics = async (category: string, usedTopics: string[]) => {
+export const findTrendingTopics = async (category: string, usedTopics: string[], language?: Language) => {
   return retryGeminiRequest("Trend Search", () =>
-    callGeminiProxy('findTrends', { category, usedTopics })
+    callGeminiProxy('findTrends', { category, usedTopics, language })
   );
 };
 
@@ -76,10 +76,11 @@ const generateScriptSingle = async (
   topic: string,
   hasReferenceImage: boolean,
   sourceContext?: string | null,
-  chunkInfo?: { current: number; total: number }
+  chunkInfo?: { current: number; total: number },
+  language?: Language
 ): Promise<ScriptScene[]> => {
   return retryGeminiRequest("Script Generation", () =>
-    callGeminiProxy('generateScript', { topic, hasReferenceImage, sourceContext, chunkInfo })
+    callGeminiProxy('generateScript', { topic, hasReferenceImage, sourceContext, chunkInfo, language })
   );
 };
 
@@ -87,9 +88,10 @@ const generateScriptSingle = async (
 export const generateScript = async (
   topic: string,
   hasReferenceImage: boolean,
-  sourceContext?: string | null
+  sourceContext?: string | null,
+  language?: Language
 ): Promise<ScriptScene[]> => {
-  return generateScriptSingle(topic, hasReferenceImage, sourceContext);
+  return generateScriptSingle(topic, hasReferenceImage, sourceContext, undefined, language);
 };
 
 // ── 텍스트 청크 분할 (클라이언트 오케스트레이션) ──
@@ -133,10 +135,11 @@ export const generateScriptChunked = async (
   hasReferenceImage: boolean,
   sourceContext: string,
   chunkSize: number = 2500,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  language?: Language
 ): Promise<ScriptScene[]> => {
   if (sourceContext.length <= chunkSize) {
-    return generateScriptSingle(topic, hasReferenceImage, sourceContext);
+    return generateScriptSingle(topic, hasReferenceImage, sourceContext, undefined, language);
   }
 
   const chunks = splitTextIntoChunks(sourceContext, chunkSize);
@@ -155,7 +158,8 @@ export const generateScriptChunked = async (
     try {
       const chunkScenes = await generateScriptSingle(
         topic, hasReferenceImage, chunkContext,
-        { current: i + 1, total: chunks.length }
+        { current: i + 1, total: chunks.length },
+        language
       );
       const offset = allScenes.length;
       allScenes.push(...chunkScenes.map((scene, idx) => ({ ...scene, sceneNumber: offset + idx + 1 })));
@@ -194,13 +198,16 @@ function optimizeReferenceImages(refImages: ReferenceImages): ReferenceImages {
 /** 씬 이미지 생성 */
 export const generateImageForScene = async (
   scene: ScriptScene,
-  referenceImages: ReferenceImages
+  referenceImages: ReferenceImages,
+  options?: { isPreview?: boolean }
 ): Promise<string | null> => {
   const { styleId, customStylePrompt } = getGeminiStyleInfo();
   const orientation = getVideoOrientation();
 
   // 참조 이미지 페이로드 최적화 (data URL 접두사 제거 → ~30% 크기 절감)
   const optimizedRefs = optimizeReferenceImages(referenceImages);
+
+  const suppressKorean = localStorage.getItem(CONFIG.STORAGE_KEYS.SUPPRESS_KOREAN) === 'true';
 
   const result = await retryGeminiRequest("Image Generation", () =>
     callGeminiProxy('generateImage', {
@@ -209,6 +216,8 @@ export const generateImageForScene = async (
       styleId,
       customStylePrompt,
       orientation,
+      isPreview: options?.isPreview || undefined,
+      suppressKorean: suppressKorean || undefined,
     }), 2, 3000
   );
   return result?.imageData || null;
@@ -225,10 +234,11 @@ export const generateAudioForScene = async (text: string) => {
 /** AI 자막 의미 단위 분리 */
 export const splitSubtitleByMeaning = async (
   narration: string,
-  maxChars: number = 20
+  maxChars: number = 20,
+  language?: Language
 ): Promise<string[]> => {
   return retryGeminiRequest("Subtitle Split", () =>
-    callGeminiProxy('splitSubtitle', { narration, maxChars }), 2, 1000
+    callGeminiProxy('splitSubtitle', { narration, maxChars, language }), 2, 1000
   );
 };
 
@@ -243,4 +253,15 @@ export const generateMotionPrompt = async (
   } catch {
     return `Slow gentle zoom in. Subtle natural movement. Maintain original art style. ${visualPrompt.slice(0, 100)}`;
   }
+};
+
+/** 분위기 분석 (BGM 자동 선택용) */
+export const analyzeMood = async (narrations: string[]): Promise<{ mood: string; confidence: number }> => {
+  return callGeminiProxy('analyzeMood', { narrations });
+};
+
+/** 썸네일 이미지 생성 */
+export const generateThumbnailImage = async (topic: string, platform: string, style?: string): Promise<string | null> => {
+  const result = await callGeminiProxy('generateThumbnail', { topic, platform, style });
+  return result?.imageData || null;
 };

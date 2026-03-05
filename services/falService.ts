@@ -2,6 +2,10 @@
 /**
  * fal.ai API 서비스
  * 서버 프록시(/api/fal, /api/fal-poll)를 통해 API 호출
+ * - fal.ai 스토리지에 실제 이미지 업로드
+ * - 동시 영상 변환 2개 제한 (큐잉)
+ * - 폴링 연속 실패 시 조기 종료
+ * - 실패 시 크레딧 환불 (서버 측)
  */
 
 import { CONFIG } from '../config';
@@ -45,17 +49,52 @@ async function callFalProxy(action: string, params: Record<string, any>): Promis
   return res.json();
 }
 
+// ── 동시 영상 변환 제한 (최대 2개) ──
+
+const MAX_CONCURRENT_VIDEOS = 2;
+let activeVideoCount = 0;
+const videoQueue: Array<{ resolve: (token: void) => void }> = [];
+
+async function acquireVideoSlot(): Promise<void> {
+  if (activeVideoCount < MAX_CONCURRENT_VIDEOS) {
+    activeVideoCount++;
+    return;
+  }
+  // 슬롯이 없으면 대기
+  return new Promise<void>((resolve) => {
+    videoQueue.push({ resolve });
+  });
+}
+
+function releaseVideoSlot(): void {
+  activeVideoCount--;
+  if (videoQueue.length > 0) {
+    const next = videoQueue.shift()!;
+    activeVideoCount++;
+    next.resolve();
+  }
+}
+
+/** 현재 대기 중인 영상 변환 수 */
+export function getVideoQueueStatus(): { active: number; waiting: number } {
+  return { active: activeVideoCount, waiting: videoQueue.length };
+}
+
 /**
  * 이미지를 영상으로 변환 (PixVerse v5.5)
  * submit → poll 패턴 (서버 타임아웃 회피)
+ * - 동시 2개 제한, 폴링 연속 실패 시 조기 종료, 실패 시 서버 측 크레딧 환불
  */
 export async function generateVideoFromImage(
   imageBase64: string,
   motionPrompt: string,
   _apiKey?: string
 ): Promise<string | null> {
+  // 동시 변환 슬롯 획득 (최대 2개)
+  await acquireVideoSlot();
+
   try {
-    // Step 1: 이미지 업로드
+    // Step 1: 이미지 업로드 (fal.ai 스토리지에 실제 업로드)
     console.log('[FAL] 이미지 업로드 중...');
     const uploadResult = await callFalProxy('uploadImage', { imageBase64 });
     const imageUrl = uploadResult.url;
@@ -75,28 +114,38 @@ export async function generateVideoFromImage(
     });
 
     const requestId = submitResult.requestId;
+    const userEmail = submitResult.email; // 환불용 이메일
     if (!requestId) {
       console.error('[FAL] 비디오 제출 실패');
       return null;
     }
     console.log('[FAL] 요청 ID:', requestId);
 
-    // Step 3: 완료까지 폴링
+    // Step 3: 완료까지 폴링 (연속 실패 시 조기 종료)
     const POLL_INTERVAL = 4000;
-    const MAX_POLLS = 45; // 최대 3분
+    const MAX_POLLS = 45;          // 최대 3분
+    const MAX_CONSECUTIVE_FAILS = 5; // 연속 5회 폴링 실패 시 조기 종료
+    let consecutiveFails = 0;
 
     for (let i = 0; i < MAX_POLLS; i++) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL));
 
-      const pollRes = await fetch(`/api/fal-poll?requestId=${encodeURIComponent(requestId)}`, {
+      const emailParam = userEmail ? `&email=${encodeURIComponent(userEmail)}` : '';
+      const pollRes = await fetch(`/api/fal-poll?requestId=${encodeURIComponent(requestId)}${emailParam}`, {
         headers: buildFalHeaders(),
       });
 
       if (!pollRes.ok) {
-        console.warn('[FAL] 폴링 실패:', pollRes.status);
+        consecutiveFails++;
+        console.warn(`[FAL] 폴링 실패 (${consecutiveFails}/${MAX_CONSECUTIVE_FAILS}):`, pollRes.status);
+        if (consecutiveFails >= MAX_CONSECUTIVE_FAILS) {
+          console.error('[FAL] 연속 폴링 실패 → 조기 종료');
+          return null;
+        }
         continue;
       }
 
+      consecutiveFails = 0; // 성공 시 리셋
       const statusData = await pollRes.json();
       console.log(`[FAL] 폴링 ${i + 1}/${MAX_POLLS}: ${statusData.status}`);
 
@@ -106,7 +155,7 @@ export async function generateVideoFromImage(
       }
 
       if (statusData.status === 'FAILED') {
-        console.error('[FAL] 영상 생성 실패');
+        console.error('[FAL] 영상 생성 실패 (fal.ai)', statusData.refunded ? '→ 크레딧 환불됨' : '');
         return null;
       }
     }
@@ -116,6 +165,8 @@ export async function generateVideoFromImage(
   } catch (error: any) {
     console.error('[FAL] 영상 생성 실패:', error.message);
     return null;
+  } finally {
+    releaseVideoSlot();
   }
 }
 

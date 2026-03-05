@@ -8,8 +8,11 @@ import AdminSessions from './AdminSessions';
 import AdminAnnouncements from './AdminAnnouncements';
 import AdminLogs from './AdminLogs';
 import AdminApiKeys from './AdminApiKeys';
+import AdminCredits from './AdminCredits';
+import AdminActivityLogs from './AdminActivityLogs';
+import AdminGamification from './AdminGamification';
 
-type Section = 'overview' | 'users' | 'projects' | 'analytics' | 'sessions' | 'announcements' | 'logs' | 'apikeys';
+type Section = 'overview' | 'users' | 'projects' | 'analytics' | 'credits' | 'sessions' | 'announcements' | 'activity' | 'logs' | 'apikeys' | 'gamification';
 
 interface Props {
   adminToken: string;
@@ -124,6 +127,24 @@ const AdminDashboard: React.FC<Props> = ({ adminToken, onLogout }) => {
       ),
     },
     {
+      id: 'credits',
+      label: '크레딧/결제',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+      ),
+    },
+    {
+      id: 'gamification',
+      label: '게이미피케이션',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="2" /><line x1="6" y1="12" x2="6" y2="12.01" /><line x1="10" y1="12" x2="10" y2="12.01" /><line x1="14" y1="12" x2="14" y2="12.01" /><line x1="18" y1="12" x2="18" y2="12.01" />
+        </svg>
+      ),
+    },
+    {
       id: 'sessions',
       label: '세션 관리',
       icon: (
@@ -151,8 +172,17 @@ const AdminDashboard: React.FC<Props> = ({ adminToken, onLogout }) => {
       ),
     },
     {
+      id: 'activity',
+      label: '활동 로그',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+      ),
+    },
+    {
       id: 'logs',
-      label: '로그',
+      label: '에러 로그',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
@@ -293,11 +323,20 @@ const AdminDashboard: React.FC<Props> = ({ adminToken, onLogout }) => {
           {activeSection === 'announcements' && (
             <AdminAnnouncements adminToken={adminToken} onToast={showToast} />
           )}
+          {activeSection === 'activity' && (
+            <AdminActivityLogs adminToken={adminToken} />
+          )}
           {activeSection === 'logs' && (
             <AdminLogs adminToken={adminToken} onToast={showToast} />
           )}
+          {activeSection === 'credits' && (
+            <AdminCredits adminToken={adminToken} />
+          )}
           {activeSection === 'apikeys' && (
             <AdminApiKeys adminToken={adminToken} onToast={showToast} />
+          )}
+          {activeSection === 'gamification' && (
+            <AdminGamification adminToken={adminToken} onToast={showToast} />
           )}
         </div>
       </main>

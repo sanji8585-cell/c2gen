@@ -32,6 +32,7 @@ const AdminApiKeys: React.FC<Props> = ({ adminToken, onToast }) => {
   const services = [
     { key: 'elevenlabs', name: 'ElevenLabs', description: 'TTS 음성 생성', color: 'purple' },
     { key: 'gemini', name: 'Google Gemini', description: '스크립트 / 이미지 생성', color: 'blue' },
+    { key: 'openai', name: 'OpenAI', description: 'GPT Image-1 이미지 생성', color: 'green' },
     { key: 'fal', name: 'fal.ai', description: 'Flux 이미지 / PixVerse 영상', color: 'amber' },
   ];
 
@@ -52,12 +53,13 @@ const AdminApiKeys: React.FC<Props> = ({ adminToken, onToast }) => {
         {checkedAt && <span className="text-[11px] text-slate-600">마지막 확인: {new Date(checkedAt).toLocaleString('ko-KR')}</span>}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
         {services.map(svc => {
           const s = status[svc.key];
           const colorMap: Record<string, { bg: string; border: string; text: string }> = {
             purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400' },
             blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400' },
+            green: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400' },
             amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400' },
           };
           const c = colorMap[svc.color] || colorMap.blue;

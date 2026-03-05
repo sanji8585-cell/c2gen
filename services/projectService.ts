@@ -62,11 +62,12 @@ async function callStorageAPI(action: string, params: Record<string, any> = {}):
 
 async function withConcurrency<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
   const results: T[] = new Array(tasks.length);
-  let index = 0;
+  const queue = tasks.map((_, i) => i);
 
   async function worker() {
-    while (index < tasks.length) {
-      const i = index++;
+    while (queue.length > 0) {
+      const i = queue.shift();
+      if (i === undefined) break;
       results[i] = await tasks[i]();
     }
   }

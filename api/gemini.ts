@@ -6,6 +6,8 @@ import {
   getTrendSearchPrompt,
   getScriptGenerationPrompt,
   getFinalVisualPrompt,
+  getMoodAnalysisPrompt,
+  getThumbnailPrompt,
 } from '../services/prompts.js';
 import { GEMINI_STYLE_CATEGORIES, VIDEO_DIMENSIONS, type VideoOrientation } from '../config.js';
 
@@ -172,7 +174,12 @@ async function logUsage(req: VercelRequest, action: string, costUsd: number) {
   }
 }
 
-async function logError(action: string, errorMessage: string) {
+async function logError(action: string, errorMessage: string, options?: {
+  severity?: 'info' | 'warn' | 'error' | 'critical';
+  stack?: string;
+  email?: string;
+  context?: Record<string, any>;
+}) {
   try {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_KEY;
@@ -180,9 +187,51 @@ async function logError(action: string, errorMessage: string) {
     const supabase = createClient(url, key);
     await supabase.from('c2gen_error_logs').insert({
       service: 'gemini', action, error_message: errorMessage,
+      severity: options?.severity || 'error',
+      stack_trace: options?.stack?.slice(0, 4000),
+      email: options?.email,
+      request_context: options?.context,
       created_at: new Date().toISOString(),
     });
   } catch {}
+}
+
+// ── 크레딧 차감 ─────────────────────────────
+
+async function checkAndDeductCredits(req: VercelRequest, creditAmount: number, description: string): Promise<{ ok: boolean; error?: string; balance?: number }> {
+  try {
+    const sessionToken = req.headers['x-session-token'] as string;
+    if (!sessionToken || req.headers['x-custom-api-key']) return { ok: true };
+
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) return { ok: true };
+
+    const supabase = createClient(url, key);
+    const { data: session } = await supabase
+      .from('c2gen_sessions')
+      .select('email')
+      .eq('token', sessionToken)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+    if (!session?.email) return { ok: true };
+
+    // 운영자 등급은 크레딧 차감 스킵
+    const { data: userRow } = await supabase
+      .from('c2gen_users').select('plan').eq('email', session.email).single();
+    if (userRow?.plan === 'operator') return { ok: true };
+
+    const { data } = await supabase.rpc('deduct_credits', {
+      p_email: session.email,
+      p_amount: creditAmount,
+      p_description: description,
+    });
+    if (!data?.success) return { ok: false, error: data?.error, balance: data?.current };
+    return { ok: true, balance: data.balance };
+  } catch (e) {
+    console.error('[api/gemini] checkAndDeductCredits error:', e);
+    return { ok: true }; // 크레딧 시스템 오류 시 생성 허용
+  }
 }
 
 // ── 핸들러 ─────────────────────────────
@@ -200,8 +249,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (action) {
       // ── 트렌드 검색 ──
       case 'findTrends': {
-        const { category, usedTopics } = params;
-        const prompt = getTrendSearchPrompt(category, (usedTopics || []).join(', '));
+        const { category, usedTopics, language } = params;
+        const prompt = getTrendSearchPrompt(category, (usedTopics || []).join(', '), language);
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: prompt,
@@ -216,7 +265,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 스크립트 생성 (단일 청크) ──
       case 'generateScript': {
-        const { topic, hasReferenceImage, sourceContext, chunkInfo } = params;
+        const { topic, hasReferenceImage, sourceContext, chunkInfo, language } = params;
         const baseInstruction =
           topic === 'Manual Script Input' ? SYSTEM_INSTRUCTIONS.MANUAL_VISUAL_MATCHER
           : hasReferenceImage ? SYSTEM_INSTRUCTIONS.REFERENCE_MATCH
@@ -226,17 +275,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const inputLength = inputText.length;
         const sentences = inputText.split(/[.!?。]+/).filter((s: string) => s.trim().length > 0);
         const sentenceCount = Math.max(1, sentences.length);
-        const estimatedSceneCount = inputLength < 200
+        const isKeywordOnly = !sourceContext || inputLength < 100;
+        const rawSceneCount = inputLength < 200
           ? sentenceCount
           : Math.max(sentenceCount, Math.ceil(inputLength / 80));
+        const estimatedSceneCount = isKeywordOnly ? Math.max(6, rawSceneCount) : rawSceneCount;
         const maxOutputTokens = Math.min(65536, Math.max(16384, Math.ceil(estimatedSceneCount * 800 * 1.5)));
 
         const chunkLabel = chunkInfo ? `[청크 ${chunkInfo.current}/${chunkInfo.total}] ` : '';
-        console.log(`${chunkLabel}[Script] 입력: ${inputLength}자, 예상 씬: ${estimatedSceneCount}개, maxOutputTokens: ${maxOutputTokens}`);
+        console.log(`${chunkLabel}[Script] 입력: ${inputLength}자, 예상 씬: ${estimatedSceneCount}개, maxOutputTokens: ${maxOutputTokens}, lang: ${language || 'ko'}`);
 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
-          contents: getScriptGenerationPrompt(topic, sourceContext),
+          contents: getScriptGenerationPrompt(topic, sourceContext, language),
           config: {
             thinkingConfig: { thinkingBudget: 24576 },
             responseMimeType: 'application/json',
@@ -261,11 +312,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 이미지 생성 ──
       case 'generateImage': {
-        const { scene, referenceImages, styleId, customStylePrompt, orientation } = params;
+        const { scene, referenceImages, styleId, customStylePrompt, orientation, isPreview, suppressKorean } = params;
         const hasCharacterRef = referenceImages?.character?.length > 0;
         const hasStyleRef = referenceImages?.style?.length > 0;
         const geminiStylePrompt = hasStyleRef ? undefined : resolveStylePrompt(styleId, customStylePrompt);
-        const basePrompt = getFinalVisualPrompt(scene, hasCharacterRef, geminiStylePrompt);
+        const basePrompt = getFinalVisualPrompt(scene, hasCharacterRef, geminiStylePrompt, suppressKorean);
 
         const characterStrength = referenceImages?.characterStrength ?? 70;
         const styleStrength = referenceImages?.styleStrength ?? 70;
@@ -316,9 +367,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               },
             });
 
-            for (const part of response.candidates[0].content.parts) {
+            const responseParts = response.candidates?.[0]?.content?.parts || [];
+            for (const part of responseParts) {
               if (part.inlineData) {
-                logUsage(req, 'image', 0.0315);
+                // 미리보기는 크레딧 차감 없이 허용
+                if (!isPreview) {
+                  // 크레딧 차감 (Gemini 이미지: 5크레딧)
+                  const creditResult = await checkAndDeductCredits(req, 5, '이미지 생성 (Gemini)');
+                  if (!creditResult.ok) {
+                    return res.status(402).json({
+                      error: 'insufficient_credits',
+                      message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 5)`,
+                      balance: creditResult.balance,
+                    });
+                  }
+                  logUsage(req, 'image', 0.0315);
+                  return res.json({ imageData: part.inlineData.data, creditBalance: creditResult.balance });
+                }
+                logUsage(req, 'preview', 0.0315);
                 return res.json({ imageData: part.inlineData.data });
               }
             }
@@ -354,34 +420,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 자막 의미 단위 분리 ──
       case 'splitSubtitle': {
-        const { narration, maxChars = 20 } = params;
-        const prompt = `자막 분리 작업입니다. 원문을 청크로 나누세요.
+        const { narration, maxChars = 20, language = 'ko' } = params;
 
-###### 🚨 절대 금지 사항 (위반 시 실패) ######
-- 띄어쓰기 추가 금지: "자막나오는거" → "자막 나오는 거" ❌
-- 띄어쓰기 삭제 금지: "역대 최고치" → "역대최고치" ❌
-- 맞춤법 교정 금지: 틀린 맞춤법도 그대로 유지
-- 어떤 글자도 변경/추가/삭제 금지
-################################################
-
-## 검증 방법
-청크를 그대로 이어붙이면 원문과 글자 하나 틀리지 않고 완전히 같아야 함.
-"${narration}".split('').join('') === chunks.join('').split('').join('')
-
-## 자막 분리 규칙
+        const langRules: Record<string, string> = {
+          ko: `## 자막 분리 규칙
 1. 각 청크는 15~20자 (최대 ${maxChars}자)
 2. 1초당 4-5글자, 최소 1.5초 = 최소 6~8글자
 3. 의미 단위로 자연스럽게 끊기
 
 ## 끊는 위치
 ✅ 좋은 위치: 쉼표(,) 뒤, 마침표(.) 뒤, 조사 뒤 공백
-❌ 나쁜 위치: 단어 중간, 숫자 내 쉼표(4,200), 조사 앞
+❌ 나쁜 위치: 단어 중간, 숫자 내 쉼표(4,200), 조사 앞`,
+          en: `## Subtitle Split Rules
+1. Each chunk is 5-8 words (max ${maxChars} characters)
+2. Split at natural phrase boundaries
+3. Keep meaningful units together
 
-## 원문 (이것을 정확히 분리)
+## Good split positions
+✅ After commas, periods, conjunctions, prepositions
+❌ In the middle of a phrase or name`,
+          ja: `## 字幕分割ルール
+1. 各チャンクは15~20文字（最大${maxChars}文字）
+2. 1秒あたり4-5文字、最低1.5秒 = 最低6~8文字
+3. 意味単位で自然に区切る
+
+## 区切り位置
+✅ 読点(、)の後、句点(。)の後、助詞の後
+❌ 単語の途中、数字内のカンマ`,
+        };
+
+        const prompt = `Subtitle splitting task. Split the original text into chunks.
+
+###### CRITICAL RULES ######
+- Do NOT add/remove spaces
+- Do NOT fix spelling
+- Do NOT change any character
+- Concatenating all chunks must exactly reproduce the original
+############################
+
+${langRules[language] || langRules.ko}
+
+## Original text (split this exactly)
 ${narration}
 
-## 출력
-JSON 배열만 출력. 예: ["청크1", "청크2"]`;
+## Output
+JSON array only. Example: ["chunk1", "chunk2"]`;
 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
@@ -428,12 +511,57 @@ Return ONLY the motion prompt, no explanation.`;
         return res.json({ motionPrompt: response.text?.trim() || '' });
       }
 
+      // ── 분위기 분석 (BGM 자동 선택용) ──
+      case 'analyzeMood': {
+        const { narrations } = params;
+        const prompt = getMoodAnalysisPrompt(narrations);
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        return res.json(JSON.parse(cleanJsonResponse(response.text)));
+      }
+
+      // ── 썸네일 이미지 생성 ──
+      case 'generateThumbnail': {
+        const { topic, platform, style } = params;
+        const thumbnailPromptText = getThumbnailPrompt(topic, platform || 'youtube', style);
+        const aspectRatio = platform === 'tiktok' ? '9:16' : platform === 'instagram' ? '1:1' : '16:9';
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: { parts: [{ text: thumbnailPromptText }] },
+          config: {
+            responseModalities: [Modality.IMAGE],
+            imageConfig: { aspectRatio },
+          },
+        });
+
+        const thumbParts = response.candidates?.[0]?.content?.parts || [];
+        for (const part of thumbParts) {
+          if (part.inlineData) {
+            const creditResult = await checkAndDeductCredits(req, 5, '썸네일 생성');
+            if (!creditResult.ok) {
+              return res.status(402).json({
+                error: 'insufficient_credits',
+                message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 5)`,
+                balance: creditResult.balance,
+              });
+            }
+            logUsage(req, 'thumbnail', 0.0315);
+            return res.json({ imageData: part.inlineData.data, creditBalance: creditResult.balance });
+          }
+        }
+        return res.json({ imageData: null });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
   } catch (error: any) {
     console.error(`[api/gemini] ${action} 실패:`, error.message);
-    logError(action, error.message || 'Unknown error');
+    logError(action, error.message || 'Unknown error', { stack: error.stack });
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }

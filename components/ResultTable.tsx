@@ -4,7 +4,7 @@ import { GeneratedAsset, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../type
 import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
 import { exportAssetsToZip } from '../services/exportService';
-import { getVideoOrientation } from '../config';
+import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier, canAccessResolution, getVideoResolution, setVideoResolution, BGM_LIBRARY, BGM_MOODS } from '../config';
 import PreviewPlayer from './PreviewPlayer';
 
 interface ResultTableProps {
@@ -23,7 +23,8 @@ interface ResultTableProps {
   onSetDefaultTransition?: (transition: string) => void;
   onAutoZoom?: (pattern: string) => void;
   onRegenerateImage?: (index: number) => void;
-  onExportVideo?: (enableSubtitles: boolean, subtitleConfig?: Partial<SubtitleConfig>, sceneGap?: number) => void;
+  onExportVideo?: (enableSubtitles: boolean, subtitleConfig?: Partial<SubtitleConfig>, sceneGap?: number, resolution?: ResolutionTier) => void;
+  userPlan?: string;
   onGenerateAnimation?: (index: number) => void;
   onDuplicateScene?: (index: number) => void;
   onRegenerateFailedScenes?: () => void;
@@ -85,7 +86,7 @@ const LazyImage: React.FC<{ src: string; alt: string; className?: string }> = me
           className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
           onLoad={() => setIsLoaded(true)} loading="lazy" />
       ) : (
-        <div className="w-full h-full bg-slate-800 animate-pulse" />
+        <div className="w-full h-full animate-pulse" style={{ backgroundColor: 'var(--bg-elevated)' }} />
       )}
     </div>
   );
@@ -124,7 +125,7 @@ const AudioPlayer: React.FC<{ base64: string }> = memo(({ base64 }) => {
   };
 
   return (
-    <button onClick={playAudio} className={`p-2.5 rounded-full border transition-all ${isPlaying ? 'bg-brand-600 border-brand-500 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
+    <button onClick={playAudio} className={`p-2.5 rounded-full border transition-all ${isPlaying ? 'bg-brand-600 border-brand-500 text-white animate-pulse' : 'hover:text-[var(--text-primary)]'}`} style={isPlaying ? undefined : { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
       {isPlaying
         ? <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
         : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
@@ -198,7 +199,7 @@ const TableRow: React.FC<TableRowProps> = memo(({
   const effectiveDuration = row.customDuration ?? (row.audioDuration ? Math.round(row.audioDuration * 10) / 10 : 3);
 
   return (
-    <tr className="group hover:bg-slate-800/20 transition-colors" onDragOver={onDragOver} onDrop={() => onDrop?.(index)}>
+    <tr className="group hover:bg-[color-mix(in_srgb,var(--bg-elevated)_20%,transparent)] transition-colors" onDragOver={onDragOver} onDrop={() => onDrop?.(index)}>
 
       {/* 드래그 핸들 + 씬 번호 + 액션 버튼들 */}
       <td
@@ -207,7 +208,7 @@ const TableRow: React.FC<TableRowProps> = memo(({
       >
         <div className="flex flex-col items-center gap-2">
           {/* 드래그 핸들 */}
-          <div className="text-slate-700 group-hover:text-slate-500 transition-colors" title="드래그하여 순서 변경">
+          <div className="group-hover:text-[var(--text-muted)] transition-colors" style={{ color: 'var(--border-subtle)' }} title="드래그하여 순서 변경">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
               <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
@@ -216,20 +217,21 @@ const TableRow: React.FC<TableRowProps> = memo(({
           </div>
 
           {/* 씬 번호 */}
-          <span className="font-mono text-slate-600 text-[10px]">#{row.sceneNumber.toString().padStart(2, '0')}</span>
+          <span className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>#{row.sceneNumber.toString().padStart(2, '0')}</span>
 
           {/* 편집/저장/취소 */}
           {isEditing ? (
             <div className="flex flex-col gap-1 w-full">
               <button onClick={handleSave} className="px-1.5 py-1 bg-green-600 hover:bg-green-500 text-white text-[8px] font-bold rounded transition-colors w-full">✓ 저장</button>
-              <button onClick={() => onEditToggle?.(null)} className="px-1.5 py-1 bg-slate-600 hover:bg-slate-500 text-white text-[8px] font-bold rounded transition-colors w-full">✗ 취소</button>
+              <button onClick={() => onEditToggle?.(null)} className="px-1.5 py-1 hover:bg-[var(--bg-hover)] text-[8px] font-bold rounded transition-colors w-full" style={{ backgroundColor: 'var(--text-muted)', color: 'var(--text-primary)' }}>✗ 취소</button>
             </div>
           ) : (
             <div className="flex flex-col gap-1 w-full">
               {/* 편집 */}
               <button
                 onClick={(e) => { e.stopPropagation(); onEditToggle?.(index); }}
-                className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-600 hover:text-slate-300 rounded transition-colors w-full flex justify-center"
+                className="p-1 hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)] rounded transition-colors w-full flex justify-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
                 title="씬 편집"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -247,7 +249,8 @@ const TableRow: React.FC<TableRowProps> = memo(({
                     onConfirmDeleteToggle?.(index);
                   }
                 }}
-                className={`p-1 rounded transition-colors w-full flex justify-center ${confirmDelete ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-slate-800 hover:bg-red-900/50 text-slate-600 hover:text-red-400'}`}
+                className={`p-1 rounded transition-colors w-full flex justify-center ${confirmDelete ? 'bg-red-600 hover:bg-red-500 text-white' : 'hover:bg-red-900/50 hover:text-red-400'}`}
+                style={confirmDelete ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
                 title={confirmDelete ? '다시 클릭하면 삭제' : '씬 삭제'}
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -257,7 +260,8 @@ const TableRow: React.FC<TableRowProps> = memo(({
               {/* 아래에 씬 추가 */}
               <button
                 onClick={(e) => { e.stopPropagation(); onAddScene?.(index); }}
-                className="p-1 bg-slate-800 hover:bg-brand-900/50 text-slate-600 hover:text-brand-400 rounded transition-colors w-full flex justify-center"
+                className="p-1 hover:bg-brand-900/50 hover:text-brand-400 rounded transition-colors w-full flex justify-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
                 title="이 씬 아래에 빈 씬 추가"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -267,7 +271,8 @@ const TableRow: React.FC<TableRowProps> = memo(({
               {/* 씬 복제 */}
               <button
                 onClick={(e) => { e.stopPropagation(); onDuplicateScene?.(index); }}
-                className="p-1 bg-slate-800 hover:bg-amber-900/50 text-slate-600 hover:text-amber-400 rounded transition-colors w-full flex justify-center"
+                className="p-1 hover:bg-amber-900/50 hover:text-amber-400 rounded transition-colors w-full flex justify-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
                 title="이 씬 복제"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -284,11 +289,12 @@ const TableRow: React.FC<TableRowProps> = memo(({
         <div className="space-y-3">
           {isEditing ? (
             <textarea ref={narrationRef} defaultValue={row.narration}
-              className="w-full bg-slate-800 border border-slate-700 focus:border-brand-500 text-slate-100 rounded-lg p-2 text-[11px] leading-relaxed resize-none focus:outline-none transition-colors"
+              className="w-full border focus:border-brand-500 rounded-lg p-2 text-[11px] leading-relaxed resize-none focus:outline-none transition-colors"
+              style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
               rows={6} onClick={(e) => e.stopPropagation()} />
           ) : (
-            <p className="text-slate-200 text-[11px] leading-relaxed font-medium tracking-tight">
-              {row.narration || <span className="text-slate-600 italic">나레이션 없음</span>}
+            <p className="text-[11px] leading-relaxed font-medium tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {row.narration || <span className="italic" style={{ color: 'var(--text-muted)' }}>나레이션 없음</span>}
             </p>
           )}
           {row.analysis?.composition_type && (
@@ -302,7 +308,7 @@ const TableRow: React.FC<TableRowProps> = memo(({
                 <span className={`text-[7px] font-black px-1.5 py-0.5 rounded border uppercase ${
                   row.analysis.sentiment === 'POSITIVE' ? 'text-green-400 bg-green-400/5 border-green-400/20' :
                   row.analysis.sentiment === 'NEGATIVE' ? 'text-red-400 bg-red-400/5 border-red-400/20' :
-                  'text-slate-400 bg-slate-400/5 border-slate-400/20'
+                  'text-gray-400 bg-gray-400/5 border-gray-400/20'
                 }`}>{row.analysis.sentiment}</span>
               )}
             </div>
@@ -314,10 +320,11 @@ const TableRow: React.FC<TableRowProps> = memo(({
       <td className="py-5 px-6 align-top">
         {isEditing ? (
           <textarea ref={promptRef} defaultValue={row.visualPrompt}
-            className="w-full bg-slate-800 border border-slate-700 focus:border-brand-500 text-slate-100 rounded-lg p-2 text-[9px] font-mono leading-tight resize-none focus:outline-none transition-colors"
+            className="w-full border focus:border-brand-500 rounded-lg p-2 text-[9px] font-mono leading-tight resize-none focus:outline-none transition-colors"
+            style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
             rows={10} onClick={(e) => e.stopPropagation()} />
         ) : (
-          <div className="bg-slate-950/30 rounded-lg p-3 border border-slate-800/50 text-[9px] text-slate-600 font-mono leading-tight whitespace-pre-wrap">
+          <div className="rounded-lg p-3 border text-[9px] font-mono leading-tight whitespace-pre-wrap" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 30%, transparent)', borderColor: 'color-mix(in srgb, var(--border-default) 50%, transparent)', color: 'var(--text-muted)' }}>
             {row.visualPrompt || <span className="italic">프롬프트 없음</span>}
           </div>
         )}
@@ -327,10 +334,10 @@ const TableRow: React.FC<TableRowProps> = memo(({
       <td className="py-5 px-6 align-top">
         {/* 이미지/영상 */}
         <div
-          className="relative mx-auto rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner group/img"
+          className="relative mx-auto rounded-xl overflow-hidden border shadow-inner group/img"
           style={isPortrait
-            ? { width: '64px', height: '114px' }   // 9:16 compact portrait
-            : { width: '192px', height: '108px' }   // 16:9 landscape
+            ? { width: '64px', height: '114px', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-default)' }
+            : { width: '192px', height: '108px', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-default)' }
           }
         >
           {/* 숨겨진 이미지 업로드 input */}
@@ -357,14 +364,14 @@ const TableRow: React.FC<TableRowProps> = memo(({
               <span className="text-[7px] text-red-400 font-black uppercase">실패</span>
               <div className="flex flex-col gap-1 px-1">
                 <button onClick={() => onRegenerateImage?.(index)} className="px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-white text-[8px] font-black transition-all">재생성</button>
-                <button onClick={() => imageUploadRef.current?.click()} className="px-1.5 py-0.5 rounded bg-slate-600 hover:bg-slate-500 text-white text-[8px] font-black transition-all">업로드</button>
+                <button onClick={() => imageUploadRef.current?.click()} className="px-1.5 py-0.5 rounded hover:bg-[var(--bg-hover)] text-[8px] font-black transition-all" style={{ backgroundColor: 'var(--text-muted)', color: 'var(--text-primary)' }}>업로드</button>
               </div>
             </div>
           ) : row.videoData ? (
             <>
               <video src={row.videoData} className="w-full h-full object-cover" autoPlay loop muted playsInline />
               <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-cyan-500/80 text-[6px] font-black text-white uppercase">영상</div>
-              <div className={`absolute inset-0 bg-slate-950/80 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center ${isPortrait ? 'flex-col gap-1' : 'gap-1.5'}`}>
+              <div className={`absolute inset-0 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center ${isPortrait ? 'flex-col gap-1' : 'gap-1.5'}`} style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 80%, transparent)' }}>
                 <button onClick={() => onRegenerateImage?.(index)} className={`rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title="이미지 재생성">
                   <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
@@ -379,8 +386,8 @@ const TableRow: React.FC<TableRowProps> = memo(({
           ) : row.imageData ? (
             <>
               <LazyImage src={`data:image/jpeg;base64,${row.imageData}`} alt="Scene"
-                className="w-full h-full object-cover transition-transform group-hover/img:scale-105" />
-              <div className={`absolute inset-0 bg-slate-950/80 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center ${isPortrait ? 'flex-col gap-1' : 'gap-1.5'}`}>
+                className="w-full h-full object-cover scene-img-hover" />
+              <div className={`absolute inset-0 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center ${isPortrait ? 'flex-col gap-1' : 'gap-1.5'}`} style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 80%, transparent)' }}>
                 <button onClick={() => onRegenerateImage?.(index)} className={`rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title="이미지 재생성">
                   <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
@@ -394,14 +401,15 @@ const TableRow: React.FC<TableRowProps> = memo(({
             </>
           ) : (
             <div
-              className="absolute inset-0 flex flex-col items-center justify-center border-2 border-dashed border-slate-700 m-2 rounded-lg cursor-pointer hover:border-slate-500 transition-colors"
+              className="absolute inset-0 flex flex-col items-center justify-center border-2 border-dashed m-2 rounded-lg cursor-pointer hover:border-[var(--text-muted)] transition-colors"
+              style={{ borderColor: 'var(--border-subtle)' }}
               onClick={() => imageUploadRef.current?.click()}
               title="클릭하여 이미지 업로드"
             >
-              <svg className="w-6 h-6 text-slate-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-6 h-6 mb-1" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              <span className="text-[7px] text-slate-700 font-black uppercase">클릭하여 업로드</span>
+              <span className="text-[7px] font-black uppercase" style={{ color: 'var(--border-subtle)' }}>클릭하여 업로드</span>
             </div>
           )}
         </div>
@@ -416,7 +424,7 @@ const TableRow: React.FC<TableRowProps> = memo(({
                 ? 'text-yellow-400 bg-yellow-950/30 border-yellow-800/40'
                 : row.errorMessage.toLowerCase().includes('api key') || row.errorMessage.toLowerCase().includes('unauthorized')
                 ? 'text-red-400 bg-red-950/30 border-red-800/40'
-                : 'text-slate-400 bg-slate-800/50 border-slate-700/40'
+                : 'text-[var(--text-secondary)] bg-[color-mix(in_srgb,var(--bg-elevated)_50%,transparent)] border-[color-mix(in_srgb,var(--border-subtle)_40%,transparent)]'
             }`}>
               {row.errorMessage.toLowerCase().includes('safety') || row.errorMessage.toLowerCase().includes('blocked') || row.errorMessage.toLowerCase().includes('policy')
                 ? '⚠ 콘텐츠 정책 위반 (호버로 상세 확인)'
@@ -431,19 +439,21 @@ const TableRow: React.FC<TableRowProps> = memo(({
 
         {/* 재생 시간 조절 */}
         <div className="mt-2 flex items-center justify-center gap-1.5">
-          <span className="text-[8px] text-slate-600">⏱</span>
+          <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>⏱</span>
           <input
             type="number" min={1} max={60} step={0.5}
             value={effectiveDuration}
             onChange={(e) => onSetCustomDuration?.(index, Math.max(1, Math.min(60, Number(e.target.value))))}
-            className="w-12 bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-brand-500 text-slate-300 rounded px-1 py-0.5 text-[9px] text-center focus:outline-none transition-colors"
+            className="w-12 border hover:border-[var(--text-muted)] focus:border-brand-500 rounded px-1 py-0.5 text-[9px] text-center focus:outline-none transition-colors"
+            style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
             title="씬 재생 시간 (초)"
           />
-          <span className="text-[8px] text-slate-600">초</span>
+          <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>초</span>
           {row.customDuration && (
             <button
               onClick={() => onSetCustomDuration?.(index, 0)}
-              className="text-[7px] text-slate-700 hover:text-slate-400 transition-colors"
+              className="text-[7px] hover:text-[var(--text-secondary)] transition-colors"
+              style={{ color: 'var(--border-subtle)' }}
               title="기본값으로 초기화"
             >↩</button>
           )}
@@ -464,8 +474,9 @@ const TableRow: React.FC<TableRowProps> = memo(({
               className={`w-5 h-5 rounded text-[8px] font-bold transition-all ${
                 (row.zoomEffect || 'zoomIn') === id
                   ? 'bg-brand-600 text-white shadow-sm'
-                  : 'bg-slate-800 text-slate-600 hover:text-slate-300 border border-slate-700'
+                  : 'hover:text-[var(--text-secondary)] border'
               }`}
+              style={(row.zoomEffect || 'zoomIn') === id ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)', borderColor: 'var(--border-subtle)' }}
               title={title}
             >
               {label}
@@ -487,8 +498,9 @@ const TableRow: React.FC<TableRowProps> = memo(({
               className={`w-5 h-5 rounded text-[7px] font-bold transition-all ${
                 (row.transition || 'none') === id
                   ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-slate-800 text-slate-600 hover:text-slate-300 border border-slate-700'
+                  : 'hover:text-[var(--text-secondary)] border'
               }`}
+              style={(row.transition || 'none') === id ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)', borderColor: 'var(--border-subtle)' }}
               title={title}
             >
               {label}
@@ -505,7 +517,8 @@ const TableRow: React.FC<TableRowProps> = memo(({
             {!isEditing && (
               <button
                 onClick={() => onRegenerateAudio?.(index)}
-                className="p-1 bg-slate-800 hover:bg-blue-900/50 text-slate-600 hover:text-blue-400 rounded transition-colors"
+                className="p-1 hover:bg-blue-900/50 hover:text-blue-400 rounded transition-colors"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
                 title="음성 재생성"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -516,8 +529,8 @@ const TableRow: React.FC<TableRowProps> = memo(({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1.5 opacity-30">
-            <div className="w-2.5 h-2.5 border-2 border-slate-700 border-t-slate-500 animate-spin rounded-full"></div>
-            <span className="text-[6px] text-slate-600 font-black uppercase">VO</span>
+            <div className="w-2.5 h-2.5 border-2 animate-spin rounded-full" style={{ borderColor: 'var(--border-subtle)', borderTopColor: 'var(--text-muted)' }}></div>
+            <span className="text-[6px] font-black uppercase" style={{ color: 'var(--text-muted)' }}>VO</span>
           </div>
         )}
       </td>
@@ -546,6 +559,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onAutoZoom,
   onRegenerateImage,
   onExportVideo,
+  userPlan = 'free',
   onGenerateAnimation,
   isExporting,
   animatingIndices,
@@ -573,6 +587,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [subtitleTextColor, setSubtitleTextColor] = useState('#FFFFFF');
   const [sceneGap, setSceneGap] = useState(0.3); // 씬 전환 간격 (초)
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedResolution, setSelectedResolution] = useState<ResolutionTier>(getVideoResolution());
+
+  const handleResolutionChange = (res: ResolutionTier) => {
+    if (!canAccessResolution(userPlan, res)) return;
+    setSelectedResolution(res);
+    setVideoResolution(res);
+  };
 
   const currentSubtitleConfig: Partial<SubtitleConfig> = {
     position: subtitlePos,
@@ -618,25 +639,23 @@ const ResultTable: React.FC<ResultTableProps> = ({
   return (
     <div className="w-full max-w-[98%] mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* 헤더 툴바 */}
-      <div className="mb-6 bg-slate-900/90 backdrop-blur-md p-5 rounded-3xl border border-slate-800">
+      <div className="mb-6 backdrop-blur-md p-5 rounded-3xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 90%, transparent)', borderColor: 'var(--border-default)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-1 h-10 bg-brand-500 rounded-full"></div>
-            <div>
-              <h2 className="text-xl font-black text-white tracking-tight">졸라맨 V10.0 마스터 스토리보드</h2>
-              <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">Ultra-Detail Identity Sync Active</p>
-            </div>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
             {/* Undo/Redo */}
             <button onClick={onUndo} disabled={!canUndo}
-              className={`px-3 py-2.5 rounded-xl border font-bold text-[10px] transition-all flex items-center gap-1.5 ${canUndo ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed'}`}
+              className={`px-3 py-2.5 rounded-xl border font-bold text-[10px] transition-all flex items-center gap-1.5 ${canUndo ? 'hover:bg-[var(--bg-hover)]' : 'cursor-not-allowed'}`}
+              style={canUndo ? { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' } : { backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', color: 'var(--border-subtle)' }}
               title="실행 취소 (Ctrl+Z)">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
               취소
             </button>
             <button onClick={onRedo} disabled={!canRedo}
-              className={`px-3 py-2.5 rounded-xl border font-bold text-[10px] transition-all flex items-center gap-1.5 ${canRedo ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed'}`}
+              className={`px-3 py-2.5 rounded-xl border font-bold text-[10px] transition-all flex items-center gap-1.5 ${canRedo ? 'hover:bg-[var(--bg-hover)]' : 'cursor-not-allowed'}`}
+              style={canRedo ? { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' } : { backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', color: 'var(--border-subtle)' }}
               title="다시 실행 (Ctrl+Y)">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" /></svg>
               재실행
@@ -654,7 +673,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               <option value="sentiment">감정 기반 (AI)</option>
               <option value="static">정적 (없음)</option>
             </select>
-            <button onClick={() => downloadProjectZip(data)} className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-bold text-[10px] hover:bg-slate-700 transition-all flex items-center gap-2">
+            <button onClick={() => downloadProjectZip(data)} className="px-4 py-2.5 rounded-xl border font-bold text-[10px] hover:bg-[var(--bg-hover)] transition-all flex items-center gap-2" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
               전체 저장
             </button>
@@ -662,17 +681,46 @@ const ResultTable: React.FC<ResultTableProps> = ({
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               엑셀+이미지
             </button>
-            <button onClick={async () => await downloadSrt(data, `subtitles_${Date.now()}.srt`)} className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-bold text-[10px] hover:bg-slate-700 transition-all flex items-center gap-2">
+            <button onClick={async () => await downloadSrt(data, `subtitles_${Date.now()}.srt`)} className="px-4 py-2.5 rounded-xl border font-bold text-[10px] hover:bg-[var(--bg-hover)] transition-all flex items-center gap-2" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               SRT
             </button>
             {/* BGM */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700">
-              <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors whitespace-nowrap" title="BGM 파일 업로드 (MP3, WAV)">
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                </svg>
-                {bgmData ? 'BGM ✓' : 'BGM'}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+              <svg className="w-3.5 h-3.5 flex-shrink-0 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+              {/* BGM 라이브러리 드롭다운 */}
+              <select
+                className="bg-transparent text-[10px] text-purple-400 font-bold border-none outline-none cursor-pointer"
+                value=""
+                onChange={async (e) => {
+                  const track = BGM_LIBRARY.find(t => t.id === e.target.value);
+                  if (!track) return;
+                  try {
+                    const response = await fetch(track.url);
+                    if (!response.ok) return;
+                    const blob = await response.blob();
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const base64 = (reader.result as string).split(',')[1];
+                      onBgmChange?.(base64);
+                    };
+                    reader.readAsDataURL(blob);
+                  } catch {}
+                }}
+                title="BGM 라이브러리에서 선택"
+              >
+                <option value="">{bgmData ? 'BGM ✓' : 'BGM 선택'}</option>
+                {BGM_LIBRARY.map(track => (
+                  <option key={track.id} value={track.id}>
+                    {BGM_MOODS[track.mood]?.emoji} {track.name}
+                  </option>
+                ))}
+              </select>
+              {/* 파일 업로드 */}
+              <label className="flex items-center cursor-pointer text-[10px] text-purple-400 hover:text-purple-300 transition-colors whitespace-nowrap" title="BGM 파일 직접 업로드 (MP3, WAV)">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                 <input type="file" accept="audio/*" className="hidden" onChange={handleBgmUpload} />
               </label>
               {bgmData && (
@@ -683,10 +731,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     className="w-16 accent-purple-500"
                     title={`BGM 볼륨: ${Math.round(bgmVolume * 100)}%`} />
                   <span className="text-[9px] text-purple-400 w-6 text-right">{Math.round(bgmVolume * 100)}%</span>
-                  <button onClick={() => onBgmChange?.(null)} className="text-slate-600 hover:text-red-400 transition-colors ml-0.5" title="BGM 제거">
+                  <button onClick={() => onBgmChange?.(null)} className="px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-colors ml-1 flex items-center gap-0.5" title="BGM 제거">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    <span className="text-[9px] font-bold">제거</span>
                   </button>
-                  <span className="text-slate-700 mx-0.5">|</span>
+                  <span className="mx-0.5" style={{ color: 'var(--border-subtle)' }}>|</span>
                   <label className="flex items-center gap-1 cursor-pointer" title="나레이션 구간에서 BGM 볼륨 자동 감소">
                     <input type="checkbox" checked={bgmDuckingEnabled ?? false}
                       onChange={(e) => onBgmDuckingToggle?.(e.target.checked)}
@@ -725,8 +774,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
               className={`px-4 py-2.5 rounded-xl border font-bold text-[10px] transition-all flex items-center gap-2 ${
                 showPreview
                   ? 'bg-cyan-900/50 border-cyan-700 text-cyan-300'
-                  : 'bg-slate-800 border-slate-700 text-cyan-400 hover:bg-slate-700'
+                  : 'text-cyan-400 hover:bg-[var(--bg-hover)]'
               }`}
+              style={showPreview ? undefined : { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
               title="브라우저에서 바로 미리보기 (MP4 렌더링 없이)"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -740,20 +790,58 @@ const ResultTable: React.FC<ResultTableProps> = ({
               className={`px-4 py-2.5 rounded-xl border font-bold text-[10px] transition-all flex items-center gap-2 ${
                 showSubtitleSettings
                   ? 'bg-brand-900/50 border-brand-700 text-brand-300'
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                  : 'hover:bg-[var(--bg-hover)]'
               }`}
+              style={showSubtitleSettings ? undefined : { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
               </svg>
               자막 설정
             </button>
-            <button onClick={() => onExportVideo?.(false, currentSubtitleConfig, sceneGap)} disabled={isExporting} className={`px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 ${isExporting ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600'}`}>
-              {isExporting ? <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent animate-spin rounded-full"></div> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+            {/* 해상도 선택 */}
+            <div className="flex items-center gap-1 px-2 py-1 rounded-xl border" style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-elevated)' }}>
+              <span className="text-[8px] font-bold uppercase tracking-wider mr-1" style={{ color: 'var(--text-muted)' }}>해상도</span>
+              {(Object.keys(VIDEO_RESOLUTIONS) as ResolutionTier[]).map((key) => {
+                const res = VIDEO_RESOLUTIONS[key];
+                const accessible = canAccessResolution(userPlan, key);
+                const isSelected = selectedResolution === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleResolutionChange(key)}
+                    disabled={!accessible}
+                    className={`px-2.5 py-1.5 rounded-lg text-[9px] font-bold transition-all flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-brand-600 text-white'
+                        : accessible
+                          ? 'hover:bg-[var(--bg-hover)]'
+                          : 'opacity-40 cursor-not-allowed'
+                    }`}
+                    style={isSelected ? undefined : { color: 'var(--text-secondary)' }}
+                    title={accessible ? res.label : `${res.planLabel} 요금제 필요`}
+                  >
+                    {!accessible && (
+                      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    {key.toUpperCase()}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedResolution !== '720p' && (
+              <span className="text-[9px] italic" style={{ color: 'var(--text-muted)' }}>
+                고해상도는 PC 성능에 따라 렌더링이 오래 걸릴 수 있습니다
+              </span>
+            )}
+            <button onClick={() => onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution)} disabled={isExporting} className={`px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 ${isExporting ? 'cursor-not-allowed' : 'border hover:bg-[var(--text-muted)]'}`} style={isExporting ? { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' } : { backgroundColor: 'var(--bg-hover)', color: 'var(--text-primary)', borderColor: 'var(--text-muted)' }}>
+              {isExporting ? <div className="w-3 h-3 border-2 border-t-transparent animate-spin rounded-full" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }}></div> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
               MP4 (자막 X)
             </button>
-            <button onClick={() => onExportVideo?.(true, currentSubtitleConfig, sceneGap)} disabled={isExporting} className={`px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 ${isExporting ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-900/20'}`}>
-              {isExporting ? <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent animate-spin rounded-full"></div> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+            <button onClick={() => onExportVideo?.(true, currentSubtitleConfig, sceneGap, selectedResolution)} disabled={isExporting} className={`px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 ${isExporting ? 'cursor-not-allowed' : 'bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-900/20'}`} style={isExporting ? { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' } : undefined}>
+              {isExporting ? <div className="w-3 h-3 border-2 border-t-transparent animate-spin rounded-full" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }}></div> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
               MP4 (자막 O)
             </button>
           </div>
@@ -761,10 +849,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
         {/* 자막 설정 패널 */}
         {showSubtitleSettings && (
-          <div className="mt-4 pt-4 border-t border-slate-800/50 flex flex-wrap items-center gap-5">
+          <div className="mt-4 pt-4 border-t flex flex-wrap items-center gap-5" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 50%, transparent)' }}>
             {/* 위치 */}
             <div className="flex items-center gap-2">
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">위치</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>위치</span>
               <div className="flex gap-1">
                 {(['top', 'center', 'bottom'] as const).map(pos => (
                   <button
@@ -773,8 +861,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all ${
                       subtitlePos === pos
                         ? 'bg-brand-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                        : 'hover:text-[var(--text-primary)] border'
                     }`}
+                    style={subtitlePos === pos ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', borderColor: 'var(--border-subtle)' }}
                   >
                     {pos === 'top' ? '상단' : pos === 'center' ? '중앙' : '하단'}
                   </button>
@@ -783,29 +872,29 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </div>
             {/* 폰트 크기 */}
             <div className="flex items-center gap-2">
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">크기</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>크기</span>
               <input
                 type="range" min={20} max={72} step={2}
                 value={subtitleFontSize}
                 onChange={(e) => setSubtitleFontSize(Number(e.target.value))}
                 className="w-24 accent-brand-500"
               />
-              <span className="text-[9px] text-slate-400 w-5 text-right">{subtitleFontSize}</span>
+              <span className="text-[9px] w-5 text-right" style={{ color: 'var(--text-secondary)' }}>{subtitleFontSize}</span>
             </div>
             {/* 배경 투명도 */}
             <div className="flex items-center gap-2">
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">배경</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>배경</span>
               <input
                 type="range" min={0} max={100} step={5}
                 value={subtitleBgOpacity}
                 onChange={(e) => setSubtitleBgOpacity(Number(e.target.value))}
                 className="w-24 accent-brand-500"
               />
-              <span className="text-[9px] text-slate-400 w-8 text-right">{subtitleBgOpacity}%</span>
+              <span className="text-[9px] w-8 text-right" style={{ color: 'var(--text-secondary)' }}>{subtitleBgOpacity}%</span>
             </div>
             {/* 텍스트 색상 */}
             <div className="flex items-center gap-2">
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">색상</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>색상</span>
               <div className="flex gap-1.5">
                 {[
                   { color: '#FFFFFF', label: '흰색' },
@@ -818,7 +907,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     onClick={() => setSubtitleTextColor(color)}
                     title={label}
                     className={`w-5 h-5 rounded-full border-2 transition-all hover:scale-110 ${
-                      subtitleTextColor === color ? 'border-brand-400 scale-110' : 'border-slate-600'
+                      subtitleTextColor === color ? 'border-brand-400 scale-110' : 'border-[var(--text-muted)]'
                     }`}
                     style={{ backgroundColor: color }}
                   />
@@ -838,23 +927,24 @@ const ResultTable: React.FC<ResultTableProps> = ({
               자막 미리보기
             </div>
             {/* 씬 전환 간격 + 기본 전환 효과 */}
-            <div className="flex flex-wrap items-center gap-4 w-full border-t border-slate-800/50 pt-3 mt-1">
+            <div className="flex flex-wrap items-center gap-4 w-full border-t pt-3 mt-1" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 50%, transparent)' }}>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">씬 간격</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>씬 간격</span>
                 <input
                   type="range" min={0} max={1.5} step={0.1}
                   value={sceneGap}
                   onChange={(e) => setSceneGap(Number(e.target.value))}
                   className="w-28 accent-brand-500"
                 />
-                <span className="text-[9px] text-slate-400 w-10 text-right">{sceneGap.toFixed(1)}초</span>
+                <span className="text-[9px] w-10 text-right" style={{ color: 'var(--text-secondary)' }}>{sceneGap.toFixed(1)}초</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">기본 전환</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>기본 전환</span>
                 <select
                   onChange={(e) => onSetDefaultTransition?.(e.target.value)}
                   defaultValue="none"
-                  className="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[9px] font-bold cursor-pointer"
+                  className="px-2 py-1 rounded-lg border text-[9px] font-bold cursor-pointer"
+                  style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
                 >
                   <option value="none">없음</option>
                   <option value="crossfade">크로스페이드</option>
@@ -886,19 +976,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
       )}
 
       {/* 테이블 */}
-      <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/20 backdrop-blur-sm">
+      <div className="overflow-hidden rounded-3xl border backdrop-blur-sm" style={{ borderColor: 'var(--border-default)', backgroundColor: 'color-mix(in srgb, var(--bg-surface) 20%, transparent)' }}>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1200px] table-fixed">
-            <thead className="bg-slate-900/80 border-b border-slate-800">
+            <thead className="border-b" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 80%, transparent)', borderColor: 'var(--border-default)' }}>
               <tr>
-                <th className="py-4 px-3 text-[9px] font-black text-slate-500 uppercase tracking-widest w-16 text-center">순서</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-[30%]">나레이션 / CEO 프로토콜</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-[30%]">V9.2 통합 영문 프롬프트</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-56 text-center">생성 결과물</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-20 text-center">음성</th>
+                <th className="py-4 px-3 text-[9px] font-black uppercase tracking-widest w-16 text-center" style={{ color: 'var(--text-muted)' }}>순서</th>
+                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-[30%]" style={{ color: 'var(--text-muted)' }}>나레이션 / CEO 프로토콜</th>
+                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-[30%]" style={{ color: 'var(--text-muted)' }}>V9.2 통합 영문 프롬프트</th>
+                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-56 text-center" style={{ color: 'var(--text-muted)' }}>생성 결과물</th>
+                <th className="py-4 px-6 text-[9px] font-black uppercase tracking-widest w-20 text-center" style={{ color: 'var(--text-muted)' }}>음성</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/40">
+            <tbody className="divide-y" style={{ '--tw-divide-color': 'color-mix(in srgb, var(--border-default) 40%, transparent)' } as React.CSSProperties}>
               {data.map((row, index) => (
                 <TableRow
                   key={`scene-${row.sceneNumber}`}
@@ -931,10 +1021,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
         </div>
 
         {/* 맨 아래 씬 추가 버튼 */}
-        <div className="border-t border-slate-800/40">
+        <div className="border-t" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 40%, transparent)' }}>
           <button
             onClick={() => onAddScene?.()}
-            className="w-full py-3 flex items-center justify-center gap-2 text-slate-600 hover:text-slate-400 hover:bg-slate-800/30 transition-all text-[10px] font-bold"
+            className="w-full py-3 flex items-center justify-center gap-2 hover:text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--bg-elevated)_30%,transparent)] transition-all text-[10px] font-bold"
+            style={{ color: 'var(--text-muted)' }}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

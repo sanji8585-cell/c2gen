@@ -15,7 +15,7 @@ interface Props {
   onToast: (type: 'success' | 'error', message: string) => void;
 }
 
-type SortKey = 'name' | 'status' | 'totalCostUsd' | 'todayCostUsd' | 'projectCount' | 'lastLoginAt' | 'createdAt';
+type SortKey = 'name' | 'status' | 'credits' | 'totalCostUsd' | 'todayCostUsd' | 'projectCount' | 'lastLoginAt' | 'createdAt' | 'level';
 type SortDir = 'asc' | 'desc';
 
 const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter, onRefresh, onViewProjects, onToast }) => {
@@ -62,6 +62,20 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
     }
     try {
       const { ok, data } = await authFetch({ action, adminToken, email });
+      if (ok) {
+        onToast('success', data.message);
+        onRefresh();
+      } else {
+        onToast('error', data.message || '처리에 실패했습니다.');
+      }
+    } catch {
+      onToast('error', '서버 연결에 실패했습니다.');
+    }
+  }, [adminToken, onRefresh, onToast]);
+
+  const handleSetOperator = useCallback(async (email: string, isOperator: boolean) => {
+    try {
+      const { ok, data } = await authFetch({ action: 'setOperator', adminToken, email, isOperator });
       if (ok) {
         onToast('success', data.message);
         onRefresh();
@@ -136,6 +150,10 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
                 <th className="text-left px-4 py-3 font-medium cursor-pointer hover:text-slate-300" onClick={() => handleSort('status')}>
                   상태 <SortIcon col="status" />
                 </th>
+                <th className="text-center px-4 py-3 font-medium">플랜</th>
+                <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-slate-300" onClick={() => handleSort('credits')}>
+                  크레딧 <SortIcon col="credits" />
+                </th>
                 <th className="text-right px-4 py-3 font-medium cursor-pointer hover:text-slate-300" onClick={() => handleSort('totalCostUsd')}>
                   누적 비용 <SortIcon col="totalCostUsd" />
                 </th>
@@ -144,6 +162,12 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
                 </th>
                 <th className="text-center px-4 py-3 font-medium cursor-pointer hover:text-slate-300" onClick={() => handleSort('projectCount')}>
                   프로젝트 <SortIcon col="projectCount" />
+                </th>
+                <th className="text-center px-4 py-3 font-medium cursor-pointer hover:text-slate-300" onClick={() => handleSort('level')}>
+                  레벨 <SortIcon col="level" />
+                </th>
+                <th className="text-left px-4 py-3 font-medium cursor-pointer hover:text-slate-300" onClick={() => handleSort('createdAt')}>
+                  가입일 <SortIcon col="createdAt" />
                 </th>
                 <th className="text-left px-4 py-3 font-medium cursor-pointer hover:text-slate-300" onClick={() => handleSort('lastLoginAt')}>
                   마지막 접속 <SortIcon col="lastLoginAt" />
@@ -154,7 +178,7 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-slate-600 text-xs">
+                  <td colSpan={11} className="text-center py-10 text-slate-600 text-xs">
                     {users.length === 0 ? '등록된 회원이 없습니다.' : '검색 결과가 없습니다.'}
                   </td>
                 </tr>
@@ -163,7 +187,18 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
                   {/* 이름/이메일 */}
                   <td className="px-4 py-3">
                     <div>
-                      <p className="text-slate-200 font-medium">{user.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-slate-200 font-medium">{user.name}</p>
+                        {user.oauthProvider === 'google' && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">G</span>
+                        )}
+                        {user.oauthProvider === 'kakao' && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 font-medium">K</span>
+                        )}
+                        {user.plan === 'operator' && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 font-medium">운영자</span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-slate-500">{user.email}</p>
                     </div>
                   </td>
@@ -173,6 +208,30 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
                     <span className={`text-[11px] px-2 py-0.5 rounded-full border ${getStatusStyle(user.status)}`}>
                       {getStatusLabel(user.status)}
                     </span>
+                  </td>
+
+                  {/* 플랜 */}
+                  <td className="px-4 py-3 text-center">
+                    {(() => {
+                      const plan = user.plan || 'free';
+                      const styles: Record<string, string> = {
+                        free: 'bg-slate-600/20 text-slate-400 border-slate-600/30',
+                        basic: 'bg-blue-600/20 text-blue-400 border-blue-600/30',
+                        pro: 'bg-purple-600/20 text-purple-400 border-purple-600/30',
+                        operator: 'bg-orange-600/20 text-orange-400 border-orange-600/30',
+                      };
+                      const labels: Record<string, string> = { free: 'Free', basic: 'Basic', pro: 'Pro', operator: '운영자' };
+                      return (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${styles[plan] || styles.free}`}>
+                          {labels[plan] || plan}
+                        </span>
+                      );
+                    })()}
+                  </td>
+
+                  {/* 크레딧 */}
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-emerald-400 text-[12px] font-medium">{user.credits.toLocaleString()}</span>
                   </td>
 
                   {/* 누적 비용 */}
@@ -188,6 +247,20 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
                   {/* 프로젝트 수 */}
                   <td className="px-4 py-3 text-center">
                     <span className="text-slate-400 text-[12px]">{user.projectCount}</span>
+                  </td>
+
+                  {/* 레벨 */}
+                  <td className="px-4 py-3 text-center">
+                    <span className="text-purple-400 text-[12px] font-medium">Lv.{user.level}</span>
+                    <span className="text-slate-600 text-[10px] ml-1">({user.xp}xp)</span>
+                    {user.streakCount >= 2 && (
+                      <span className="text-orange-400 text-[10px] ml-1">🔥{user.streakCount}d</span>
+                    )}
+                  </td>
+
+                  {/* 가입일 */}
+                  <td className="px-4 py-3">
+                    <span className="text-slate-500 text-[12px]">{timeAgo(user.createdAt)}</span>
                   </td>
 
                   {/* 마지막 접속 */}
@@ -230,12 +303,24 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
                         </>
                       )}
                       {user.status === 'approved' && (
-                        <button
-                          onClick={() => handleUserAction('rejectUser', user.email, user.name)}
-                          className="text-[11px] px-2 py-1 bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 border border-yellow-600/30 rounded-md transition-all"
-                        >
-                          차단
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleSetOperator(user.email, user.plan !== 'operator')}
+                            className={`text-[11px] px-2 py-1 rounded-md transition-all ${
+                              user.plan === 'operator'
+                                ? 'bg-orange-600/20 hover:bg-orange-600/40 text-orange-400 border border-orange-600/30'
+                                : 'bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 border border-teal-600/30'
+                            }`}
+                          >
+                            {user.plan === 'operator' ? '운영자 해제' : '운영자 지정'}
+                          </button>
+                          <button
+                            onClick={() => handleUserAction('rejectUser', user.email, user.name)}
+                            className="text-[11px] px-2 py-1 bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 border border-yellow-600/30 rounded-md transition-all"
+                          >
+                            차단
+                          </button>
+                        </>
                       )}
                       {user.status === 'rejected' && (
                         <button
@@ -268,6 +353,7 @@ const AdminUsers: React.FC<Props> = ({ users, adminToken, loading, initialFilter
           adminToken={adminToken}
           onClose={() => setDetailUser(null)}
           onToast={onToast}
+          onRefresh={onRefresh}
         />
       )}
     </div>

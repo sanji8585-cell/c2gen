@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
@@ -24,22 +25,179 @@
       }
     </script>
     <style>
-      /* Custom Scrollbar for sleek look */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+      /* ── 테마 변수 ── */
+      :root {
+        --bg-base: #eef2f6;
+        --bg-surface: #f8fafc;
+        --bg-elevated: #e2e8f0;
+        --bg-hover: #cbd5e1;
+        --bg-inset: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
+        --border-default: #cbd5e1;
+        --border-subtle: #e2e8f0;
+        --shadow-card: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.08);
+        --scrollbar-track: #e2e8f0;
+        --scrollbar-thumb: #94a3b8;
+        --scrollbar-thumb-hover: #64748b;
       }
-      ::-webkit-scrollbar-track {
-        background: #1e293b;
+      .dark {
+        --bg-base: #020617;
+        --bg-surface: #0f172a;
+        --bg-elevated: #1e293b;
+        --bg-hover: #334155;
+        --bg-inset: #0f172a;
+        --text-primary: #e2e8f0;
+        --text-secondary: #94a3b8;
+        --text-muted: #475569;
+        --border-default: #1e293b;
+        --border-subtle: #334155;
+        --shadow-card: 0 1px 3px 0 rgba(0,0,0,0.3);
+        --scrollbar-track: #1e293b;
+        --scrollbar-thumb: #475569;
+        --scrollbar-thumb-hover: #64748b;
       }
-      ::-webkit-scrollbar-thumb {
-        background: #475569;
-        border-radius: 4px;
+
+      /* ── 스크롤바 ── */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+      ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+      /* ── Fun 애니메이션 ── */
+      @keyframes confetti-fall {
+        0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #64748b;
+      @keyframes wiggle {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-2deg); }
+        75% { transform: rotate(2deg); }
+      }
+      @keyframes bounce-in {
+        0% { transform: scale(0.3); opacity: 0; }
+        50% { transform: scale(1.05); }
+        70% { transform: scale(0.9); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes rainbow-spin {
+        0% { transform: rotate(0deg); filter: hue-rotate(0deg); }
+        100% { transform: rotate(720deg); filter: hue-rotate(360deg); }
+      }
+      @keyframes toast-in {
+        0% { transform: translateY(100%) scale(0.8); opacity: 0; }
+        100% { transform: translateY(0) scale(1); opacity: 1; }
+      }
+      @keyframes toast-out {
+        0% { transform: translateY(0) scale(1); opacity: 1; }
+        100% { transform: translateY(100%) scale(0.8); opacity: 0; }
+      }
+      @keyframes fade-sub {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 1; }
+      }
+      .animate-wiggle:hover { animation: wiggle 0.4s ease-in-out; }
+      .animate-bounce-in { animation: bounce-in 0.6s ease-out; }
+      .animate-rainbow-spin { animation: rainbow-spin 2s ease-in-out; }
+      .animate-toast-in { animation: toast-in 0.4s ease-out forwards; }
+      .animate-toast-out { animation: toast-out 0.3s ease-in forwards; }
+      .animate-fade-sub { animation: fade-sub 3s ease-in-out infinite; }
+      .scene-img-hover { transition: transform 1.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
+      .scene-img-hover:hover { transform: scale(1.08) translate(-1%, -0.5%); }
+      .confetti-piece {
+        position: fixed; top: -10px; width: 10px; height: 10px; z-index: 9999;
+        border-radius: 2px; pointer-events: none;
+        animation: confetti-fall 2.5s ease-in forwards;
+      }
+
+      /* ── 숫자 팝 ── */
+      @keyframes number-pop {
+        0% { transform: scale(1); color: inherit; }
+        30% { transform: scale(1.4); color: #22c55e; }
+        100% { transform: scale(1); color: inherit; }
+      }
+      .animate-number-pop { animation: number-pop 0.4s ease-out; }
+
+      /* ── 에러 흔들림 ── */
+      @keyframes gentle-shake {
+        0%, 100% { transform: translateX(0); }
+        15% { transform: translateX(-4px) rotate(-1deg); }
+        30% { transform: translateX(3px) rotate(0.5deg); }
+        45% { transform: translateX(-2px) rotate(-0.5deg); }
+        60% { transform: translateX(1px); }
+      }
+      .animate-gentle-shake { animation: gentle-shake 0.5s ease-out; }
+
+      /* ── 콤보 팝 ── */
+      @keyframes combo-pop {
+        0% { transform: scale(0.5); opacity: 0; }
+        50% { transform: scale(1.3); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .animate-combo-pop { animation: combo-pop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+
+      /* ── 유휴 파티클 ── */
+      @keyframes float-particle {
+        0% { transform: translateY(0) translateX(0) scale(0); opacity: 0; }
+        20% { opacity: 0.6; transform: scale(1); }
+        100% { transform: translateY(-120px) translateX(30px) scale(0.3); opacity: 0; }
+      }
+      .idle-particle {
+        position: fixed; pointer-events: none; z-index: 10;
+        font-size: 14px; animation: float-particle 4s ease-in-out infinite;
+      }
+
+      /* ── XP 바 ── */
+      .xp-bar-fill { transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+      /* ── 카운트다운 ── */
+      @keyframes countdown-pulse {
+        0% { transform: scale(2.5); opacity: 0; }
+        15% { transform: scale(1); opacity: 1; }
+        70% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(0.3); opacity: 0; }
+      }
+      .animate-countdown { animation: countdown-pulse 0.65s ease-in-out forwards; }
+
+      /* ── 뽑기 등장 ── */
+      @keyframes slot-reveal {
+        0% { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+        60% { transform: scale(1.2) rotate(3deg); }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      .animate-slot-reveal { animation: slot-reveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+      /* ── 코나미 레트로 모드 ── */
+      .retro-mode { filter: sepia(0.4) contrast(1.1) !important; font-family: "Courier New", monospace !important; }
+      .retro-mode * { border-radius: 0 !important; }
+      .scanline-overlay {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+        pointer-events: none; z-index: 99999;
+      }
+
+      /* ── 다이나믹 악센트 ── */
+      :root { --accent-dynamic: rgb(14, 165, 233); }
+
+      /* ── 테마 전환 트랜지션 ── */
+      html.theme-transition,
+      html.theme-transition *,
+      html.theme-transition *::before,
+      html.theme-transition *::after {
+        transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease !important;
       }
     </style>
+    <script>
+      // 테마 초기화 (FOUC 방지)
+      (function() {
+        const saved = localStorage.getItem('tubegen_theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   <script type="importmap">
 {
   "imports": {
@@ -53,8 +211,10 @@
 }
 </script>
 <link rel="stylesheet" href="/index.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js" async defer></script>
 </head>
-  <body class="bg-slate-950 text-slate-200 antialiased min-h-screen">
+  <body class="antialiased min-h-screen" style="background-color: var(--bg-base); color: var(--text-primary);">
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

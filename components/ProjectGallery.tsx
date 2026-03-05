@@ -98,9 +98,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   if (detailLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 text-center">
-        <div className="inline-flex items-center gap-3 px-6 py-4 bg-slate-900 rounded-2xl border border-slate-800">
+        <div className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
           <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent animate-spin rounded-full"></div>
-          <span className="text-slate-300 font-medium">프로젝트 불러오는 중...</span>
+          <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>프로젝트 불러오는 중...</span>
         </div>
       </div>
     );
@@ -116,7 +116,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         <div className="flex items-center justify-between mb-8">
           <button
             onClick={() => setSelectedProject(null)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+            style={{ backgroundColor: 'var(--bg-elevated)' }}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -124,7 +125,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             목록으로
           </button>
 
-          <h2 className="text-xl font-bold text-white">{selectedProject.name}</h2>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{selectedProject.name}</h2>
 
           <button
             onClick={() => onLoad(selectedProject)}
@@ -138,18 +139,18 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         </div>
 
         {/* 설정 정보 */}
-        <div className="bg-slate-900 rounded-xl p-4 mb-6 border border-slate-800">
+        <div className="rounded-xl p-4 mb-6 border" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
           <div className="flex flex-wrap items-center gap-4 text-sm">
-            <span className="text-slate-400">{formatDate(selectedProject.createdAt)}</span>
-            <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
+            <span style={{ color: 'var(--text-secondary)' }}>{formatDate(selectedProject.createdAt)}</span>
+            <span className="px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
               {selectedProject.settings?.imageModel?.includes('flux') ? 'Flux' : 'Gemini'}
             </span>
             {selectedProject.settings?.imageModel?.includes('flux') && (
-              <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
+              <span className="px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
                 {(selectedProject.settings as any)?.fluxStyle}
               </span>
             )}
-            <span className="px-3 py-1 bg-slate-800 rounded-full text-slate-300">
+            <span className="px-3 py-1 rounded-full" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
               {selectedProject.settings?.elevenLabsModel}
             </span>
             <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full">
@@ -162,17 +163,17 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
           {/* 비용 상세 (있는 경우만) */}
           {selectedProject.cost && (
-            <div className="mt-3 pt-3 border-t border-slate-800">
+            <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-default)' }}>
               <div className="flex flex-wrap items-center gap-4 text-xs">
-                <span className="text-slate-500">비용:</span>
-                <span className="text-slate-300">
+                <span style={{ color: 'var(--text-muted)' }}>비용:</span>
+                <span style={{ color: 'var(--text-secondary)' }}>
                   이미지 {selectedProject.cost.imageCount}장 {formatKRW(selectedProject.cost.images)}
                 </span>
-                <span className="text-slate-300">
+                <span style={{ color: 'var(--text-secondary)' }}>
                   TTS {selectedProject.cost.ttsCharacters}자 {formatKRW(selectedProject.cost.tts)}
                 </span>
                 {selectedProject.cost.videoCount > 0 && (
-                  <span className="text-slate-300">
+                  <span style={{ color: 'var(--text-secondary)' }}>
                     영상 {selectedProject.cost.videoCount}개 {formatKRW(selectedProject.cost.videos)}
                   </span>
                 )}
@@ -189,7 +190,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           {assets.map((asset, index) => (
             <div
               key={index}
-              className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800"
+              className="rounded-xl overflow-hidden border"
+              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
             >
               <div className="flex flex-col md:flex-row">
                 {/* 이미지 */}
@@ -201,8 +203,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                       className="w-full h-48 md:h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-48 md:h-full bg-slate-800 flex items-center justify-center">
-                      <span className="text-slate-500">이미지 없음</span>
+                    <div className="w-full h-48 md:h-full flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>이미지 없음</span>
                     </div>
                   )}
                 </div>
@@ -226,15 +228,15 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                   </div>
 
                   <div className="mb-3">
-                    <h4 className="text-xs font-bold text-slate-400 mb-1">나레이션</h4>
-                    <p className="text-slate-200 text-sm leading-relaxed">
+                    <h4 className="text-xs font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>나레이션</h4>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                       {asset.narration}
                     </p>
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold text-slate-400 mb-1">비주얼 프롬프트</h4>
-                    <p className="text-slate-400 text-xs leading-relaxed line-clamp-3">
+                    <h4 className="text-xs font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>비주얼 프롬프트</h4>
+                    <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
                       {asset.visualPrompt}
                     </p>
                   </div>
@@ -254,7 +256,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
       <div className="flex items-center justify-between mb-8">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+          style={{ backgroundColor: 'var(--bg-elevated)' }}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -262,10 +265,10 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           돌아가기
         </button>
 
-        <h2 className="text-xl font-bold text-white">저장된 프로젝트</h2>
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>저장된 프로젝트</h2>
 
         <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-400">{projects.length}개 프로젝트</span>
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{projects.length}개 프로젝트</span>
           {/* JSON 가져오기 버튼 */}
           <label className="flex items-center gap-2 px-3 py-2 bg-blue-800/50 hover:bg-blue-700/50 border border-blue-700/50 text-blue-300 text-xs font-bold rounded-lg cursor-pointer transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -287,11 +290,16 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
       {/* 프로젝트 목록 */}
       {projects.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="text-6xl mb-4">📁</div>
-          <h3 className="text-lg font-bold text-slate-300 mb-2">저장된 프로젝트가 없습니다</h3>
-          <p className="text-slate-500 text-sm">
-            스토리보드를 생성하면 자동으로 저장됩니다
+        <div className="text-center py-20 relative">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(6)].map((_, i) => (
+              <span key={i} className="idle-particle absolute" style={{ left: `${20 + Math.random() * 60}%`, top: `${30 + Math.random() * 40}%`, animationDelay: `${i * 0.7}s` }}>✨</span>
+            ))}
+          </div>
+          <div className="text-6xl mb-4">🎨</div>
+          <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>첫 작품을 만들어보세요!</h3>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            AI와 함께 놀라운 영상 콘텐츠를 창작해보세요
           </p>
         </div>
       ) : (
@@ -299,11 +307,13 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           {projects.map(project => (
             <div
               key={project.id}
-              className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-slate-700 transition-all group"
+              className="rounded-xl overflow-hidden border hover:border-[var(--border-subtle)] transition-all group"
+              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
             >
               {/* 썸네일 */}
               <div
-                className="h-40 bg-slate-800 cursor-pointer relative overflow-hidden"
+                className="h-40 cursor-pointer relative overflow-hidden"
+                style={{ backgroundColor: 'var(--bg-elevated)' }}
                 onClick={() => handleSelectProject(project)}
               >
                 {project.thumbnail ? (
@@ -314,20 +324,21 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-slate-600 text-4xl">🖼️</span>
+                    <span className="text-4xl" style={{ color: 'var(--text-muted)' }}>🖼️</span>
                   </div>
                 )}
 
                 {/* 오버레이 */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
-                  <span className="text-white text-sm font-medium">자세히 보기</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>자세히 보기</span>
                 </div>
               </div>
 
               {/* 정보 */}
               <div className="p-4">
                 <h3
-                  className="font-bold text-white mb-2 truncate cursor-pointer hover:text-brand-400 transition-colors"
+                  className="font-bold mb-2 truncate cursor-pointer hover:text-brand-400 transition-colors"
+                  style={{ color: 'var(--text-primary)' }}
                   onClick={() => handleSelectProject(project)}
                   title={project.name}
                 >
@@ -335,7 +346,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 </h3>
 
                 {/* 날짜 */}
-                <div className="text-xs text-slate-500 mb-2">
+                <div className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
                   {formatDate(project.createdAt)}
                 </div>
 
@@ -354,13 +365,13 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
                   {/* Flux 화풍 (Flux일 때만) */}
                   {project.settings?.imageModel?.includes('flux') && (project.settings as any)?.fluxStyle && (
-                    <span className="px-2 py-0.5 bg-slate-700 text-slate-300 text-[10px] rounded">
+                    <span className="px-2 py-0.5 text-[10px] rounded" style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                       {(project.settings as any)?.fluxStyle === 'custom' ? '커스텀' : (project.settings as any)?.fluxStyle}
                     </span>
                   )}
 
                   {/* 씬 수 */}
-                  <span className="px-2 py-0.5 bg-slate-800 text-slate-400 text-[10px] rounded">
+                  <span className="px-2 py-0.5 text-[10px] rounded" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
                     {(project.sceneCount || project.assets?.length || 0)}씬
                   </span>
 
@@ -389,7 +400,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                       e.stopPropagation();
                       handleExportProject(project);
                     }}
-                    className="p-2 rounded transition-colors bg-slate-800 text-slate-400 hover:bg-blue-900/50 hover:text-blue-400"
+                    className="p-2 rounded transition-colors hover:bg-blue-900/50 hover:text-blue-400"
+                    style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
                     title="JSON으로 내보내기 (다른 기기 이전용)"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -405,8 +417,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                     className={`p-2 rounded transition-colors ${
                       confirmDelete === project.id
                         ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        : 'bg-slate-800 text-slate-400 hover:bg-red-500/20 hover:text-red-400'
+                        : 'hover:bg-red-500/20 hover:text-red-400'
                     }`}
+                    style={confirmDelete === project.id ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
                     title={confirmDelete === project.id ? '다시 클릭하여 삭제' : '삭제'}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

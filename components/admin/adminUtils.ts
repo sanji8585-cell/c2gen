@@ -12,6 +12,13 @@ export interface UserInfo {
   totalCostUsd: number;
   todayCostUsd: number;
   projectCount: number;
+  oauthProvider?: string | null;
+  plan?: string;
+  credits: number;
+  xp: number;
+  level: number;
+  totalGenerations: number;
+  streakCount: number;
 }
 
 export interface SystemStats {
@@ -22,7 +29,44 @@ export interface SystemStats {
   todayCostUsd: number;
   totalProjects: number;
   activeSessions: number;
+  // 게이미피케이션 집계
+  avgLevel: number;
+  activeStreaks: number;
+  totalGachaPulls: number;
+  activeEvents: number;
 }
+
+export interface GameProfile {
+  xp: number;
+  level: number;
+  streakCount: number;
+  maxCombo: number;
+  gachaTickets: number;
+  totalPulls: number;
+  totalGenerations: number;
+  totalImages: number;
+  totalAudio: number;
+  totalVideos: number;
+  loginDays: number;
+  prestigeLevel: number;
+}
+
+export interface EquippedInfo {
+  title: string | null;
+  titleEmoji: string | null;
+  badges: string[];
+  frame: string | null;
+}
+
+export interface AchievementSummary {
+  unlocked: number;
+  total: number;
+}
+
+export interface LevelDistEntry { level: number; count: number; }
+export interface AchievementRate { id: string; name: string; icon: string; unlocked: number; total: number; }
+export interface GachaRarityDist { rarity: string; count: number; }
+export interface QuestCompletionRate { id: string; name: string; icon: string; completed: number; assigned: number; }
 
 export interface UsageBreakdown {
   [action: string]: { cost: number; count: number };
@@ -49,9 +93,16 @@ export interface ProjectAsset {
   narration?: string;
   visualPrompt?: string;
   imageData?: string;
+  imageUrl?: string;
   audioData?: string;
+  audioUrl?: string;
   videoData?: string;
   videoDuration?: number;
+  audioDuration?: number;
+  customDuration?: number;
+  subtitleData?: { words: { word: string; start: number; end: number }[]; fullText: string; meaningChunks?: { text: string; startTime: number; endTime: number }[] } | null;
+  zoomEffect?: string;
+  transition?: string;
   status?: string;
 }
 
@@ -91,7 +142,11 @@ export interface ErrorLogEntry {
   service: string;
   action: string;
   error_message: string;
+  severity?: 'info' | 'warn' | 'error' | 'critical';
+  stack_trace?: string;
   email?: string;
+  request_context?: Record<string, any>;
+  resolved?: boolean;
   created_at: string;
 }
 

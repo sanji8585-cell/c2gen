@@ -1,26 +1,55 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import AuthGate from './components/AuthGate';
 import AdminDashboard from './components/admin/AdminDashboard';
+import AuthGate from './components/AuthGate';
+import AuthModal from './components/AuthModal';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultTable from './components/ResultTable';
 import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig } from './types';
 import { useUndoRedo } from './hooks/useUndoRedo';
-import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt } from './services/geminiService';
+import { useTheme } from './hooks/useTheme';
+import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood } from './services/geminiService';
+import ThumbnailGenerator from './components/ThumbnailGenerator';
 import { generateImage, getSelectedImageModel } from './services/imageService';
 import { generateAudioWithElevenLabs } from './services/elevenLabsService';
 import { generateVideo } from './services/videoService';
 import { generateVideoFromImage } from './services/falService';
+import { generateAmbientBgm } from './services/bgmGenerator';
 import { saveProject, getSavedProjects, getProjectById, deleteProject, importProject } from './services/projectService';
+import { useGameState } from './hooks/useGameState';
+import type { RecordActionResponse } from './types/gamification';
+import GameOverlay from './components/GameOverlay';
+import DailyQuestPanel from './components/DailyQuestPanel';
+import EventBanner from './components/EventBanner';
+import AchievementShowcase from './components/AchievementShowcase';
+import InventoryModal from './components/InventoryModal';
+import LeaderboardWidget from './components/LeaderboardWidget';
 
 import { SavedProject } from './types';
-import { CONFIG, PRICING, formatKRW } from './config';
+import { CONFIG, PRICING, formatKRW, ResolutionTier, Language, BGM_LIBRARY, LANGUAGE_CONFIG, BgmMood } from './config';
 import ProjectGallery from './components/ProjectGallery';
+import Playground from './components/Playground';
+import CreditShop from './components/CreditShop';
+import UserProfile from './components/UserProfile';
+import PaymentSuccess from './components/PaymentSuccess';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const AI_PERSONALITY={
+  SCRIPTING:["대본 집필 중... 오늘 영감이 넘치네요! ✍️","이야기의 뼈대를 세우고 있어요... 🏗️","어떤 서사로 풀어볼까 고민 중이에요 🤔","스토리 아키텍트 모드 ON! 📐","창작의 신이 강림했어요... ✨","이 주제, 흥미로운데요? 기대하세요! 🎭","플롯 트위스트 고민 중... 🌀","대본의 리듬감을 잡고 있어요 🎵"],
+  ASSETS:["이 씬은 특별히 신경 써서 그릴게요 🎨","색을 고르고 있어요... 이 조합 어때요? 🎨","픽셀 하나하나 정성스럽게... ✨","AI 아틀리에에서 걸작 제작 중... 🖼️","이 구도, 프로 감독도 인정할 걸요? 📸","빛과 그림자의 마법을 부리는 중... 🌓","세밀한 디테일 작업에 들어갔어요 🔍","상상을 현실로 바꾸는 마법 시전 중... 🪄","거의 완성! 마무리 터치 중이에요 ✨","이 색감, 제가 봐도 예뻐요 💎"],
+  ERROR:["앗, 잠깐 쉬고 올게요! 다시 도전해볼까요? 😊","AI도 가끔 쉬어야 해요... 잠시만요! 💤","창작의 길에 작은 돌부리... 다시 가봐요! 💪","에러도 성장의 일부! 다시 시도해볼게요 🌱","잠깐의 방해일 뿐, 포기하지 않아요! 🔥","우주적 간섭이 있었나봐요... 다시! 🌌"],
+  COMPLETED:["와! 이건 제가 봐도 걸작이에요! 🎬","역시 프로! 이 퀄리티 보세요! ⭐","당신의 창의력 + AI의 기술 = 완벽! 🤝","이 작품, 바이럴 갈 것 같은 느낌... 🚀","AI도 감탄했어요! 대단해요! 👏","마스터피스 완성! 박수! 🎉","이거 포트폴리오에 넣어야 해요! 💼","완벽한 한 편이 탄생했어요! 🌟"],
+};
+const MILESTONES=[{count:1,emoji:'🎉',title:'첫 작품 탄생!'},{count:5,emoji:'🚀',title:'크리에이터의 길로!'},{count:10,emoji:'🏆',title:'프로 크리에이터 등극!'},{count:25,emoji:'👑',title:'마스터 크리에이터!'},{count:50,emoji:'🌟',title:'레전드!'},{count:100,emoji:'💎',title:'다이아몬드 크리에이터!'}];
+function launchConfetti(customColors?:string[]){const c=customColors||['#f43f5e','#8b5cf6','#3b82f6','#10b981','#f59e0b','#ec4899'];for(let i=0;i<40;i++){const e=document.createElement('div');e.className='confetti-piece';e.style.left=Math.random()*100+'vw';e.style.backgroundColor=c[Math.floor(Math.random()*c.length)];e.style.animationDelay=Math.random()*1+'s';e.style.animationDuration=(2+Math.random()*1.5)+'s';e.style.width=(6+Math.random()*8)+'px';e.style.height=(6+Math.random()*8)+'px';document.body.appendChild(e);setTimeout(()=>e.remove(),4000);}}
+function getStorytellingPhase(current:number,total:number):{text:string;icon:string}{const r=total>0?current/total:0;if(r===0)return{text:"AI가 캔버스를 펼쳤어요",icon:"✏️"};if(r<0.3)return{text:"색을 고르고 있어요",icon:"🎨"};if(r<0.6)return{text:"세밀한 디테일 작업 중...",icon:"🔍"};if(r<0.9)return{text:"거의 다 됐어요!",icon:"🖌️"};return{text:"마무리 터치!",icon:"✨"};}
+function getTimeGreeting(streak:number):string{const h=new Date().getHours();let g='';if(h<6)g='새벽의 크리에이터시군요! 🌙';else if(h<12)g='좋은 아침이에요! 오늘도 멋진 작품 만들어볼까요? ☀️';else if(h<18)g='오후의 창작 시간! 영감이 넘치는 시간이에요 🌤️';else g='밤의 창작이 가장 깊어요... 🌜';if(streak>=3)g+=` (${streak}일 연속 접속 중! 대단해요!)`;return g;}
+const PRO_TIPS=[{id:1,text:'참조 이미지를 사용하면 캐릭터의 일관성을 유지할 수 있어요! 📎'},{id:2,text:'화풍을 바꿔보세요 - 크레용, 수채화, 인포그래픽 등 다양한 스타일이 있어요 🎨'},{id:3,text:'대본을 직접 입력하면 더 정확한 영상을 만들 수 있어요 ✍️'},{id:4,text:'Ken Burns 효과로 정적 이미지에 생동감을 더해보세요 🎬'},{id:5,text:'BGM 자동 선택 기능이 분위기에 맞는 음악을 골라줘요 🎵'},{id:6,text:'씬 순서를 드래그로 바꿀 수 있어요! ↕️'},{id:7,text:'이미지가 마음에 안 들면 씬별로 재생성할 수 있어요 🔄'},{id:8,text:'다국어 지원! 한국어, 영어, 일본어로 나레이션을 만들어보세요 🌏'},{id:9,text:'자막 위치와 스타일을 커스텀할 수 있어요 💬'},{id:10,text:'프로젝트는 클라우드에 자동 저장돼요. 언제든 불러오세요! ☁️'}];
+function getGenerationStats(){return{total:parseInt(localStorage.getItem('tubegen_total_generations')||'0',10),lastDate:localStorage.getItem('tubegen_streak_last_date')||'',streak:parseInt(localStorage.getItem('tubegen_streak_count')||'0',10)};}
+function updateGenerationStats():{total:number;streak:number;newMilestone:typeof MILESTONES[0]|null}{const s=getGenerationStats();const today=new Date().toISOString().slice(0,10);const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);const t=s.total+1;let st=1;if(s.lastDate===today)st=s.streak;else if(s.lastDate===yesterday)st=s.streak+1;localStorage.setItem('tubegen_total_generations',String(t));localStorage.setItem('tubegen_streak_last_date',today);localStorage.setItem('tubegen_streak_count',String(st));const a=JSON.parse(localStorage.getItem('tubegen_milestones')||'[]')as number[];const m=MILESTONES.find(x=>x.count===t&&!a.includes(x.count));if(m){a.push(m.count);localStorage.setItem('tubegen_milestones',JSON.stringify(a));}return{total:t,streak:st,newMilestone:m||null};}
 
 // 에러 캐치용 ErrorBoundary
 class GalleryErrorBoundary extends React.Component<
@@ -40,7 +69,7 @@ class GalleryErrorBoundary extends React.Component<
         <div className="max-w-3xl mx-auto px-4 py-16 text-center">
           <div className="bg-red-900/30 border border-red-500/50 rounded-2xl p-8">
             <h2 className="text-red-400 text-xl font-bold mb-4">갤러리 로딩 오류</h2>
-            <pre className="text-red-300 text-xs text-left bg-slate-900 p-4 rounded-xl overflow-auto max-h-64">
+            <pre className="text-red-300 text-xs text-left p-4 rounded-xl overflow-auto max-h-64" style={{ backgroundColor: 'var(--bg-surface)' }}>
               {this.state.error.message}{'\n'}{this.state.error.stack}
             </pre>
           </div>
@@ -51,29 +80,113 @@ class GalleryErrorBoundary extends React.Component<
   }
 }
 
-type ViewMode = 'main' | 'gallery';
+// 전역 에러 바운더리
+class GlobalErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // 서버로 에러 전송
+    const token = localStorage.getItem('c2gen_session_token');
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'logClientError',
+        token,
+        message: error.message,
+        stack: error.stack,
+        componentStack: info.componentStack,
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+      }),
+    }).catch(() => {});
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-base)' }}>
+          <div className="max-w-md w-full bg-red-900/30 border border-red-500/50 rounded-2xl p-8 text-center">
+            <h2 className="text-red-400 text-xl font-bold mb-2">오류가 발생했습니다</h2>
+            <p className="text-red-300 text-sm mb-4">{this.state.error.message}</p>
+            <button
+              onClick={() => { this.setState({ error: null }); window.location.reload(); }}
+              className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all text-sm"
+            >
+              새로고침
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// 전역 JS 에러 리포팅 (window.onerror, unhandledrejection)
+if (typeof window !== 'undefined') {
+  const reportClientError = (message: string, stack?: string) => {
+    const token = localStorage.getItem('c2gen_session_token');
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'logClientError', token, message, stack,
+        url: window.location.href, userAgent: navigator.userAgent,
+      }),
+    }).catch(() => {});
+  };
+
+  window.onerror = (msg, _src, _line, _col, error) => {
+    reportClientError(String(msg), error?.stack);
+  };
+
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    reportClientError(
+      reason?.message || String(reason),
+      reason?.stack
+    );
+  });
+}
+
+type ViewMode = 'main' | 'gallery' | 'playground';
 
 // 인증 래퍼
 const App: React.FC = () => {
+  const { theme, toggleTheme, isDark } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleAuthSuccess = useCallback((name: string) => {
     setIsAuthenticated(true);
     setUserName(name);
+    setShowAuthModal(false);
   }, []);
 
   const handleAdminSuccess = useCallback((token: string) => {
     setIsAdmin(true);
     setAdminToken(token);
+    setShowAuthModal(false);
   }, []);
+
+  const isAdminPath = window.location.pathname === '/admin';
 
   const handleAdminLogout = useCallback(() => {
     setIsAdmin(false);
     setAdminToken(null);
     localStorage.removeItem('c2gen_admin_token');
+    window.history.replaceState({}, '', '/');
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -93,20 +206,96 @@ const App: React.FC = () => {
     setUserName(null);
   }, []);
 
+  // 페이지 로드 시 기존 세션 자동 복원
+  useEffect(() => {
+    (async () => {
+      const savedAdmin = localStorage.getItem('c2gen_admin_token');
+      if (savedAdmin) {
+        try {
+          const r = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'validate', token: savedAdmin }) });
+          const d = await r.json();
+          if (d.valid && d.email === 'admin') { handleAdminSuccess(savedAdmin); return; }
+          localStorage.removeItem('c2gen_admin_token');
+        } catch {}
+      }
+      const token = localStorage.getItem('c2gen_session_token');
+      if (token) {
+        try {
+          const r = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'validate', token }) });
+          const d = await r.json();
+          if (d.valid) { localStorage.setItem('c2gen_user_name', d.name); setIsAuthenticated(true); setUserName(d.name); return; }
+          localStorage.removeItem('c2gen_session_token');
+          localStorage.removeItem('c2gen_user_name');
+        } catch {}
+      }
+    })();
+  }, [handleAdminSuccess]);
+
   // 관리자 대시보드
   if (isAdmin && adminToken) {
     return <AdminDashboard adminToken={adminToken} onLogout={handleAdminLogout} />;
   }
 
-  if (!isAuthenticated) {
-    return <AuthGate onSuccess={handleAuthSuccess} onAdminSuccess={handleAdminSuccess} />;
+  // /admin 경로 → 관리자 로그인 페이지 표시
+  if (isAdminPath) {
+    return (
+      <AuthGate
+        onSuccess={handleAuthSuccess}
+        onAdminSuccess={handleAdminSuccess}
+        mode="page"
+        initialTab="admin"
+      />
+    );
   }
 
-  return <AppContent userName={userName} onLogout={handleLogout} />;
+  // 항상 메인 앱 렌더링 (게스트/로그인 모두)
+  return (
+    <AppContent
+      userName={userName}
+      onLogout={handleLogout}
+      isDark={isDark}
+      onToggleTheme={toggleTheme}
+      onNameChange={setUserName}
+      isAuthenticated={isAuthenticated}
+      showAuthModal={showAuthModal}
+      onShowAuthModal={() => setShowAuthModal(true)}
+      onCloseAuthModal={() => setShowAuthModal(false)}
+      onAuthSuccess={handleAuthSuccess}
+      onAdminSuccess={handleAdminSuccess}
+    />
+  );
 };
 
 // 메인 앱 콘텐츠
-const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = ({ userName, onLogout }) => {
+const AppContent: React.FC<{
+  userName: string | null; onLogout: () => void; isDark: boolean; onToggleTheme: () => void; onNameChange: (name: string) => void;
+  isAuthenticated: boolean; showAuthModal: boolean; onShowAuthModal: () => void; onCloseAuthModal: () => void;
+  onAuthSuccess: (name: string) => void; onAdminSuccess: (token: string) => void;
+}> = ({ userName, onLogout, isDark, onToggleTheme, onNameChange, isAuthenticated, showAuthModal, onShowAuthModal, onCloseAuthModal, onAuthSuccess, onAdminSuccess }) => {
+  const [announcements, setAnnouncements] = useState<{id:string;title:string;content:string;type:string}[]>([]);
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('c2gen_dismissed_announcements') || '[]')); } catch { return new Set(); }
+  });
+
+  useEffect(() => {
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getActiveAnnouncements' }),
+    }).then(r => r.json()).then(d => { if (d.announcements) setAnnouncements(d.announcements); }).catch(() => {});
+  }, []);
+
+  const dismissAnnouncement = useCallback((id: string) => {
+    setDismissedAnnouncements(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem('c2gen_dismissed_announcements', JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  const visibleAnnouncements = announcements.filter(a => !dismissedAnnouncements.has(a.id));
+
   const [step, setStep] = useState<GenerationStep>(GenerationStep.IDLE);
   const [generatedData, setGeneratedData] = useState<GeneratedAsset[]>([]);
   const [progressMessage, setProgressMessage] = useState('');
@@ -119,16 +308,76 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
   // 갤러리 뷰 관련
   const [viewMode, setViewMode] = useState<ViewMode>('main');
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
-  const [, setCurrentTopic] = useState<string>('');
+  const [currentTopic, setCurrentTopic] = useState<string>('');
 
   // 씬 편집 관련
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // 썸네일 모달
+  const [showThumbnailGenerator, setShowThumbnailGenerator] = useState(false);
 
   // BGM 관련
   const [bgmData, setBgmData] = useState<string | null>(null);
   const [bgmVolume, setBgmVolume] = useState(0.25);
   const [bgmDuckingEnabled, setBgmDuckingEnabled] = useState(false);
   const [bgmDuckingAmount, setBgmDuckingAmount] = useState(0.3);
+
+  // 크레딧 시스템
+  const [userCredits, setUserCredits] = useState<number>(0);
+  const [userPlan, setUserPlan] = useState<string>('free');
+  const [showCreditShop, setShowCreditShop] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
+
+  // RPG 게이미피케이션 (v2 — 서버 기반)
+  const game = useGameState(isAuthenticated);
+
+  // Fun & Gamification 상태
+  const [genStats, setGenStats] = useState(getGenerationStats);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [funTip, setFunTip] = useState('');
+  const [completionCompliment, setCompletionCompliment] = useState<string | null>(null);
+  const [showReactions, setShowReactions] = useState(false);
+  const [sessionCombo, setSessionCombo] = useState(0);
+  const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
+  const [showIdleParticles, setShowIdleParticles] = useState(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // XP/Level (레거시 — useGameState로 점진적 대체)
+  const [funXp, setFunXp] = useState(() => parseInt(localStorage.getItem('tubegen_fun_xp') || '0', 10));
+  const [funLevel, setFunLevel] = useState(() => parseInt(localStorage.getItem('tubegen_fun_level') || '1', 10));
+  // Tip of the Day
+  const [showTipOfDay, setShowTipOfDay] = useState(false);
+  const [tipOfDay, setTipOfDay] = useState<typeof PRO_TIPS[0] | null>(null);
+  // Gacha (레거시)
+  const [gachaReward, setGachaReward] = useState<{emoji:string;title:string;rarity:string}|null>(null);
+  const [showGachaAnimation, setShowGachaAnimation] = useState(false);
+  // Game Overlay (v2)
+  const [overlayLevelUp, setOverlayLevelUp] = useState<{level:number;title:string;emoji:string;color:string;reward?:{credits:number;gacha_tickets:number}}|null>(null);
+  const [overlayAchievement, setOverlayAchievement] = useState<{name:string;icon:string;description:string;category:string;rewardXp:number;rewardCredits:number}|null>(null);
+  const [overlayGacha, setOverlayGacha] = useState<{item:{name:string;emoji:string;rarity:string;itemType:string};isNew:boolean}|null>(null);
+  const [overlayMilestone, setOverlayMilestone] = useState<{emoji:string;title:string;xp:number;credits:number}|null>(null);
+  // 모달 상태
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showInventory, setShowInventory] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  // Konami
+  const [konamiActive, setKonamiActive] = useState(false);
+  const konamiRef = useRef<string[]>([]);
+
+  const fetchCredits = useCallback(async () => {
+    const token = localStorage.getItem('c2gen_session_token');
+    if (!token) return;
+    try {
+      const r = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getCredits', token }),
+      });
+      const d = await r.json();
+      if (d.credits !== undefined) setUserCredits(d.credits);
+      if (d.plan) setUserPlan(d.plan);
+    } catch { /* ignore */ }
+  }, []);
 
   // 비용 추적
   const [, setCurrentCost] = useState<CostBreakdown | null>(null);
@@ -144,6 +393,13 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
   const assetsRef = useRef<GeneratedAsset[]>([]);
   const isAbortedRef = useRef(false);
   const isProcessingRef = useRef(false);
+  const pendingGenContextRef = useRef<{
+    targetTopic: string;
+    refImgs: ReferenceImages;
+    language: Language;
+    hasRefImages: boolean;
+    sourceText: string | null;
+  } | null>(null);
 
   const checkApiKeyStatus = useCallback(async () => {
     if ((window as any).aistudio) {
@@ -156,13 +412,142 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
 
   useEffect(() => {
     checkApiKeyStatus();
+    fetchCredits(); // 크레딧 잔액 로드
     // 클라우드에서 프로젝트 목록 로드
     (async () => {
       const projects = await getSavedProjects();
       setSavedProjects(projects);
     })();
+
+    // 결제 성공 리다이렉트 처리
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const orderId = urlParams.get('orderId');
+    if (paymentStatus === 'success' && orderId) {
+      setPaymentOrderId(orderId);
+      // URL에서 결제 파라미터 제거
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     return () => { isAbortedRef.current = true; };
-  }, [checkApiKeyStatus]);
+  }, [checkApiKeyStatus, fetchCredits]);
+
+  // 로그인 성공 시 크레딧 & 프로젝트 갱신
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchCredits();
+      (async () => {
+        const projects = await getSavedProjects();
+        setSavedProjects(projects);
+      })();
+      // useGameState 훅이 자동으로 게이미피케이션 동기화 처리
+    }
+  }, [isAuthenticated, fetchCredits]);
+
+  // 게이미피케이션 v2 → 레거시 상태 동기화
+  useEffect(() => {
+    if (game.synced && game.userState) {
+      setFunXp(game.userState.xp);
+      setFunLevel(game.levelInfo.level);
+      setGenStats({
+        total: game.userState.totalGenerations,
+        streak: game.userState.streakCount,
+        lastDate: game.userState.streakLastDate || '',
+      });
+      localStorage.setItem('tubegen_fun_xp', String(game.userState.xp));
+      localStorage.setItem('tubegen_fun_level', String(game.levelInfo.level));
+    }
+  }, [game.synced, game.userState?.xp, game.levelInfo.level]);
+
+  // Fun tip 인터벌 (생성 중일 때만, AI 인격 시스템)
+  useEffect(() => {
+    if (step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS) {
+      const pool = step === GenerationStep.SCRIPTING ? AI_PERSONALITY.SCRIPTING : AI_PERSONALITY.ASSETS;
+      setFunTip(pool[Math.floor(Math.random() * pool.length)]);
+      const iv = setInterval(() => {
+        setFunTip(pool[Math.floor(Math.random() * pool.length)]);
+      }, 3000);
+      return () => clearInterval(iv);
+    } else if (step === GenerationStep.ERROR) {
+      setFunTip(AI_PERSONALITY.ERROR[Math.floor(Math.random() * AI_PERSONALITY.ERROR.length)]);
+    } else {
+      setFunTip('');
+    }
+  }, [step]);
+
+  // 오늘의 팁 (하루 1회)
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem('tubegen_tip_date') === today) return;
+    const seenIds = JSON.parse(localStorage.getItem('tubegen_tip_seen') || '[]') as number[];
+    const unseen = PRO_TIPS.filter(t => !seenIds.includes(t.id));
+    if (unseen.length === 0) return;
+    const tip = unseen[Math.floor(Math.random() * unseen.length)];
+    setTipOfDay(tip); setShowTipOfDay(true);
+    localStorage.setItem('tubegen_tip_date', today);
+  }, []);
+
+  // 코나미 코드
+  useEffect(() => {
+    const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    const handler = (e: KeyboardEvent) => {
+      konamiRef.current.push(e.key);
+      if (konamiRef.current.length > 10) konamiRef.current.shift();
+      if (JSON.stringify(konamiRef.current) === JSON.stringify(KONAMI)) {
+        setKonamiActive(true);
+        document.documentElement.classList.add('retro-mode');
+        const overlay = document.createElement('div'); overlay.className = 'scanline-overlay'; overlay.id = 'konami-scanline'; document.body.appendChild(overlay);
+        // 레트로 8-bit 파워업 사운드
+        try {
+          const ctx = new AudioContext();
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6 아르페지오
+          notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square'; // 8-bit 사운드
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.15);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + i * 0.08);
+            osc.stop(ctx.currentTime + i * 0.08 + 0.15);
+          });
+          // 마무리 화음
+          setTimeout(() => {
+            [523.25, 783.99, 1046.50].forEach(freq => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'square';
+              osc.frequency.value = freq;
+              gain.gain.setValueAtTime(0.1, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+              osc.connect(gain); gain.connect(ctx.destination);
+              osc.start(); osc.stop(ctx.currentTime + 0.4);
+            });
+          }, 350);
+        } catch {}
+        setTimeout(() => { setKonamiActive(false); document.documentElement.classList.remove('retro-mode'); document.getElementById('konami-scanline')?.remove(); }, 10000);
+        konamiRef.current = [];
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // 유휴 파티클 (30초 무조작)
+  const resetIdleTimer = useCallback(() => {
+    setShowIdleParticles(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      if (step === GenerationStep.IDLE || step === GenerationStep.COMPLETED) setShowIdleParticles(true);
+    }, 30000);
+  }, [step]);
+  useEffect(() => {
+    const events = ['mousemove','keydown','click','scroll','touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+    return () => { events.forEach(e => window.removeEventListener(e, resetIdleTimer)); if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
+  }, [resetIdleTimer]);
 
   // 프로젝트 목록 새로고침
   const refreshProjects = useCallback(async () => {
@@ -263,6 +648,20 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
     sourceText: string | null
   ) => {
     if (isProcessingRef.current) return;
+
+    // 비회원이면 로그인 모달 표시
+    if (!isAuthenticated) {
+      onShowAuthModal();
+      return;
+    }
+
+    // 크레딧 잔액 확인 (최소 10크레딧 필요, 운영자 제외)
+    if (userPlan !== 'operator' && userCredits < 10) {
+      setProgressMessage('크레딧이 부족합니다. 충전 후 다시 시도해주세요.');
+      setShowCreditShop(true);
+      return;
+    }
+
     isProcessingRef.current = true;
     isAbortedRef.current = false;
 
@@ -286,6 +685,9 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
       const hasRefImages = (refImgs.character?.length || 0) + (refImgs.style?.length || 0) > 0;
       console.log(`[App] 참조 이미지 - 캐릭터: ${refImgs.character?.length || 0}개, 스타일: ${refImgs.style?.length || 0}개`);
 
+      // 언어 설정 읽기
+      const language = (localStorage.getItem(CONFIG.STORAGE_KEYS.LANGUAGE) as Language) || 'ko';
+
       let targetTopic = topic;
 
       if (topic === "Manual Script Input" && sourceText) {
@@ -298,13 +700,13 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
         targetTopic = "Custom Analysis Topic";
       } else {
         setProgressMessage(`글로벌 경제 트렌드 탐색 중...`);
-        const trends = await findTrendingTopics(topic, usedTopicsRef.current);
+        const trends = await findTrendingTopics(topic, usedTopicsRef.current, language);
         if (isAbortedRef.current) return;
         targetTopic = trends[0].topic;
         usedTopicsRef.current.push(targetTopic);
       }
 
-      setProgressMessage(`스토리보드 및 메타포 생성 중...`);
+      setProgressMessage(`스토리보드 및 메타포 생성 중... (${LANGUAGE_CONFIG[language].name})`);
 
       // 긴 대본(3000자 초과) 감지 시 청크 분할 처리
       const inputLength = sourceText?.length || 0;
@@ -320,11 +722,12 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
           hasRefImages,
           sourceText!,
           2500, // 청크당 2500자
-          setProgressMessage // 진행 상황 콜백
+          setProgressMessage, // 진행 상황 콜백
+          language
         );
       } else {
         // 일반 대본: 기존 방식
-        scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText);
+        scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText, language);
       }
       if (isAbortedRef.current) return;
       
@@ -333,8 +736,40 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
       }));
       assetsRef.current = initialAssets;
       setGeneratedData(initialAssets);
-      setStep(GenerationStep.ASSETS);
 
+      // 스크립트 검토 단계에서 멈춤 — 사용자가 확인/편집 후 "생성 시작" 클릭
+      pendingGenContextRef.current = { targetTopic, refImgs, language, hasRefImages, sourceText };
+      setStep(GenerationStep.SCRIPT_REVIEW);
+      setProgressMessage(`스크립트 ${initialAssets.length}개 씬 생성 완료 — 확인 후 생성을 시작하세요.`);
+
+    } catch (error: any) {
+      if (!isAbortedRef.current) {
+        setStep(GenerationStep.ERROR);
+        setProgressMessage(`오류: ${error.message}`);
+      }
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }, [checkApiKeyStatus, userCredits, userPlan, isAuthenticated, onShowAuthModal]);
+
+  // ── Phase 2: 스크립트 승인 → 에셋 생성 ──
+  const handleApproveScript = useCallback(async () => {
+    if (isProcessingRef.current) return;
+    if (!pendingGenContextRef.current) return;
+
+    isProcessingRef.current = true;
+    isAbortedRef.current = false;
+
+    const { refImgs, language } = pendingGenContextRef.current;
+    const targetTopic = pendingGenContextRef.current.targetTopic;
+
+    // 사용자가 편집했을 수 있으므로 최신 데이터 사용
+    const initialAssets = [...assetsRef.current];
+
+    setStep(GenerationStep.ASSETS);
+    resetCost();
+
+    try {
       const runAudio = async () => {
           const TTS_CONCURRENCY = 5; // 동시 TTS 생성 수 (ElevenLabs Pro)
           const MAX_TTS_RETRIES = 2;
@@ -467,15 +902,193 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
           }
       };
 
+      // BGM 자동 선택 (비차단, 병렬)
+      const runAutoBgm = async () => {
+        try {
+          const autoBgmEnabled = localStorage.getItem('tubegen_auto_bgm') !== 'false';
+          if (!autoBgmEnabled || bgmData) return; // 비활성화 또는 이미 BGM 있으면 스킵
+
+          const narrations = initialAssets.map(a => a.narration);
+          const moodResult = await analyzeMood(narrations);
+          if (isAbortedRef.current) return;
+
+          const matchedTrack = BGM_LIBRARY.find(t => t.mood === moodResult.mood) || BGM_LIBRARY[0];
+          console.log(`[AutoBGM] 분위기: ${moodResult.mood} → ${matchedTrack.name}`);
+
+          // 1차: public/bgm/ 폴더 파일 시도, 2차: Web Audio API로 자동 생성
+          let base64: string | null = null;
+          try {
+            const response = await fetch(matchedTrack.url);
+            if (response.ok) {
+              const blob = await response.blob();
+              base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.readAsDataURL(blob);
+              });
+            }
+          } catch { /* 파일 없으면 자동 생성으로 폴백 */ }
+
+          if (!base64) {
+            console.log(`[AutoBGM] 파일 없음, Web Audio API로 생성 중...`);
+            base64 = await generateAmbientBgm(moodResult.mood as BgmMood);
+          }
+
+          if (!isAbortedRef.current && base64) setBgmData(base64);
+        } catch (e) {
+          console.warn('[AutoBGM] 자동 BGM 선택 실패:', e);
+        }
+      };
+
       setProgressMessage(`시각 에셋 및 오디오 합성 중...`);
-      // 이미지와 오디오 먼저 병렬 생성
-      await Promise.all([runAudio(), runImages()]);
+      // 이미지, 오디오, BGM 병렬 생성
+      await Promise.all([runAudio(), runImages(), runAutoBgm()]);
 
       // 애니메이션 변환은 이제 수동으로 (이미지 호버 시 버튼 클릭)
       // 자동 변환 비활성화 - 사용자가 원하는 이미지만 선택적으로 변환 가능
       
       if (isAbortedRef.current) return;
+
+      // 카운트다운 이펙트 (완료 전 빌드업)
+      for (let n = 3; n >= 1; n--) { setCountdownNumber(n); await wait(700); }
+      setCountdownNumber(null);
+
       setStep(GenerationStep.COMPLETED);
+
+      // confetti + 칭찬 + 리액션
+      launchConfetti();
+      setCompletionCompliment(AI_PERSONALITY.COMPLETED[Math.floor(Math.random() * AI_PERSONALITY.COMPLETED.length)]);
+      setShowReactions(true);
+      setTimeout(() => { setCompletionCompliment(null); setShowReactions(false); }, 8000);
+
+      // 콤보
+      setSessionCombo(prev => {
+        const nc = prev + 1;
+        if (nc >= 2) { setToastMessage(`${nc}연속 생성! ${'🔥'.repeat(Math.min(nc, 5))}`); setTimeout(() => setToastMessage(null), 3000); }
+        return nc;
+      });
+
+      // 마일스톤 + 통계 (레거시 localStorage 기반 — 비로그인 폴백)
+      const statsResult = updateGenerationStats();
+      setGenStats(getGenerationStats());
+      if (statsResult.newMilestone) { setTimeout(() => { setToastMessage(`${statsResult.newMilestone!.emoji} ${statsResult.newMilestone!.title}`); setTimeout(() => setToastMessage(null), 4000); }, 3500); }
+
+      // 서버 기반 게이미피케이션 (v2) — 로그인 시 서버가 XP/업적/퀘스트/뽑기 모두 처리
+      const imgCount = assetsRef.current.filter(a => a.imageData).length;
+      const audioCount = assetsRef.current.filter(a => a.audioData).length;
+      const videoCount = assetsRef.current.filter(a => a.videoData).length;
+
+      if (isAuthenticated && game.synced) {
+        // 서버에 recordAction → 모든 결과를 응답으로 받음
+        const result = await game.recordAction('generation_complete', 1, {
+          imageCount: imgCount, audioCount, videoCount,
+          sessionCombo: sessionCombo + 1,
+        });
+        if (result) {
+          // 레벨 정보 동기화
+          setFunXp(result.totalXp);
+          const newLvl = result.newLevel ?? result.oldLevel;
+          setFunLevel(newLvl);
+          localStorage.setItem('tubegen_fun_xp', String(result.totalXp));
+          localStorage.setItem('tubegen_fun_level', String(newLvl));
+
+          // 레벨업 오버레이
+          if (result.newLevel && result.newLevel > result.oldLevel) {
+            setTimeout(() => {
+              launchConfetti(); setTimeout(() => launchConfetti(), 400);
+              setOverlayLevelUp({
+                level: result.newLevel!,
+                title: result.levelTitle || '',
+                emoji: result.levelEmoji || '🌟',
+                color: result.levelColor || '#06b6d4',
+                reward: result.levelReward || undefined,
+              });
+            }, 4000);
+          }
+
+          // 업적 해금 오버레이
+          if (result.achievementsUnlocked?.length > 0) {
+            const a = result.achievementsUnlocked[0];
+            setTimeout(() => {
+              setOverlayAchievement({
+                name: a.name, icon: a.icon, description: a.description,
+                category: a.category, rewardXp: a.rewardXp, rewardCredits: a.rewardCredits,
+              });
+            }, result.newLevel ? 9500 : 4000);
+          }
+
+          // 뽑기 결과 오버레이
+          if (result.gachaResult) {
+            setTimeout(() => {
+              setOverlayGacha({
+                item: result.gachaResult!.item,
+                isNew: result.gachaResult!.isNew,
+              });
+            }, result.newLevel ? 14000 : result.achievementsUnlocked?.length ? 8500 : 5000);
+          }
+
+          // 마일스톤 오버레이
+          if (result.milestoneReached) {
+            setTimeout(() => {
+              setOverlayMilestone(result.milestoneReached!);
+            }, 4500);
+          }
+        }
+      } else {
+        // 비로그인 폴백: 레거시 localStorage XP
+        const xpGain = 10 + imgCount * 5 + audioCount * 3;
+        const currentXp = parseInt(localStorage.getItem('tubegen_fun_xp') || '0', 10);
+        const newXp = currentXp + xpGain;
+        const THRESHOLDS = [0,50,120,200,350,500,750,1000,1500,2500];
+        const TITLES = ['초보 크리에이터','아이디어 탐험가','스토리 위버','아이디어 뱅크','비주얼 아키텍트','영감의 마법사','AI 파트너','마스터 크리에이터','레전드 프로듀서','다이아몬드 아티스트'];
+        let newLv = 1;
+        for (let i = THRESHOLDS.length - 1; i >= 0; i--) { if (newXp >= THRESHOLDS[i]) { newLv = i + 1; break; } }
+        localStorage.setItem('tubegen_fun_xp', String(newXp));
+        localStorage.setItem('tubegen_fun_level', String(newLv));
+        setFunXp(newXp);
+        setFunLevel(prevLv => {
+          if (newLv > prevLv) {
+            setTimeout(() => { launchConfetti(); setTimeout(() => launchConfetti(), 400); setToastMessage(`🎉 레벨 업! Lv.${newLv} ${TITLES[newLv-1]}`); setTimeout(() => setToastMessage(null), 5000); }, 4000);
+          }
+          return newLv;
+        });
+        // 비로그인 뽑기 (5회마다)
+        const gachaCount = parseInt(localStorage.getItem('tubegen_fun_gacha') || '0', 10) + 1;
+        localStorage.setItem('tubegen_fun_gacha', String(gachaCount));
+        if (gachaCount % 5 === 0) {
+          const GACHA = [
+            {emoji:'📖',title:'이야기꾼',rarity:'common'},{emoji:'🎮',title:'픽셀 아티스트',rarity:'common'},{emoji:'🦉',title:'밤의 크리에이터',rarity:'common'},{emoji:'⚡',title:'스피드 러너',rarity:'common'},
+            {emoji:'🌈',title:'색채의 마법사',rarity:'rare'},{emoji:'🔮',title:'비전 아키텍트',rarity:'rare'},{emoji:'✋',title:'황금손',rarity:'rare'},
+            {emoji:'🤖',title:'AI 위스퍼러',rarity:'epic'},{emoji:'🌌',title:'차원 창조자',rarity:'epic'},{emoji:'👑',title:'전설의 크리에이터',rarity:'epic'},
+          ];
+          const roll = Math.random();
+          const rarity = roll < 0.6 ? 'common' : roll < 0.9 ? 'rare' : 'epic';
+          const pool = GACHA.filter(r => r.rarity === rarity);
+          const reward = pool[Math.floor(Math.random() * pool.length)];
+          setTimeout(() => { setGachaReward(reward); setShowGachaAnimation(true); }, 5000);
+        }
+      }
+
+      // 다이나믹 테마 악센트
+      const firstImg = assetsRef.current.find(a => a.imageData);
+      if (firstImg?.imageData) {
+        try {
+          const img = new Image();
+          img.onload = () => {
+            const cv = document.createElement('canvas'); cv.width = 4; cv.height = 4;
+            const ctx = cv.getContext('2d')!; ctx.drawImage(img, 0, 0, 4, 4);
+            const d = ctx.getImageData(0, 0, 4, 4).data;
+            let r = 0, g = 0, b = 0;
+            for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i+1]; b += d[i+2]; }
+            const n = d.length / 4;
+            document.documentElement.style.setProperty('--accent-dynamic', `rgb(${Math.round(r/n)},${Math.round(g/n)},${Math.round(b/n)})`);
+          };
+          img.src = firstImg.imageData.startsWith('data:') ? firstImg.imageData : `data:image/png;base64,${firstImg.imageData}`;
+        } catch {}
+      }
+
+      // 크레딧 잔액 갱신
+      fetchCredits();
 
       // 비용 요약 메시지 (원화)
       const cost = costRef.current;
@@ -500,8 +1113,50 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
       }
     } finally {
       isProcessingRef.current = false;
+      pendingGenContextRef.current = null;
     }
-  }, [checkApiKeyStatus, refreshProjects]);
+  }, [refreshProjects, bgmData, fetchCredits]);
+
+  // ── 스크립트 다시 생성 (무료 — 텍스트 생성만) ──
+  const handleRegenerateScript = useCallback(async () => {
+    if (isProcessingRef.current) return;
+    if (!pendingGenContextRef.current) return;
+
+    isProcessingRef.current = true;
+    isAbortedRef.current = false;
+    setStep(GenerationStep.SCRIPTING);
+    setProgressMessage('스크립트 다시 생성 중...');
+
+    try {
+      const { targetTopic, hasRefImages, sourceText, language } = pendingGenContextRef.current;
+      const inputLength = sourceText?.length || 0;
+      const CHUNK_THRESHOLD = 3000;
+
+      let scriptScenes: ScriptScene[];
+      if (inputLength > CHUNK_THRESHOLD) {
+        scriptScenes = await generateScriptChunked(
+          targetTopic, hasRefImages, sourceText!, 2500, setProgressMessage, language
+        );
+      } else {
+        scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText, language);
+      }
+      if (isAbortedRef.current) return;
+
+      const newAssets = scriptScenes.map(scene => ({
+        ...scene, imageData: null, audioData: null, audioDuration: null,
+        subtitleData: null, videoData: null, videoDuration: null, status: 'pending' as const
+      }));
+      assetsRef.current = newAssets;
+      setGeneratedData(newAssets);
+      setStep(GenerationStep.SCRIPT_REVIEW);
+      setProgressMessage(`스크립트 ${newAssets.length}개 씬 재생성 완료 — 확인 후 생성을 시작하세요.`);
+    } catch (error: any) {
+      setStep(GenerationStep.ERROR);
+      setProgressMessage(`스크립트 재생성 오류: ${error.message}`);
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }, []);
 
   // 이미지 재생성 핸들러 (useCallback으로 메모이제이션)
   const handleRegenerateImage = useCallback(async (idx: number) => {
@@ -603,24 +1258,31 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
     }
   }, [animatingIndices]);
 
-  const triggerVideoExport = async (enableSubtitles: boolean = true, subtitleConfig?: Partial<SubtitleConfig>, sceneGap?: number) => {
+  const triggerVideoExport = async (enableSubtitles: boolean = true, subtitleConfig?: Partial<SubtitleConfig>, sceneGap?: number, resolution?: ResolutionTier) => {
     if (isVideoGenerating) return;
     try {
       setIsVideoGenerating(true);
       const suffix = enableSubtitles ? 'sub' : 'nosub';
+      const resSuffix = resolution ?? '720p';
       const timestamp = Date.now();
+
+      // 언어별 자막 폰트 자동 적용
+      const language = (localStorage.getItem(CONFIG.STORAGE_KEYS.LANGUAGE) as Language) || 'ko';
+      const langFont = LANGUAGE_CONFIG[language].subtitleFont;
+      const mergedSubtitleConfig = subtitleConfig
+        ? { fontFamily: langFont, ...subtitleConfig }
+        : { fontFamily: langFont };
 
       const result = await generateVideo(
         assetsRef.current,
         (msg) => setProgressMessage(`[Render] ${msg}`),
         isAbortedRef,
-        { enableSubtitles, bgmData, bgmVolume, subtitleConfig, sceneGap, bgmDuckingEnabled, bgmDuckingAmount }
+        { enableSubtitles, bgmData, bgmVolume, subtitleConfig: mergedSubtitleConfig, sceneGap, bgmDuckingEnabled, bgmDuckingAmount, resolution }
       );
 
       if (result) {
-        // 영상 저장 (자막은 영상에 하드코딩됨)
-        saveAs(result.videoBlob, `c2gen_${suffix}_${timestamp}.mp4`);
-        setProgressMessage(`✨ MP4 렌더링 완료! (${enableSubtitles ? '자막 O' : '자막 X'})`);
+        saveAs(result.videoBlob, `c2gen_${suffix}_${resSuffix}_${timestamp}.mp4`);
+        setProgressMessage(`✨ MP4 렌더링 완료! (${enableSubtitles ? '자막 O' : '자막 X'}, ${resSuffix.toUpperCase()})`);
       }
     } catch (error: any) {
       setProgressMessage(`렌더링 실패: ${error.message}`);
@@ -675,7 +1337,7 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
     newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
     assetsRef.current = newAssets;
     setGeneratedData([...newAssets]);
-  }, []);
+  }, [pushUndoState]);
 
   // 씬 삭제 핸들러
   const handleDeleteScene = useCallback((idx: number) => {
@@ -685,7 +1347,7 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
     assetsRef.current = newAssets;
     setGeneratedData([...newAssets]);
     setEditingIndex(null);
-  }, []);
+  }, [pushUndoState]);
 
   // 씬 추가 핸들러 (afterIdx 위치 다음에 삽입, undefined면 맨 끝)
   const handleAddScene = useCallback((afterIdx?: number) => {
@@ -710,7 +1372,7 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
     assetsRef.current = newAssets;
     setGeneratedData([...newAssets]);
     setEditingIndex(insertAt);
-  }, []);
+  }, [pushUndoState]);
 
   // 씬 이미지 직접 업로드 핸들러
   const handleUploadSceneImage = useCallback((idx: number, base64: string) => {
@@ -740,7 +1402,7 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
     newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
     assetsRef.current = newAssets;
     setGeneratedData([...newAssets]);
-  }, []);
+  }, [pushUndoState]);
 
   // 자동 줌 패턴 일괄 적용 핸들러
   const handleAutoZoom = useCallback((pattern: string) => {
@@ -854,36 +1516,118 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <Header />
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={game.synced ? game.userState?.streakCount ?? genStats.streak : genStats.streak} totalGenerations={game.synced ? game.userState?.totalGenerations ?? genStats.total : genStats.total} level={game.synced ? game.levelInfo.level : funLevel} title={game.synced ? '' : (['','초보 크리에이터','아이디어 탐험가','스토리 위버','아이디어 뱅크','비주얼 아키텍트','영감의 마법사','AI 파트너','마스터 크리에이터','레전드 프로듀서','다이아몬드 아티스트'])[funLevel]||''} xpPercent={game.synced ? game.levelInfo.progress : (() => { const T=[0,50,120,200,350,500,750,1000,1500,2500]; const cur=T[funLevel-1]||0; const nxt=T[funLevel]||T[T.length-1]; return nxt>cur?Math.min(100,((funXp-cur)/(nxt-cur))*100):100; })()} sessionCombo={sessionCombo} levelInfo={game.synced ? game.levelInfo : null} equipped={game.synced ? game.equipped : null} />
 
       {/* 유저 정보 바 */}
-      {userName && (
-        <div className="bg-slate-900/50 border-b border-slate-800/50">
-          <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-end gap-3">
-            <span className="text-[11px] text-slate-400">
-              <span className="text-cyan-400 font-medium">{userName}</span> 님
-            </span>
-            <button
-              onClick={onLogout}
-              className="text-[10px] px-2.5 py-1 bg-slate-800/80 hover:bg-red-900/40 text-slate-500 hover:text-red-400 rounded-md border border-slate-700/50 transition-all"
-            >
-              로그아웃
-            </button>
+      <div className="border-b" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 50%, transparent)', borderColor: 'var(--border-default)' }}>
+        <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-end gap-3">
+          {isAuthenticated && userName ? (
+            <>
+              {/* 크레딧 표시 */}
+              <div className="flex items-center gap-1.5">
+                {userPlan === 'operator' ? (
+                  <span className="text-[11px] font-bold text-orange-400">무제한</span>
+                ) : (
+                  <span className={`text-[11px] font-bold ${userCredits <= 10 ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`}>
+                    {userCredits.toLocaleString()} 크레딧
+                  </span>
+                )}
+                {userPlan === 'operator' && (
+                  <span className="text-[9px] px-1.5 py-0.5 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full font-bold">
+                    운영자
+                  </span>
+                )}
+                {userPlan !== 'free' && userPlan !== 'operator' && (
+                  <span className="text-[9px] px-1.5 py-0.5 bg-brand-500/20 text-brand-400 rounded-full font-bold uppercase">
+                    {userPlan}
+                  </span>
+                )}
+              </div>
+              {userPlan !== 'operator' && (
+                <button
+                  onClick={() => setShowCreditShop(true)}
+                  className="text-[10px] px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 rounded-md border border-emerald-700/50 transition-all font-bold"
+                >
+                  충전
+                </button>
+              )}
+              <div className="w-px h-4" style={{ backgroundColor: 'var(--border-subtle)' }} />
+              {/* 게이미피케이션 v2 바로가기 */}
+              {game.synced && (
+                <>
+                  <button onClick={() => setShowAchievements(true)} className="text-[10px] px-2 py-0.5 rounded-md hover:bg-amber-900/30 transition-all" style={{ color: 'var(--text-muted)' }} title="업적">🏆</button>
+                  <button onClick={() => setShowInventory(true)} className="text-[10px] px-2 py-0.5 rounded-md hover:bg-purple-900/30 transition-all" style={{ color: 'var(--text-muted)' }} title="인벤토리">🎒</button>
+                  <button onClick={() => setShowLeaderboard(true)} className="text-[10px] px-2 py-0.5 rounded-md hover:bg-cyan-900/30 transition-all" style={{ color: 'var(--text-muted)' }} title="리더보드">🏅</button>
+                </>
+              )}
+              <button
+                onClick={() => setShowUserProfile(true)}
+                className="text-[11px] hover:underline transition-all cursor-pointer"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <span className="text-cyan-400 font-medium">{userName}</span> 님
+              </button>
+              <button
+                onClick={onLogout}
+                className="text-[10px] px-2.5 py-1 hover:bg-red-900/40 hover:text-red-400 rounded-md transition-all"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                로그인하면 AI 콘텐츠를 생성할 수 있습니다
+              </span>
+              <button
+                onClick={onShowAuthModal}
+                className="text-[11px] px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-md transition-all font-bold"
+              >
+                로그인 / 회원가입
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 공지사항 배너 */}
+      {visibleAnnouncements.length > 0 && (
+        <div className="border-b" style={{ borderColor: 'var(--border-default)' }}>
+          <div className="max-w-7xl mx-auto px-4 py-2 space-y-1.5">
+            {visibleAnnouncements.map(a => {
+              const styles = a.type === 'urgent'
+                ? 'bg-red-900/30 border-red-700/50 text-red-300'
+                : a.type === 'warning'
+                ? 'bg-yellow-900/30 border-yellow-700/50 text-yellow-300'
+                : 'bg-cyan-900/30 border-cyan-700/50 text-cyan-300';
+              return (
+                <div key={a.id} className={`flex items-start gap-3 px-3 py-2 rounded-lg border text-[12px] ${styles}`}>
+                  <span className="flex-shrink-0 mt-0.5">{a.type === 'urgent' ? '!' : a.type === 'warning' ? '!' : 'i'}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{a.title}</span>
+                    {a.content && <span className="ml-1.5 opacity-80">{a.content}</span>}
+                  </div>
+                  <button onClick={() => dismissAnnouncement(a.id)} className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity text-[10px]">✕</button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* 네비게이션 탭 */}
-      <div className="border-b border-slate-800">
+      <div className="border-b" style={{ borderColor: 'var(--border-default)' }}>
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-1">
           <button
             onClick={() => setViewMode('main')}
             className={`px-4 py-3 text-sm font-bold transition-colors relative ${
               viewMode === 'main'
                 ? 'text-brand-400'
-                : 'text-slate-400 hover:text-slate-200'
+                : ''
             }`}
+            style={viewMode !== 'main' ? { color: 'var(--text-secondary)' } : undefined}
           >
             스토리보드 생성
             {viewMode === 'main' && (
@@ -895,16 +1639,29 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
             className={`px-4 py-3 text-sm font-bold transition-colors relative flex items-center gap-2 ${
               viewMode === 'gallery'
                 ? 'text-brand-400'
-                : 'text-slate-400 hover:text-slate-200'
+                : ''
             }`}
+            style={viewMode !== 'gallery' ? { color: 'var(--text-secondary)' } : undefined}
           >
             저장된 프로젝트
             {savedProjects.length > 0 && (
-              <span className="px-1.5 py-0.5 bg-slate-700 text-xs rounded-full">
+              <span className="px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
                 {savedProjects.length}
               </span>
             )}
             {viewMode === 'gallery' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
+            )}
+          </button>
+          <button
+            onClick={() => setViewMode('playground')}
+            className={`px-4 py-3 text-sm font-bold transition-colors relative ${
+              viewMode === 'playground' ? 'text-brand-400' : ''
+            }`}
+            style={viewMode !== 'playground' ? { color: 'var(--text-secondary)' } : undefined}
+          >
+            놀이터
+            {viewMode === 'playground' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
             )}
           </button>
@@ -914,40 +1671,177 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
       {needsKey && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 flex items-center justify-center gap-4 animate-in fade-in slide-in-from-top-4">
           <span className="text-amber-400 text-xs font-bold">Gemini 3 Pro 엔진을 위해 API 키 설정이 필요합니다.</span>
-          <button onClick={handleOpenKeySelector} className="px-3 py-1 bg-amber-500 text-slate-950 text-[10px] font-black rounded-lg hover:bg-amber-400 transition-colors uppercase">API 키 설정</button>
+          <button onClick={handleOpenKeySelector} className="px-3 py-1 bg-amber-500 text-[10px] font-black rounded-lg hover:bg-amber-400 transition-colors uppercase" style={{ color: 'var(--bg-base)' }}>API 키 설정</button>
         </div>
       )}
 
       {/* 갤러리 뷰 */}
       {viewMode === 'gallery' && (
-        <GalleryErrorBoundary>
-          <ProjectGallery
-            projects={savedProjects}
-            onBack={() => setViewMode('main')}
-            onDelete={handleDeleteProject}
-            onRefresh={refreshProjects}
-            onLoad={handleLoadProject}
-            onImport={handleImportProject}
-          />
-        </GalleryErrorBoundary>
+        isAuthenticated ? (
+          <GalleryErrorBoundary>
+            <ProjectGallery
+              projects={savedProjects}
+              onBack={() => setViewMode('main')}
+              onDelete={handleDeleteProject}
+              onRefresh={refreshProjects}
+              onLoad={handleLoadProject}
+              onImport={handleImportProject}
+            />
+          </GalleryErrorBoundary>
+        ) : (
+          <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+            <div className="rounded-2xl border p-8" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' }}>
+                <svg className="w-7 h-7" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>로그인이 필요합니다</h3>
+              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>프로젝트 저장 및 불러오기는 로그인 후 이용 가능합니다.</p>
+              <button
+                onClick={onShowAuthModal}
+                className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all"
+              >
+                로그인 / 회원가입
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* 놀이터 뷰 */}
+      {viewMode === 'playground' && (
+        <Playground
+          isAuthenticated={isAuthenticated}
+          onShowAuthModal={onShowAuthModal}
+          savedProjects={savedProjects}
+        />
       )}
 
       {/* 메인 뷰 */}
       {viewMode === 'main' && (
       <main className="py-8">
         <InputSection onGenerate={handleGenerate} step={step} />
-        
+
+        {step === GenerationStep.IDLE && generatedData.length === 0 && (
+          <div className="max-w-7xl mx-auto px-4 text-center py-4">
+            <p className="text-sm animate-fade-sub" style={{ color: 'var(--text-muted)' }}>{getTimeGreeting(genStats.streak)}</p>
+          </div>
+        )}
+
+        {showTipOfDay && tipOfDay && step === GenerationStep.IDLE && (
+          <div className="max-w-xl mx-auto px-4 mb-4">
+            <div className="relative rounded-xl border p-4 animate-bounce-in" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+              <button onClick={() => { if (tipOfDay) { const seen = JSON.parse(localStorage.getItem('tubegen_tip_seen') || '[]') as number[]; seen.push(tipOfDay.id); localStorage.setItem('tubegen_tip_seen', JSON.stringify(seen)); } setShowTipOfDay(false); }} className="absolute top-2 right-3 text-xs opacity-50 hover:opacity-100" style={{ color: 'var(--text-muted)' }}>✕</button>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">💡</span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>오늘의 팁</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{tipOfDay.text}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {step !== GenerationStep.IDLE && (
           <div className="max-w-7xl mx-auto px-4 text-center mb-12">
-             <div className="inline-flex items-center gap-4 px-6 py-3 rounded-2xl border bg-slate-900 border-slate-800 shadow-2xl">
+             <div className="inline-flex items-center gap-4 px-6 py-3 rounded-2xl border shadow-2xl" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
                 {step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS ? (
                   <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent animate-spin rounded-full"></div>
-                ) : <div className={`w-2 h-2 rounded-full ${step === GenerationStep.ERROR ? 'bg-red-500' : 'bg-green-500'}`}></div>}
-                <span className="text-sm font-bold text-slate-300">{progressMessage}</span>
+                ) : step === GenerationStep.SCRIPT_REVIEW ? (
+                  <div className="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></div>
+                ) : step === GenerationStep.ERROR ? (
+                  <div className="animate-gentle-shake text-red-500">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  </div>
+                ) : <div className="w-2 h-2 rounded-full bg-green-500"></div>}
+                <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{(() => {
+                  const m = progressMessage.match(/(\d+)\/(\d+)/);
+                  if (!m) return progressMessage;
+                  const parts = progressMessage.split(m[0]);
+                  return <>{parts[0]}<span key={m[1]} className="inline-block animate-number-pop text-green-400 font-black">{m[0]}</span>{parts.slice(1).join(m[0])}</>;
+                })()}</span>
                 {(step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS) && (
                   <button onClick={handleAbort} className="ml-2 px-3 py-1 rounded-lg bg-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/30">Stop</button>
                 )}
              </div>
+             {funTip && (step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS || step === GenerationStep.ERROR) && (
+               <p className="mt-3 text-sm font-medium animate-fade-sub" style={{ color: step === GenerationStep.ERROR ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{funTip}</p>
+             )}
+             {step === GenerationStep.ASSETS && generatedData.length > 0 && (() => {
+               const done = generatedData.filter(d => d.imageData).length;
+               const phase = getStorytellingPhase(done, generatedData.length);
+               return (
+                 <div className="mt-2 flex items-center justify-center gap-2">
+                   <span className="text-lg">{phase.icon}</span>
+                   <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{phase.text}</span>
+                   <span key={done} className="text-xs font-bold text-green-400 animate-number-pop inline-block">✓ {done}/{generatedData.length} 씬 완성</span>
+                 </div>
+               );
+             })()}
+          </div>
+        )}
+
+        {/* 썸네일 생성 버튼 */}
+        {generatedData.length > 0 && step === GenerationStep.COMPLETED && (
+          <div className="max-w-7xl mx-auto px-4 mb-6 flex justify-center">
+            <button
+              onClick={() => setShowThumbnailGenerator(true)}
+              className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-default)',
+                color: 'var(--text-primary)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--brand-500)'; e.currentTarget.style.color = 'var(--brand-400)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            >
+              썸네일 생성 (YouTube / TikTok / Instagram)
+            </button>
+          </div>
+        )}
+
+        {/* 스크립트 검토 배너 */}
+        {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 mb-6">
+            <div className="rounded-2xl border-2 p-6 text-center" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--brand-500)' }}>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+                스크립트 검토
+              </h3>
+              <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
+                아래 {generatedData.length}개 씬의 나레이션과 시각 연출을 확인하세요. 편집/추가/삭제 후 생성을 시작하세요.
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={handleRegenerateScript}
+                  disabled={isProcessingRef.current}
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border hover:opacity-80"
+                  style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
+                >
+                  스크립트 다시 생성
+                </button>
+                <button
+                  onClick={handleApproveScript}
+                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black py-2.5 px-8 rounded-xl transition-all text-sm"
+                >
+                  생성 시작
+                </button>
+                <button
+                  onClick={() => {
+                    setStep(GenerationStep.IDLE);
+                    setGeneratedData([]);
+                    assetsRef.current = [];
+                    pendingGenContextRef.current = null;
+                    setProgressMessage('');
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-all hover:opacity-80"
+                  style={{ borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -970,6 +1864,7 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
             onDuplicateScene={handleDuplicateScene}
             onRegenerateFailedScenes={handleRegenerateFailedScenes}
             onExportVideo={triggerVideoExport}
+            userPlan={userPlan}
             isExporting={isVideoGenerating}
             animatingIndices={animatingIndices}
             onGenerateAnimation={handleGenerateAnimation}
@@ -988,8 +1883,188 @@ const AppContent: React.FC<{ userName: string | null; onLogout: () => void }> = 
         />
       </main>
       )}
+
+      {/* 크레딧 충전 모달 */}
+      {showCreditShop && (
+        <CreditShop
+          onClose={() => { setShowCreditShop(false); fetchCredits(); }}
+          currentCredits={userCredits}
+          currentPlan={userPlan}
+        />
+      )}
+
+      {/* 사용자 프로필 모달 */}
+      {showUserProfile && (
+        <UserProfile
+          onClose={() => { setShowUserProfile(false); fetchCredits(); }}
+          currentCredits={userCredits}
+          currentPlan={userPlan}
+          userName={userName || ''}
+          onNameChange={onNameChange}
+        />
+      )}
+
+      {/* 결제 완료 확인 모달 */}
+      {paymentOrderId && (
+        <PaymentSuccess
+          orderId={paymentOrderId}
+          onDone={() => { setPaymentOrderId(null); fetchCredits(); }}
+        />
+      )}
+
+      {/* 썸네일 생성 모달 */}
+      {showThumbnailGenerator && (
+        <ThumbnailGenerator
+          topic={currentTopic}
+          sceneImages={generatedData.filter(d => d.imageData).map(d => d.imageData!)}
+          onClose={() => setShowThumbnailGenerator(false)}
+        />
+      )}
+
+      {/* 로그인/회원가입 모달 (게스트용) */}
+      {showAuthModal && (
+        <AuthModal
+          onSuccess={onAuthSuccess}
+          onAdminSuccess={onAdminSuccess}
+          onClose={onCloseAuthModal}
+        />
+      )}
+
+      {/* 카운트다운 이펙트 */}
+      {countdownNumber !== null && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <span key={countdownNumber} className="text-9xl font-black animate-countdown" style={{ color: '#ffffff', textShadow: '0 0 60px rgba(59,130,246,0.7), 0 0 120px rgba(59,130,246,0.3)' }}>{countdownNumber}</span>
+        </div>
+      )}
+
+      {/* 완료 칭찬 + 리액션 */}
+      {completionCompliment && step === GenerationStep.COMPLETED && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9998] animate-bounce-in">
+          <div className="px-6 py-4 rounded-2xl shadow-2xl border text-center" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--accent-dynamic, var(--border-default))' }}>
+            <p className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>{completionCompliment}</p>
+            {showReactions && (
+              <div className="flex gap-3 justify-center">
+                {(['😍','🔥','👏'] as const).map(emoji => (
+                  <button key={emoji} onClick={() => {
+                    setShowReactions(false);
+                    const colorMap: Record<string, string[]> = {'😍':['#ec4899','#f43f5e','#f97316','#fbbf24'],'🔥':['#ef4444','#f97316','#eab308','#dc2626'],'👏':['#3b82f6','#8b5cf6','#06b6d4','#10b981']};
+                    launchConfetti(colorMap[emoji]);
+                  }} className="text-2xl hover:scale-125 transition-transform active:scale-90">{emoji}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 뽑기(가챠) 모달 */}
+      {showGachaAnimation && gachaReward && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowGachaAnimation(false)}>
+          <div className="rounded-2xl border p-8 text-center animate-bounce-in max-w-xs" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }} onClick={e => e.stopPropagation()}>
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: gachaReward.rarity === 'epic' ? '#f59e0b' : gachaReward.rarity === 'rare' ? '#8b5cf6' : 'var(--text-muted)' }}>
+              {gachaReward.rarity === 'epic' ? '★ EPIC ★' : gachaReward.rarity === 'rare' ? '★ RARE' : 'COMMON'}
+            </p>
+            <div className="text-6xl mb-3 animate-slot-reveal">{gachaReward.emoji}</div>
+            <h3 className="text-lg font-black mb-1" style={{ color: 'var(--text-primary)' }}>"{gachaReward.title}"</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>새로운 칭호를 획득했어요!</p>
+            <button onClick={() => setShowGachaAnimation(false)} className="px-5 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-600 to-blue-600 text-white">확인</button>
+          </div>
+        </div>
+      )}
+
+      {/* 유휴 파티클 */}
+      {showIdleParticles && (
+        <>
+          {[...Array(8)].map((_, i) => (
+            <span key={i} className="idle-particle" style={{ left: `${10 + Math.random() * 80}%`, bottom: `${10 + Math.random() * 30}%`, animationDelay: `${i * 0.5}s`, animationDuration: `${3 + Math.random() * 2}s` }}>✨</span>
+          ))}
+        </>
+      )}
+
+      {/* 마일스톤/콤보 토스트 */}
+      {toastMessage && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] animate-toast-in">
+          <div className="px-6 py-3 rounded-2xl shadow-2xl border text-sm font-bold animate-bounce-in" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}>
+            {toastMessage}
+          </div>
+        </div>
+      )}
+
+      {/* ── 게이미피케이션 v2 UI ── */}
+
+      {/* 이벤트 배너 (활성 이벤트가 있을 때 상단 표시) */}
+      <EventBanner events={game.activeEvents} isDark={isDark} />
+
+      {/* 일일 퀘스트 패널 (플로팅 버튼) */}
+      {game.synced && (
+        <DailyQuestPanel
+          quests={game.quests}
+          onClaimReward={game.claimQuestReward}
+          isDark={isDark}
+        />
+      )}
+
+      {/* 게임 오버레이 (레벨업/업적/뽑기/마일스톤) */}
+      {(overlayLevelUp || overlayAchievement || overlayGacha || overlayMilestone) && (
+        <GameOverlay
+          levelUp={overlayLevelUp}
+          achievementUnlock={overlayAchievement}
+          gachaResult={overlayGacha}
+          milestone={overlayMilestone}
+          gachaSettings={game.config?.gachaSettings}
+          onDismiss={() => { setOverlayLevelUp(null); setOverlayAchievement(null); setOverlayGacha(null); setOverlayMilestone(null); }}
+        />
+      )}
+
+      {/* 업적 쇼케이스 모달 */}
+      {showAchievements && game.achievements && (
+        <AchievementShowcase
+          isOpen={showAchievements}
+          onClose={() => setShowAchievements(false)}
+          achievements={game.achievements}
+          isDark={isDark}
+        />
+      )}
+
+      {/* 인벤토리 모달 */}
+      {showInventory && game.inventory && (
+        <InventoryModal
+          isOpen={showInventory}
+          onClose={() => setShowInventory(false)}
+          inventory={game.inventory}
+          equipped={game.equipped}
+          gachaTickets={game.userState?.gachaTickets ?? 0}
+          onEquipItem={game.equipItem}
+          onUseConsumable={game.useConsumable}
+          onPullGacha={async () => {
+            const result = await game.pullGacha();
+            if (result?.item) {
+              setOverlayGacha({ item: result.item, isNew: result.isNew });
+              // 인벤토리 갱신
+              await game.refreshState();
+            }
+          }}
+          isDark={isDark}
+        />
+      )}
+
+      {/* 리더보드 모달 */}
+      <LeaderboardWidget
+        isOpen={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
+        userLevel={game.levelInfo.level}
+        userXp={game.levelInfo.currentXp}
+        userStreak={game.userState?.streakCount ?? 0}
+        isDark={isDark}
+      />
     </div>
   );
 };
 
-export default App;
+const WrappedApp: React.FC = () => (
+  <GlobalErrorBoundary>
+    <App />
+  </GlobalErrorBoundary>
+);
+
+export default WrappedApp;

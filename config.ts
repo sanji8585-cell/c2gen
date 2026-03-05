@@ -5,46 +5,167 @@
  * 앱 내의 [설정] 메뉴를 통해 입력하면 브라우저에 안전하게 보관됩니다.
  */
 
-// 이미지 생성 모델 목록 (Gemini만 지원)
+// 이미지 생성 모델 목록
 export const IMAGE_MODELS = [
   {
     id: 'gemini-2.5-flash-image',
     name: 'Gemini 2.5 Flash',
     provider: 'Google',
     pricePerImage: 0.0315,  // $0.0315/image (추정)
-    description: '고품질, 프롬프트 이해력 우수',
+    description: '고품질, 참조이미지 지원',
+    speed: '보통'
+  },
+  {
+    id: 'gpt-image-1',
+    name: 'GPT Image-1',
+    provider: 'OpenAI',
+    pricePerImage: 0.042,   // $0.042/image (medium quality)
+    description: '최고 품질, 사실적 표현',
     speed: '보통'
   },
 ] as const;
 
 export type ImageModelId = typeof IMAGE_MODELS[number]['id'];
 
-// Gemini 전용 스타일 카테고리 (3가지 핵심 화풍)
+// Gemini 전용 스타일 카테고리
+// 주의: 캐릭터 설명은 VAR_BASE_CHAR가 처리하므로 스타일 프롬프트에 포함하지 않음
 export const GEMINI_STYLE_CATEGORIES = [
   {
-    id: 'main',
-    name: '메인 화풍',
+    id: 'casual',
+    name: '캐주얼',
     styles: [
       {
         id: 'gemini-crayon',
-        name: '크레용 (기본)',
+        name: '크레용',
+        description: '따뜻한 크레용 질감, 손그림 느낌',
         prompt: 'Hand-drawn crayon and colored pencil illustration style, waxy texture with rough organic strokes, warm nostalgic colors, childlike charm with innocent atmosphere, visible pencil texture on outlines and fills, soft analog warmth, 2D flat composition'
-      },
-      {
-        id: 'gemini-korea-cartoon',
-        name: '한국 경제 카툰',
-        prompt: 'Korean economic cartoon style, digital illustration with clean bold black outlines, cel-shaded flat coloring, simple rounded stick figure character (white circle head, dot eyes), strong color contrasts with golden warm highlights vs cool gray tones, Korean text integration, modern webtoon infographic aesthetic, professional news graphic feel, dramatic lighting with sparkles and glow effects, 16:9 cinematic composition'
       },
       {
         id: 'gemini-watercolor',
         name: '수채화',
-        prompt: 'Soft watercolor illustration style, gentle hand-drawn aesthetic, warm color palette by default, simple stick figure with white circle head and thin black line body, organic brush strokes with paint bleeding effects, soft diffused edges, analog texture. Use cool tones only when danger or twist elements appear. Focus on visualizing the exact meaning and context of the sentence.'
+        description: '부드러운 번짐, 몽환적 분위기',
+        prompt: 'Soft watercolor illustration style, gentle hand-drawn aesthetic, warm color palette by default, organic brush strokes with paint bleeding effects, soft diffused edges, analog texture, dreamy and delicate atmosphere'
+      },
+      {
+        id: 'gemini-minimal-flat',
+        name: '미니멀 플랫',
+        description: '깔끔한 도형, 토스/컬리 디자인풍',
+        prompt: 'Minimal flat design illustration, clean geometric shapes, limited color palette with bold accent colors, no gradients, no shadows, modern UI/UX aesthetic inspired by Korean fintech apps, white space emphasis, simple iconographic elements, professional and sleek'
+      },
+    ]
+  },
+  {
+    id: 'professional',
+    name: '전문/뉴스',
+    styles: [
+      {
+        id: 'gemini-korea-cartoon',
+        name: '한국 경제 카툰',
+        description: '웹툰풍 경제 뉴스, 굵은 외곽선',
+        prompt: 'Korean economic cartoon style, digital illustration with clean bold black outlines, cel-shaded flat coloring, strong color contrasts with golden warm highlights vs cool gray tones, Korean text integration, modern webtoon infographic aesthetic, professional news graphic feel, dramatic lighting with sparkles and glow effects, 16:9 cinematic composition'
+      },
+      {
+        id: 'gemini-infographic',
+        name: '인포그래픽',
+        description: '차트/데이터 시각화, 비즈니스 보고서풍',
+        prompt: 'Clean infographic illustration style, data visualization aesthetic, flat icons and diagram elements, bold sans-serif typography, color-coded sections with red for up and blue for down (Korean financial convention), white or light gray background, chart and graph visual motifs, professional business report feel, organized grid layout'
+      },
+      {
+        id: 'gemini-retro-news',
+        name: '레트로 뉴스',
+        description: '80-90년대 TV 뉴스, 복고풍 그래픽',
+        prompt: 'Retro 1980s-90s Korean news broadcast style, vintage CRT TV aesthetic, halftone dot texture, limited color palette with warm yellows and deep blues, old newspaper print quality, nostalgic analog broadcast graphics, bold Korean headline typography, grainy film texture overlay'
+      },
+    ]
+  },
+  {
+    id: 'dimensional',
+    name: '입체/공간',
+    styles: [
+      {
+        id: 'gemini-isometric',
+        name: '3D 아이소메트릭',
+        description: '미니어처 블록, 파스텔 입체 도시',
+        prompt: 'Isometric 3D block illustration style, 30-degree angle perspective, clean geometric shapes, bright pastel colors with subtle shadows, miniature diorama feel, detailed tiny buildings and objects, organized grid layout, low-poly aesthetic with smooth surfaces'
       },
     ]
   }
 ] as const;
 
 export type GeminiStyleId = typeof GEMINI_STYLE_CATEGORIES[number]['styles'][number]['id'] | 'gemini-custom' | 'gemini-none';
+
+// GPT Image-1 전용 스타일 카테고리
+// GPT Image-1은 사실적/고품질 표현이 강점이므로 이에 맞게 차별화
+export const GPT_STYLE_CATEGORIES = [
+  {
+    id: 'realistic',
+    name: '사실적',
+    styles: [
+      {
+        id: 'gpt-photorealistic',
+        name: '포토리얼리스틱',
+        description: '스톡 사진급 초고화질, DSLR 퀄리티',
+        prompt: 'Photorealistic stock photography style, ultra-sharp detail, natural studio lighting with soft fill light, shallow depth of field, professional DSLR camera quality, neutral color grading, clean commercial aesthetic, 4K resolution feel'
+      },
+      {
+        id: 'gpt-cinematic',
+        name: '시네마틱',
+        description: '넷플릭스 다큐 느낌, 드라마틱 조명',
+        prompt: 'Cinematic movie still style, dramatic three-point lighting, subtle film grain, anamorphic lens bokeh, moody color grading with teal and orange tones, wide-angle composition, atmospheric haze, depth of field, Netflix documentary quality'
+      },
+      {
+        id: 'gpt-news-graphic',
+        name: '뉴스 그래픽',
+        description: 'Bloomberg/CNBC 방송 그래픽, 홀로그램 UI',
+        prompt: 'Professional broadcast news graphic style, Bloomberg/CNBC financial news aesthetic, clean dark background with glowing data elements, sleek glass and metal textures, holographic UI overlays, blue and white corporate color scheme, sharp typography integration, polished 3D infographic elements'
+      },
+    ]
+  },
+  {
+    id: 'stylized',
+    name: '스타일라이즈',
+    styles: [
+      {
+        id: 'gpt-3d-render',
+        name: '3D 렌더',
+        description: '픽사/블렌더풍, 클레이 질감 3D',
+        prompt: 'High-quality 3D render style, Pixar/Blender aesthetic, soft global illumination, subsurface scattering, smooth rounded shapes, vibrant saturated colors, clay-like material texture, clean studio backdrop, professional product visualization quality'
+      },
+      {
+        id: 'gpt-webtoon',
+        name: '한국 웹툰',
+        description: '깔끔한 선화, 셀 셰이딩, 만화 느낌',
+        prompt: 'Korean webtoon digital illustration style, clean precise linework, cel-shaded coloring with smooth gradients, expressive character poses, dramatic panel-like composition, manhwa aesthetic, vibrant colors with atmospheric lighting effects, modern Korean digital art quality'
+      },
+      {
+        id: 'gpt-oil-painting',
+        name: '유화',
+        description: '르네상스 유화, 무게감 있는 클래식',
+        prompt: 'Classical oil painting style, rich impasto brushwork, layered glazing technique, warm Renaissance-inspired palette, dramatic chiaroscuro lighting, museum-quality fine art aesthetic, canvas texture visible in brush strokes, timeless and authoritative'
+      },
+    ]
+  },
+  {
+    id: 'creative',
+    name: '특수 효과',
+    styles: [
+      {
+        id: 'gpt-neon-cyber',
+        name: '네온/사이버',
+        description: '사이버펑크 네온, 암호화폐/AI 콘텐츠용',
+        prompt: 'Cyberpunk neon aesthetic, dark background with vivid neon glow effects in pink/cyan/purple, futuristic holographic UI elements, circuit board patterns, glitch art accents, rain-soaked reflective surfaces, high-tech dystopian atmosphere, crypto and blockchain visual motifs'
+      },
+      {
+        id: 'gpt-watercolor',
+        name: '수채화',
+        description: '갤러리급 수채화, 투명한 색감',
+        prompt: 'Artistic watercolor painting style, soft wet-on-wet washes of translucent color, gentle brush strokes with organic paint bleeding effects, delicate and ethereal atmosphere, visible paper texture, muted pastel tones with occasional vibrant accents, dreamy hand-painted gallery quality'
+      },
+    ]
+  }
+] as const;
+
+export type GptStyleId = typeof GPT_STYLE_CATEGORIES[number]['styles'][number]['id'] | 'gpt-custom' | 'gpt-none';
 
 // 가격 정보 (USD)
 export const PRICING = {
@@ -54,6 +175,7 @@ export const PRICING = {
   // 이미지 생성 (Gemini만 지원)
   IMAGE: {
     'gemini-2.5-flash-image': 0.0315,  // $0.0315/image
+    'gpt-image-1': 0.042,              // $0.042/image (medium)
   },
   // TTS (ElevenLabs) - 글자당 가격
   TTS: {
@@ -64,6 +186,44 @@ export const PRICING = {
     perVideo: 0.15,  // $0.15/video (5초)
   }
 } as const;
+
+// 크레딧 시스템 설정
+export const CREDIT_CONFIG = {
+  // 1 크레딧 = 10원
+  KRW_PER_CREDIT: 10,
+
+  // 작업별 크레딧 비용
+  COSTS: {
+    'gemini-2.5-flash-image': 5,
+    'gpt-image-1': 7,
+    tts_per_1000_chars: 5,
+    video: 22,
+    script: 0,
+  } as Record<string, number>,
+
+  // 구독 요금제
+  PLANS: {
+    free:  { name: '무료',   price_krw: 0,     monthly_credits: 0,    features: ['가입 시 50크레딧'] },
+    basic: { name: '베이직', price_krw: 9900,  monthly_credits: 500,  features: ['월 500크레딧', '우선 생성'] },
+    pro:      { name: '프로',   price_krw: 29900, monthly_credits: 2000,   features: ['월 2,000크레딧', '우선 생성', '워터마크 제거'] },
+    operator: { name: '운영자', price_krw: 0,     monthly_credits: 999999, features: ['전 기능 무제한', '크레딧 차감 없음'] },
+  } as Record<string, { name: string; price_krw: number; monthly_credits: number; features: string[] }>,
+
+  // 크레딧 팩
+  PACKS: [
+    { id: 'pack_1000',  credits: 1000,  price_krw: 10000, label: '1,000 크레딧' },
+    { id: 'pack_3000',  credits: 3000,  price_krw: 25000, label: '3,000 크레딧 (17% 할인)' },
+    { id: 'pack_10000', credits: 10000, price_krw: 70000, label: '10,000 크레딧 (30% 할인)' },
+  ],
+
+  SIGNUP_BONUS: 50,
+  LOW_CREDIT_THRESHOLD: 10,
+};
+
+// TTS 크레딧 계산 (글자 수 기반)
+export function calcTtsCredits(charCount: number): number {
+  return Math.ceil(charCount / 1000) * CREDIT_CONFIG.COSTS.tts_per_1000_chars;
+}
 
 // USD를 KRW로 변환
 export function toKRW(usd: number): number {
@@ -163,6 +323,122 @@ export function setVideoOrientation(orientation: VideoOrientation): void {
   localStorage.setItem('tubegen_video_orientation', orientation);
 }
 
+// 해상도 티어
+export type ResolutionTier = '720p' | '1080p' | '4k';
+
+export const VIDEO_RESOLUTIONS: Record<ResolutionTier, {
+  label: string;
+  landscape: { width: number; height: number };
+  portrait: { width: number; height: number };
+  bitrate: number;
+  requiredPlan: string;
+  planLabel: string;
+}> = {
+  '720p': {
+    label: '720p HD',
+    landscape: { width: 1280, height: 720 },
+    portrait:  { width: 720,  height: 1280 },
+    bitrate: 8_000_000,
+    requiredPlan: 'free',
+    planLabel: '무료',
+  },
+  '1080p': {
+    label: '1080p Full HD',
+    landscape: { width: 1920, height: 1080 },
+    portrait:  { width: 1080, height: 1920 },
+    bitrate: 15_000_000,
+    requiredPlan: 'basic',
+    planLabel: '베이직+',
+  },
+  '4k': {
+    label: '4K Ultra HD',
+    landscape: { width: 3840, height: 2160 },
+    portrait:  { width: 2160, height: 3840 },
+    bitrate: 35_000_000,
+    requiredPlan: 'pro',
+    planLabel: '프로',
+  },
+};
+
+const PLAN_HIERARCHY: Record<string, number> = { free: 0, basic: 1, pro: 2, operator: 3 };
+
+export function canAccessResolution(plan: string, resolution: ResolutionTier): boolean {
+  const tier = VIDEO_RESOLUTIONS[resolution];
+  return (PLAN_HIERARCHY[plan] ?? 0) >= (PLAN_HIERARCHY[tier.requiredPlan] ?? 0);
+}
+
+export function getVideoResolution(): ResolutionTier {
+  return (localStorage.getItem('tubegen_video_resolution') as ResolutionTier) || '720p';
+}
+
+export function setVideoResolution(resolution: ResolutionTier): void {
+  localStorage.setItem('tubegen_video_resolution', resolution);
+}
+
+// ── 다국어 지원 ──
+
+export type Language = 'ko' | 'en' | 'ja';
+
+export interface LanguageConfig {
+  id: Language;
+  name: string;
+  subtitleFont: string;
+  defaultVoiceId: string;
+  sampleText: string;
+}
+
+export const LANGUAGE_CONFIG: Record<Language, LanguageConfig> = {
+  ko: { id: 'ko', name: '한국어', subtitleFont: '"Noto Sans KR", "Malgun Gothic", sans-serif', defaultVoiceId: '21m00Tcm4TlvDq8ikWAM', sampleText: '테스트 음성입니다' },
+  en: { id: 'en', name: 'English', subtitleFont: '"Inter", "Segoe UI", "Roboto", sans-serif', defaultVoiceId: '21m00Tcm4TlvDq8ikWAM', sampleText: 'This is a test voice sample.' },
+  ja: { id: 'ja', name: '日本語', subtitleFont: '"Noto Sans JP", "Yu Gothic", sans-serif', defaultVoiceId: '21m00Tcm4TlvDq8ikWAM', sampleText: 'テスト音声です。' },
+};
+
+// ── BGM 라이브러리 ──
+
+export type BgmMood = 'upbeat' | 'calm' | 'dramatic' | 'news' | 'tech' | 'emotional' | 'inspiring' | 'dark';
+
+export interface BgmTrack {
+  id: string;
+  name: string;
+  mood: BgmMood;
+  url: string;
+  description: string;
+}
+
+export const BGM_MOODS: Record<BgmMood, { label: string; emoji: string }> = {
+  upbeat: { label: '밝은/활기', emoji: '🎵' },
+  calm: { label: '잔잔한', emoji: '🎹' },
+  dramatic: { label: '극적인', emoji: '🎻' },
+  news: { label: '뉴스/정보', emoji: '📰' },
+  tech: { label: '테크/IT', emoji: '💻' },
+  emotional: { label: '감성적', emoji: '🎶' },
+  inspiring: { label: '희망/동기부여', emoji: '✨' },
+  dark: { label: '어두운/미스터리', emoji: '🌑' },
+};
+
+// Pixabay 무료 BGM 트랙 (Content License: free for commercial use)
+// 사용자가 Pixabay에서 다운로드하여 public/bgm/ 폴더에 넣으면 사용 가능
+export const BGM_LIBRARY: BgmTrack[] = [
+  { id: 'bgm-upbeat', name: '밝은 에너지', mood: 'upbeat', url: '/bgm/upbeat.mp3', description: '활기차고 긍정적인 분위기' },
+  { id: 'bgm-calm', name: '잔잔한 피아노', mood: 'calm', url: '/bgm/calm.mp3', description: '차분하고 편안한 분위기' },
+  { id: 'bgm-dramatic', name: '극적인 오케스트라', mood: 'dramatic', url: '/bgm/dramatic.mp3', description: '긴장감과 무게감' },
+  { id: 'bgm-news', name: '뉴스 브리핑', mood: 'news', url: '/bgm/news.mp3', description: '뉴스/정보 전달 분위기' },
+  { id: 'bgm-tech', name: '테크 일렉트로닉', mood: 'tech', url: '/bgm/tech.mp3', description: 'IT/기술 주제에 적합' },
+  { id: 'bgm-emotional', name: '감성 어쿠스틱', mood: 'emotional', url: '/bgm/emotional.mp3', description: '감성적인 스토리텔링' },
+  { id: 'bgm-inspiring', name: '희망의 선율', mood: 'inspiring', url: '/bgm/inspiring.mp3', description: '동기부여/영감' },
+  { id: 'bgm-dark', name: '다크 앰비언트', mood: 'dark', url: '/bgm/dark.mp3', description: '어둡고 미스터리한 분위기' },
+];
+
+// ── 썸네일 플랫폼 ──
+
+export type ThumbnailPlatform = 'youtube' | 'tiktok' | 'instagram';
+
+export const THUMBNAIL_PLATFORMS: Record<ThumbnailPlatform, { label: string; width: number; height: number; aspectRatio: string }> = {
+  youtube:   { label: 'YouTube', width: 1280, height: 720,  aspectRatio: '16:9' },
+  tiktok:    { label: 'TikTok', width: 1080, height: 1920, aspectRatio: '9:16' },
+  instagram: { label: 'Instagram', width: 1080, height: 1080, aspectRatio: '1:1' },
+};
+
 export const CONFIG = {
   // 기본 설정값들 (키 제외)
   DEFAULT_VOICE_ID: "21m00Tcm4TlvDq8ikWAM",  // Rachel - 기본 음성 목록에 포함된 유효한 ID
@@ -177,14 +453,22 @@ export const CONFIG = {
     ELEVENLABS_VOICE_ID: 'tubegen_el_voice',
     ELEVENLABS_MODEL: 'tubegen_el_model',
     FAL_API_KEY: 'tubegen_fal_key',  // PixVerse 영상 변환용
+    OPENAI_API_KEY: 'tubegen_openai_key',  // GPT Image-1용
     IMAGE_MODEL: 'tubegen_image_model',
     // Gemini 전용 화풍 설정
     GEMINI_STYLE: 'tubegen_gemini_style',
     GEMINI_CUSTOM_STYLE: 'tubegen_gemini_custom_style',
+    // GPT 전용 화풍 설정
+    GPT_STYLE: 'tubegen_gpt_style',
+    GPT_CUSTOM_STYLE: 'tubegen_gpt_custom_style',
     PROJECTS: 'tubegen_projects',
     VIDEO_ORIENTATION: 'tubegen_video_orientation',
+    VIDEO_RESOLUTION: 'tubegen_video_resolution',
     ELEVENLABS_SPEED: 'tubegen_el_speed',       // 음성 속도 (0.7~1.3)
     ELEVENLABS_STABILITY: 'tubegen_el_stability', // 리듬 안정성 (0.3~0.9)
+    LANGUAGE: 'tubegen_language',                 // 나레이션 언어
+    SUPPRESS_KOREAN: 'tubegen_suppress_korean',  // 이미지 내 한글 억제
+    THEME: 'tubegen_theme',                      // 테마 (light/dark)
   },
 
   // 애니메이션 설정

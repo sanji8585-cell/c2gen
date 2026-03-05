@@ -47,6 +47,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureBucket(supabase);
 
     switch (action) {
+      // ── 프로필 이미지 업로드 ──
+      case 'upload-avatar': {
+        const { data: imgData } = params;
+        if (!imgData) return res.status(400).json({ error: 'data 필요' });
+
+        // 크기 제한 (2MB, base64는 약 33% 크기 증가)
+        if (imgData.length > 2 * 1024 * 1024 * 1.4) {
+          return res.status(400).json({ error: '이미지 크기는 2MB 이하여야 합니다.' });
+        }
+
+        const path = `avatars/${email}/avatar.jpg`;
+        const buffer = Buffer.from(imgData, 'base64');
+
+        const { error } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, buffer, { contentType: 'image/jpeg', upsert: true });
+
+        if (error) {
+          console.error('[storage] avatar upload error:', error);
+          return res.status(500).json({ error: error.message });
+        }
+
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+        const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // 캐시 무효화
+
+        // DB에 아바타 URL 저장
+        await supabase.from('c2gen_users').update({ avatar_url: avatarUrl }).eq('email', email);
+
+        return res.json({ url: avatarUrl });
+      }
+
       // ── 단일 파일 업로드 ──
       case 'upload': {
         const { projectId, sceneIndex, type, data } = params;
