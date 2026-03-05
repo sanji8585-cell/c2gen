@@ -708,7 +708,24 @@ const AppContent: React.FC<{
         setProgressMessage('외부 콘텐츠 분석 중...');
         targetTopic = "Custom Analysis Topic";
       } else {
-        setProgressMessage(`글로벌 경제 트렌드 탐색 중...`);
+        const trendMsgs = [
+          `"${topic}" 관련 인터넷을 샅샅이 뒤지는 중...`,
+          `AI가 "${topic}"에 꽂혔습니다. 잠시만요...`,
+          `"${topic}" 트렌드 탐색 중... 커피 한 잔 드세요 ☕`,
+          `전 세계 "${topic}" 덕후들의 관심사 분석 중...`,
+          `"${topic}" 콘텐츠 제조 공장 가동 중 🏭`,
+          `창작의 신이 "${topic}" 스크립트를 집필 중 ✨`,
+          `"${topic}" 데이터 우주에서 보석 캐는 중 💎`,
+          `AI 뇌세포 풀가동 중... 주제: "${topic}" 🧠`,
+          `"${topic}" 관련 트렌드, 지금 발굴 중 ⛏️`,
+          `곧 완성됩니다. "${topic}" 설계도 작성 중...`,
+          `"${topic}" 전문가 AI가 투입되었습니다 🎯`,
+          `"${topic}"... 흥미롭군요. 분석 들어갑니다 🔍`,
+          `"${topic}" 콘텐츠 요리 중입니다. 불 조절 중 🍳`,
+          `"${topic}" 시나리오 작가 모드 ON 🎬`,
+          `"${topic}"에 진심인 AI가 여기 있습니다 💪`,
+        ];
+        setProgressMessage(trendMsgs[Math.floor(Math.random() * trendMsgs.length)]);
         const trends = await findTrendingTopics(topic, usedTopicsRef.current, language);
         if (isAbortedRef.current) return;
         targetTopic = trends[0].topic;
