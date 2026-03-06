@@ -29,10 +29,11 @@ export default function CompletionScreen({
   gachaTickets,
   onClose,
 }: CompletionScreenProps) {
-  const imgCredits = cost.imageCount * 5;
-  const ttsCredits = Math.ceil(cost.ttsCharacters / 1000) * 5;
-  const videoCredits = cost.videoCount * 22;
-  const totalCredits = imgCredits + ttsCredits + videoCredits;
+  const imgCredits = cost.imageCount * 16;
+  const ttsCredits = Math.ceil(cost.ttsCharacters / 1000) * 15;
+  const videoCredits = cost.videoCount * 73;
+  const scriptCredits = 5;
+  const totalCredits = scriptCredits + imgCredits + ttsCredits + videoCredits;
 
   const creditsPerScene = sceneCount > 0 ? totalCredits / sceneCount : 999;
   const grade = creditsPerScene <= 8 ? 'S' : creditsPerScene <= 12 ? 'A' : creditsPerScene <= 18 ? 'B' : 'C';

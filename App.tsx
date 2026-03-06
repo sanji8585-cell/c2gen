@@ -1822,53 +1822,108 @@ const AppContent: React.FC<{
               {(() => {
                 const sc = generatedData.length;
                 const imgModel = getSelectedImageModel();
-                const imgPer = imgModel === 'gpt-image-1' ? 7 : 5;
+                const imgPer = imgModel === 'gpt-image-1' ? 21 : 16;
                 const totalChars = generatedData.reduce((s, d) => s + (d.narration?.length || 0), 0);
-                const ttsPer = Math.max(5, Math.ceil((totalChars / sc) / 1000) * 5);
+                const ttsPer = Math.max(15, Math.ceil((totalChars / sc) / 1000) * 15);
+                const scriptCost = 5;
                 const imgTotal = sc * imgPer;
                 const ttsTotal = sc * ttsPer;
-                const est = imgTotal + ttsTotal;
-                const LOW = [
-                  '편의점 삼각김밥보다 싸다니... AI 만세!',
-                  '이 가격에 영상 콘텐츠를? 거의 공짜네!',
-                  '자판기 커피보다 저렴한 프로 영상 제작',
-                  '이거 실화? 택시 기본요금보다 싸잖아!',
+                const est = scriptCost + imgTotal + ttsTotal;
+                // 음식 비유 시스템
+                const krwEst = est * 10;
+                const foodTiers: { max: number; label: string; quotes: string[] }[] = [
+                  { max: 100, label: '콜라 한 캔 🥤', quotes: [
+                    '이거 콜라 한 캔도 안 하네 ㅋㅋ 🥤',
+                    '동전 몇 개로 콘텐츠를 만든다고? 🪙',
+                  ]},
+                  { max: 150, label: '삼각김밥 하나 🍙', quotes: [
+                    '삼각김밥 하나 참으면 되는 거잖아 🍙',
+                    '편의점 들를 뻔한 돈으로 뚝딱! 🏪',
+                  ]},
+                  { max: 200, label: '햄버거 반개 🍔', quotes: [
+                    '햄버거 반개 값이라니...! 살도빼고 개이득! 🍔',
+                    '라면 보다도 싸다고?? 라면먹기전에 만들어준다고!? 🍜',
+                  ]},
+                  { max: 300, label: '떡볶이 한 접시 🍢', quotes: [
+                    '떡볶이 한 접시 값이면 끝! 매운 건 참자 🍢',
+                    '분식집 한 번 안 가면 되는 거지 뭐~ 🍢',
+                  ]},
+                  { max: 400, label: '아메리카노 한 잔 ☕', quotes: [
+                    '아아 한 잔 참으면 되는 거잖아~ ☕',
+                    '오늘 커피 한 잔 스킵하면 콘텐츠 완성! ☕',
+                  ]},
+                  { max: 500, label: '컵라면 + 김밥 세트 🍜', quotes: [
+                    '편의점 세트 하나 아끼면 OK 🍜',
+                    '야식 한 번 참으면 되는 가격 🍜',
+                  ]},
+                  { max: 700, label: '볶음밥 한 그릇 🍳', quotes: [
+                    '볶음밥 한 그릇 포기하면... 충분해! 🍳',
+                    '김밥천국 한 끼면 해결되는 가격 🍳',
+                  ]},
+                  { max: 1000, label: '짜장면 한 그릇 🍜', quotes: [
+                    '짜장면 한 그릇이냐 콘텐츠냐, 고민할 것도 없지 🍜',
+                    '배달 한 번 안 시키면 되는 거지~ 🍜',
+                  ]},
+                  { max: 1500, label: '햄버거 세트 🍔', quotes: [
+                    '빅맥 세트 하나 참으면 프로 콘텐츠 완성! 🍔',
+                    '패스트푸드 한 끼 vs 콘텐츠 한 편... 현명한 선택 🍔',
+                  ]},
+                  { max: 2000, label: '치킨 한 마리 🍗', quotes: [
+                    '치킨 한 마리 vs 프로 콘텐츠... 어렵다 🍗',
+                    '오늘 치킨 대신 콘텐츠 어때? 🍗',
+                  ]},
+                  { max: 3000, label: '피자 라지 🍕', quotes: [
+                    '피자 한 판이면 콘텐츠가 나오는 세상 🍕',
+                    '배달 피자 한 판 vs 프로 영상... 고민되네 🍕',
+                  ]},
+                  { max: Infinity, label: '스시 오마카세 🍣', quotes: [
+                    '오마카세 한 끼 생각하면 오히려 싼 거 아냐? 🍣',
+                    '맛집 한 번 참으면 대작이 탄생! 🍣',
+                  ]},
                 ];
-                const MID = [
-                  '커피 한잔 4천원인데, 이 가격이면 혜자인데...',
-                  '치킨 반 마리 가격으로 영상 한 편 뚝딱!',
-                  '점심값보다 싼 AI 영상 제작, 나쁘지 않은 딜!',
-                  '영화 한편 볼 돈으로 영상을 만든다니!',
-                ];
-                const HIGH = [
-                  '대작은 좀 투자가 필요한 법이지!',
-                  '할리우드 대비 99.9% 할인된 제작비!',
-                  '이 정도 퀄리티에 이 가격이면 감사해야지~',
-                  '프로 영상 제작사에 맡기면 100배는 나갈걸?',
-                ];
-                const pool = est <= 120 ? LOW : est <= 500 ? MID : HIGH;
-                const quote = pool[Math.floor(Math.random() * pool.length)];
+                const tier = foodTiers.find(t => est <= t.max) || foodTiers[foodTiers.length - 1];
+                const quote = tier.quotes[Math.floor(Math.random() * tier.quotes.length)];
                 return (
-                  <div className="mx-auto max-w-sm mb-5 rounded-xl p-4 border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 60%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                    <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>예상 비용</div>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
-                        <span>🖼️ 이미지 {sc}장 ({imgModel === 'gpt-image-1' ? 'GPT' : 'Gemini'})</span>
-                        <span className="font-bold">{imgTotal} 크레딧</span>
+                  <div className="mx-auto max-w-md mb-5 rounded-2xl overflow-hidden border" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(139,92,246,0.06) 100%)' }}>
+                    <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(245,158,11,0.15)' }}>
+                      <span className="text-base">💰</span>
+                      <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#f59e0b' }}>예상 비용</span>
+                      <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full font-bold" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
+                        {tier.label}
+                      </span>
+                    </div>
+                    <div className="px-5 py-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(139,92,246,0.15)' }}>📝</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>스크립트 생성</span>
+                        </div>
+                        <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{scriptCost}</span>
                       </div>
-                      <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
-                        <span>🔊 TTS {sc}건 (~{Math.round(totalChars / sc)}자/씬)</span>
-                        <span className="font-bold">{ttsTotal} 크레딧</span>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(96,165,250,0.15)' }}>🖼️</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>이미지 {sc}장 <span className="text-[10px] opacity-60">({imgModel === 'gpt-image-1' ? 'GPT' : 'Gemini'} @{imgPer})</span></span>
+                        </div>
+                        <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{imgTotal}</span>
                       </div>
-                      <div className="border-t my-1.5" style={{ borderColor: 'var(--border-subtle)' }} />
-                      <div className="flex justify-between text-sm font-black" style={{ color: '#f59e0b' }}>
-                        <span>💰 예상 합계</span>
-                        <span>{est} 크레딧</span>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(34,197,94,0.15)' }}>🔊</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>TTS {sc}건 <span className="text-[10px] opacity-60">(~{Math.round(totalChars / sc)}자/씬)</span></span>
+                        </div>
+                        <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{ttsTotal}</span>
+                      </div>
+                      <div className="border-t pt-2 mt-1 flex items-center justify-between" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
+                        <span className="text-sm font-black" style={{ color: '#f59e0b' }}>예상 합계</span>
+                        <span className="text-lg font-black tabular-nums" style={{ color: '#f59e0b' }}>{est} <span className="text-xs font-bold">크레딧</span></span>
                       </div>
                     </div>
-                    <p className="text-[11px] mt-3 italic text-center" style={{ color: 'var(--text-muted)' }}>
-                      💬 "{quote}"
-                    </p>
+                    <div className="px-5 py-2.5 text-center" style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderTop: '1px solid rgba(245,158,11,0.1)' }}>
+                      <p className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>
+                        "{quote}"
+                      </p>
+                    </div>
                   </div>
                 );
               })()}
