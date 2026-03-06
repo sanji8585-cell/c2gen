@@ -11,8 +11,10 @@ import AdminApiKeys from './AdminApiKeys';
 import AdminCredits from './AdminCredits';
 import AdminActivityLogs from './AdminActivityLogs';
 import AdminGamification from './AdminGamification';
+import AdminReferral from './AdminReferral';
+import AdminPlayground from './AdminPlayground';
 
-type Section = 'overview' | 'users' | 'projects' | 'analytics' | 'credits' | 'sessions' | 'announcements' | 'activity' | 'logs' | 'apikeys' | 'gamification';
+type Section = 'overview' | 'users' | 'projects' | 'playground' | 'analytics' | 'credits' | 'sessions' | 'announcements' | 'activity' | 'logs' | 'apikeys' | 'gamification' | 'referral';
 
 interface Props {
   adminToken: string;
@@ -141,6 +143,24 @@ const AdminDashboard: React.FC<Props> = ({ adminToken, onLogout }) => {
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="6" width="20" height="12" rx="2" /><line x1="6" y1="12" x2="6" y2="12.01" /><line x1="10" y1="12" x2="10" y2="12.01" /><line x1="14" y1="12" x2="14" y2="12.01" /><line x1="18" y1="12" x2="18" y2="12.01" />
+        </svg>
+      ),
+    },
+    {
+      id: 'referral',
+      label: '추천인 관리',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+    },
+    {
+      id: 'playground',
+      label: '놀이터 관리',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3" />
         </svg>
       ),
     },
@@ -337,6 +357,12 @@ const AdminDashboard: React.FC<Props> = ({ adminToken, onLogout }) => {
           )}
           {activeSection === 'gamification' && (
             <AdminGamification adminToken={adminToken} onToast={showToast} />
+          )}
+          {activeSection === 'referral' && (
+            <AdminReferral />
+          )}
+          {activeSection === 'playground' && (
+            <AdminPlayground adminToken={adminToken} onToast={showToast} />
           )}
         </div>
       </main>

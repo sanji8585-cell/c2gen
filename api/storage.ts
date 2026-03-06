@@ -1,6 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
+// Vercel body size 제한 확장 (놀이터 영상 업로드용, 기본 4.5MB → 50MB)
+export const config = {
+  api: { bodyParser: { sizeLimit: '50mb' } },
+};
+
 const BUCKET = 'project-assets';
 
 function getSupabase() {
@@ -158,40 +163,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ success: true, deleted: files?.length || 0 });
       }
 
-      // ── 놀이터 영상 업로드 ──
-      case 'upload-playground-video': {
-        const { postId, data: videoBase64 } = params;
-        if (!postId || !videoBase64) {
-          return res.status(400).json({ error: 'postId, data 필요' });
-        }
+      // ── 놀이터 영상: 서명된 업로드 URL 생성 ──
+      case 'get-playground-upload-url': {
+        const { postId, ext: fileExt } = params;
+        if (!postId) return res.status(400).json({ error: 'postId 필요' });
 
-        // 50MB 제한 (base64 인코딩 오버헤드 감안)
-        if (videoBase64.length > 50 * 1024 * 1024 * 1.4) {
-          return res.status(400).json({ error: '영상 크기는 50MB 이하여야 합니다.' });
-        }
+        const extension = fileExt === 'webm' ? 'webm' : 'mp4';
+        const path = `playground/${email}/${postId}.${extension}`;
 
-        const buffer = Buffer.from(videoBase64, 'base64');
-        const path = `playground/${email}/${postId}.mp4`;
+        // 기존 파일 삭제 (mp4/webm 모두, upsert 효과)
+        await supabase.storage.from(BUCKET).remove([
+          `playground/${email}/${postId}.mp4`,
+          `playground/${email}/${postId}.webm`,
+        ]);
 
-        const { error: uploadErr } = await supabase.storage
+        const { data: signedData, error: signErr } = await supabase.storage
           .from(BUCKET)
-          .upload(path, buffer, { contentType: 'video/mp4', upsert: true });
+          .createSignedUploadUrl(path);
 
-        if (uploadErr) {
-          console.error('[storage] playground video upload error:', uploadErr);
-          return res.status(500).json({ error: uploadErr.message });
+        if (signErr || !signedData) {
+          console.error('[storage] signed url error:', signErr);
+          return res.status(500).json({ error: signErr?.message || 'URL 생성 실패' });
         }
 
         const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
 
-        // playground_posts 테이블에 video_url 저장
+        return res.json({
+          uploadUrl: signedData.signedUrl,
+          token: signedData.token,
+          publicUrl: urlData.publicUrl,
+        });
+      }
+
+      // ── 놀이터 영상: 업로드 완료 확인 (DB 업데이트) ──
+      case 'confirm-playground-video': {
+        const { postId: confirmPostId, publicUrl } = params;
+        if (!confirmPostId || !publicUrl) return res.status(400).json({ error: 'postId, publicUrl 필요' });
+
         await supabase
           .from('playground_posts')
-          .update({ video_url: urlData.publicUrl })
-          .eq('id', postId)
+          .update({ video_url: publicUrl })
+          .eq('id', confirmPostId)
           .eq('email', email);
 
-        return res.json({ url: urlData.publicUrl });
+        return res.json({ success: true, url: publicUrl });
       }
 
       // ── 놀이터 영상 삭제 ──
@@ -199,8 +214,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { postId: delPostId } = params;
         if (!delPostId) return res.status(400).json({ error: 'postId 필요' });
 
-        const path = `playground/${email}/${delPostId}.mp4`;
-        await supabase.storage.from(BUCKET).remove([path]);
+        // mp4와 webm 모두 삭제 시도
+        await supabase.storage.from(BUCKET).remove([
+          `playground/${email}/${delPostId}.mp4`,
+          `playground/${email}/${delPostId}.webm`,
+        ]);
         return res.json({ success: true });
       }
 

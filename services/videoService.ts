@@ -205,18 +205,19 @@ function renderSubtitle(
   ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 8);
   ctx.fill();
 
-  // 텍스트 렌더링
+  // 텍스트 렌더링 (maxWidth로 캔버스 넘침 방지)
+  const textMaxWidth = boxWidth - padding * 2;
   lines.forEach((line, lineIndex) => {
     const textY = boxY + padding + lineIndex * lineHeight;
 
     // 검은 외곽선
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.lineWidth = 4;
-    ctx.strokeText(line, canvas.width / 2, textY);
+    ctx.strokeText(line, canvas.width / 2, textY, textMaxWidth);
 
     // 흰색 텍스트
     ctx.fillStyle = config.textColor;
-    ctx.fillText(line, canvas.width / 2, textY);
+    ctx.fillText(line, canvas.width / 2, textY, textMaxWidth);
   });
 }
 
@@ -414,7 +415,7 @@ export const generateVideo = async (
   }
 
   // 이미지가 있는 모든 씬 포함 (오디오 없으면 기본 3초)
-  const validAssets = assets.filter(a => a.imageData);
+  const validAssets = assets.filter(a => a.imageData || a.imageUrl);
   if (validAssets.length === 0) throw new Error("에셋이 준비되지 않았습니다.");
 
   // 자막 데이터 유무 체크
@@ -443,7 +444,8 @@ export const generateVideo = async (
     // 이미지 로드 (폴백용으로 항상 필요) - 에러 핸들링 추가
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.src = `data:image/jpeg;base64,${asset.imageData}`;
+    const imgData = asset.imageData || asset.imageUrl || '';
+    img.src = imgData.startsWith('http') || imgData.startsWith('data:') ? imgData : `data:image/jpeg;base64,${imgData}`;
     await new Promise<void>((resolve, reject) => {
       img.onload = () => {
         if (img.width === 0 || img.height === 0) {
@@ -524,15 +526,33 @@ export const generateVideo = async (
     let duration = DEFAULT_DURATION;
 
     // 오디오가 있으면 디코딩, 없으면 기본 시간 사용
-    if (asset.audioData) {
+    let audioSource = asset.audioData;
+    // audioData가 없고 audioUrl(HTTP)이 있으면 fetch로 가져오기
+    if (!audioSource && asset.audioUrl && asset.audioUrl.startsWith('http')) {
       try {
-        audioBuffer = await decodeAudio(asset.audioData, audioCtx);
+        const audioResp = await fetch(asset.audioUrl);
+        const audioBlob = await audioResp.arrayBuffer();
+        const audioBytes = new Uint8Array(audioBlob);
+        let audioBin = '';
+        for (let j = 0; j < audioBytes.length; j++) audioBin += String.fromCharCode(audioBytes[j]);
+        audioSource = btoa(audioBin);
+      } catch (e) {
+        console.warn(`[Video] 씬 ${i + 1} 오디오 URL fetch 실패`);
+      }
+    }
+    if (audioSource) {
+      try {
+        audioBuffer = await decodeAudio(audioSource, audioCtx);
         duration = audioBuffer.duration;
         // 뮤트 씬: duration은 유지하되 오디오는 출력하지 않음
         if (asset.audioMuted) audioBuffer = null;
       } catch (e) {
         console.warn(`[Video] 씬 ${i + 1} 오디오 디코딩 실패, 기본 ${DEFAULT_DURATION}초 사용`);
       }
+    } else if (asset.audioDuration && asset.audioDuration > 0) {
+      // 오디오 URL도 없지만 duration 정보가 있으면 사용
+      duration = asset.audioDuration;
+      console.log(`[Video] 씬 ${i + 1} 오디오 없음, audioDuration ${duration.toFixed(1)}초 사용`);
     } else {
       console.log(`[Video] 씬 ${i + 1} 오디오 없음, 기본 ${DEFAULT_DURATION}초 사용`);
     }
@@ -583,7 +603,8 @@ export const generateVideo = async (
 
   // 2. 캔버스 및 미디어 레코더 설정 (해상도 티어 적용)
   const dims = resDims;
-  console.log(`[Video] 해상도: ${resolution} (${dims.width}x${dims.height}), 비트레이트: ${resConfig.bitrate / 1_000_000}Mbps`);
+  const actualBitrate = options?.bitrateOverride ?? resConfig.bitrate;
+  console.log(`[Video] 해상도: ${resolution} (${dims.width}x${dims.height}), 비트레이트: ${actualBitrate / 1_000_000}Mbps`);
   const canvas = document.createElement('canvas');
   canvas.width = dims.width;
   canvas.height = dims.height;

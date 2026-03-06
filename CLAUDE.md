@@ -179,13 +179,29 @@ await Promise.all([runAudio(), runImages(), runAutoBgm()]);
 - **BGM 자동선택**: `tubegen_auto_bgm` localStorage 키로 ON/OFF (기본 ON), 이미 BGM이 있으면 스킵
 - **BGM 파일**: `public/bgm/` 폴더에 MP3 파일 필요 (Pixabay에서 무료 다운로드)
 - **자막 폰트**: 영상 렌더링 시 `LANGUAGE_CONFIG[language].subtitleFont` 자동 적용
-- **썸네일**: 5크레딧 소비, Gemini 2.5 Flash로 이미지 생성 → Canvas 텍스트 오버레이 (선택적)
+- **썸네일**: 16크레딧 소비, Gemini 2.5 Flash로 이미지 생성 → Canvas 텍스트 오버레이 (선택적)
 
 ## 인증/결제 시스템
 
 - **회원가입**: 관리자 승인제 (`api/auth.ts` → Supabase `users` 테이블)
 - **로그인**: 세션 토큰 기반 (`c2gen_session_token` localStorage)
-- **크레딧 시스템**: Supabase RPC `deduct_credits`, 이미지/TTS/영상별 크레딧 차감
+- **크레딧 시스템**: Supabase RPC `deduct_credits`, API 원가 기준 30% 원가율로 설정
+
+### 크레딧 단가 (API 원가율 30% 기준, 1크레딧 = 10원)
+
+| 항목 | 크레딧 | API 원가 | 설정 위치 |
+|------|--------|---------|----------|
+| 스크립트 생성 | 5 | ~$0.01 | `api/gemini.ts` |
+| 이미지 (Gemini) | 16 | ~$0.0315 | `api/gemini.ts`, `config.ts` |
+| 이미지 (GPT Image-1) | 21 | ~$0.042 | `api/openai.ts`, `config.ts` |
+| 이미지 (Flux) | 16 | ~$0.0315 | `api/fal.ts`, `config.ts` |
+| TTS (1000자당) | 15 | ~$0.03 | `api/elevenlabs.ts`, `config.ts` |
+| 영상 변환 (PixVerse) | 73 | ~$0.15 | `api/fal.ts`, `api/fal-poll.ts`, `config.ts` |
+| 썸네일 | 16 | ~$0.0315 | `api/gemini.ts`, `config.ts` |
+
+- **가입 보너스**: 100크레딧 (`api/auth.ts`)
+- **크레딧 설정 중앙**: `config.ts` → `CREDIT_CONFIG.COSTS`
+- **주의**: API 파일에도 하드코딩된 크레딧 값이 있으므로 변경 시 `config.ts` + 해당 API 파일 모두 동기화 필요
 - **소셜 로그인**: Google/Kakao OAuth 준비됨 (활성화 필요 — Google Cloud Console, Kakao Developers 설정)
 - **결제**: Toss Payments 연동 준비됨 (API 키 설정 필요)
 

@@ -155,9 +155,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const data = await response.json();
 
-        // 크레딧 차감 (TTS: 1000자당 5크레딧)
+        // 크레딧 차감 (TTS: 1000자당 15크레딧)
         const charCount = text?.length || 0;
-        const ttsCredits = Math.max(1, Math.ceil(charCount / 1000) * 5);
+        const ttsCredits = Math.max(1, Math.ceil(charCount / 1000) * 15);
         const creditResult = await checkAndDeductCredits(req, ttsCredits, `TTS 생성 (${charCount}자)`);
         if (!creditResult.ok) {
           return res.status(402).json({

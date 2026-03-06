@@ -197,7 +197,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                     color: imageSource === 'ai' ? '#fff' : 'var(--text-secondary)',
                   }}
                 >
-                  AI 생성 <span className="text-[9px] opacity-60">(5크레딧)</span>
+                  AI 생성 <span className="text-[9px] opacity-60">(16크레딧)</span>
                 </button>
                 <button onClick={() => setImageSource('scene')}
                   disabled={sceneImages.length === 0}
@@ -349,7 +349,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                           boxShadow: '0 4px 16px rgba(99, 102, 241, 0.3)',
                         }}
                       >
-                        {loading ? '생성 중...' : '✨ 다시 생성 (5크레딧)'}
+                        {loading ? '생성 중...' : '✨ 다시 생성 (16크레딧)'}
                       </button>
                     )}
                     <button onClick={handleDownload}
@@ -397,7 +397,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                       border: '2px solid rgba(255,255,255,0.15)',
                     }}
                   >
-                    ✨ 이 스타일로 이미지 생성 (5 크레딧)
+                    ✨ 이 스타일로 이미지 생성 (16 크레딧)
                   </button>
                   <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>
                     위 이미지는 "{selectedAiStyle?.nameKo}" 스타일 예시입니다. 실제 생성 시 주제에 맞는 이미지가 만들어집니다.

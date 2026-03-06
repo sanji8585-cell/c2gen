@@ -161,12 +161,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (base64) {
           // 미리보기는 크레딧 차감 없이 허용
           if (!isPreview) {
-            // 크레딧 차감 (GPT 이미지: 7크레딧)
-            const creditResult = await checkAndDeductCredits(req, 7, '이미지 생성 (GPT Image-1)');
+            // 크레딧 차감 (GPT 이미지: 21크레딧)
+            const creditResult = await checkAndDeductCredits(req, 21, '이미지 생성 (GPT Image-1)');
             if (!creditResult.ok) {
               return res.status(402).json({
                 error: 'insufficient_credits',
-                message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 7)`,
+                message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 21)`,
                 balance: creditResult.balance,
               });
             }

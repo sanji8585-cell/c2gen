@@ -306,6 +306,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           analysis: scene.analysis || {},
         }));
 
+        // 크레딧 차감 (스크립트: 5크레딧)
+        const scriptCreditResult = await checkAndDeductCredits(req, 5, '스크립트 생성');
+        if (!scriptCreditResult.ok) {
+          return res.status(402).json({
+            error: 'insufficient_credits',
+            message: `크레딧이 부족합니다. (현재: ${scriptCreditResult.balance ?? 0}, 필요: 5)`,
+            balance: scriptCreditResult.balance,
+          });
+        }
+
         logUsage(req, 'script', 0);
         return res.json(mapped);
       }
@@ -372,12 +382,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               if (part.inlineData) {
                 // 미리보기는 크레딧 차감 없이 허용
                 if (!isPreview) {
-                  // 크레딧 차감 (Gemini 이미지: 5크레딧)
-                  const creditResult = await checkAndDeductCredits(req, 5, '이미지 생성 (Gemini)');
+                  // 크레딧 차감 (Gemini 이미지: 16크레딧)
+                  const creditResult = await checkAndDeductCredits(req, 16, '이미지 생성 (Gemini)');
                   if (!creditResult.ok) {
                     return res.status(402).json({
                       error: 'insufficient_credits',
-                      message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 5)`,
+                      message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 16)`,
                       balance: creditResult.balance,
                     });
                   }
@@ -541,11 +551,11 @@ Return ONLY the motion prompt, no explanation.`;
         const thumbParts = response.candidates?.[0]?.content?.parts || [];
         for (const part of thumbParts) {
           if (part.inlineData) {
-            const creditResult = await checkAndDeductCredits(req, 5, '썸네일 생성');
+            const creditResult = await checkAndDeductCredits(req, 16, '썸네일 생성');
             if (!creditResult.ok) {
               return res.status(402).json({
                 error: 'insufficient_credits',
-                message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 5)`,
+                message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 16)`,
                 balance: creditResult.balance,
               });
             }

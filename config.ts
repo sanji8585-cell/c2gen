@@ -192,18 +192,20 @@ export const CREDIT_CONFIG = {
   // 1 크레딧 = 10원
   KRW_PER_CREDIT: 10,
 
-  // 작업별 크레딧 비용
+  // 작업별 크레딧 비용 (API 원가 대비 원가율 30% 기준)
+  // 원가율 = API원가 / 판매가, 판매가 = 크레딧 × 10원
   COSTS: {
-    'gemini-2.5-flash-image': 5,
-    'gpt-image-1': 7,
-    tts_per_1000_chars: 5,
-    video: 22,
-    script: 0,
+    'gemini-2.5-flash-image': 16,  // 원가 $0.0315(46원) → 160원 판매 → 원가율 29%
+    'gpt-image-1': 21,             // 원가 $0.042(61원) → 210원 판매 → 원가율 29%
+    tts_per_1000_chars: 15,        // 원가 $0.03(44원) → 150원 판매 → 원가율 29%
+    video: 73,                     // 원가 $0.15(218원) → 730원 판매 → 원가율 30%
+    script: 5,                     // 원가 ~$0.01(15원) → 50원 판매 → 원가율 30%
+    thumbnail: 16,                 // 원가 $0.0315(46원) → 160원 판매 → 원가율 29%
   } as Record<string, number>,
 
   // 구독 요금제
   PLANS: {
-    free:  { name: '무료',   price_krw: 0,     monthly_credits: 0,    features: ['가입 시 50크레딧'] },
+    free:  { name: '무료',   price_krw: 0,     monthly_credits: 0,    features: ['가입 시 100크레딧'] },
     basic: { name: '베이직', price_krw: 9900,  monthly_credits: 500,  features: ['월 500크레딧', '우선 생성'] },
     pro:      { name: '프로',   price_krw: 29900, monthly_credits: 2000,   features: ['월 2,000크레딧', '우선 생성', '워터마크 제거'] },
     operator: { name: '운영자', price_krw: 0,     monthly_credits: 999999, features: ['전 기능 무제한', '크레딧 차감 없음'] },
@@ -216,7 +218,7 @@ export const CREDIT_CONFIG = {
     { id: 'pack_10000', credits: 10000, price_krw: 70000, label: '10,000 크레딧 (30% 할인)' },
   ],
 
-  SIGNUP_BONUS: 50,
+  SIGNUP_BONUS: 100,
   LOW_CREDIT_THRESHOLD: 10,
 };
 

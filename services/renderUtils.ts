@@ -165,13 +165,14 @@ export function renderSubtitle(
   ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 8);
   ctx.fill();
 
+  const textMaxWidth = boxWidth - padding * 2;
   lines.forEach((line, lineIndex) => {
     const textY = boxY + padding + lineIndex * lineHeight;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.lineWidth = 4;
-    ctx.strokeText(line, canvas.width / 2, textY);
+    ctx.strokeText(line, canvas.width / 2, textY, textMaxWidth);
     ctx.fillStyle = config.textColor;
-    ctx.fillText(line, canvas.width / 2, textY);
+    ctx.fillText(line, canvas.width / 2, textY, textMaxWidth);
   });
 }
 

@@ -249,10 +249,11 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
               <div className="mt-4 p-3 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' }}>
                 <div className="text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>크레딧 사용 안내</div>
                 <div className="grid grid-cols-2 gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  <div>이미지 (Gemini): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>5 크레딧</span></div>
-                  <div>이미지 (GPT): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>7 크레딧</span></div>
-                  <div>TTS (1000자): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>5 크레딧</span></div>
-                  <div>영상 변환: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>22 크레딧</span></div>
+                  <div>스크립트 생성: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>5 크레딧</span></div>
+                  <div>이미지 (Gemini): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>16 크레딧</span></div>
+                  <div>이미지 (GPT): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>21 크레딧</span></div>
+                  <div>TTS (1000자): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>15 크레딧</span></div>
+                  <div>영상 변환: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>73 크레딧</span></div>
                 </div>
               </div>
             </div>

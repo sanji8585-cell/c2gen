@@ -166,12 +166,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { imageUrl, motionPrompt, duration = 5, aspectRatio = '16:9', resolution = '720p' } = params;
         if (!imageUrl) return res.status(400).json({ error: 'imageUrl required' });
 
-        // 크레딧 차감을 API 호출 전에 수행 (영상: 22크레딧)
-        const creditResult = await checkAndDeductCredits(req, 22, '영상 생성 (PixVerse)');
+        // 크레딧 차감을 API 호출 전에 수행 (영상: 73크레딧)
+        const creditResult = await checkAndDeductCredits(req, 73, '영상 생성 (PixVerse)');
         if (!creditResult.ok) {
           return res.status(402).json({
             error: 'insufficient_credits',
-            message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 22)`,
+            message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 73)`,
             balance: creditResult.balance,
           });
         }
@@ -199,7 +199,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const errorText = await response.text();
           console.error('[api/fal] Submit error:', response.status, errorText);
           // 제출 실패 → 크레딧 환불
-          await refundCredits(creditResult.email, 22, '영상 생성 실패 환불 (제출 오류)');
+          await refundCredits(creditResult.email, 73, '영상 생성 실패 환불 (제출 오류)');
           return res.status(response.status).json({ error: errorText, refunded: true });
         }
 
@@ -236,12 +236,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const result = await response.json();
 
-        // 크레딧 차감 (Flux 이미지: 5크레딧)
-        const fluxCreditResult = await checkAndDeductCredits(req, 5, '이미지 생성 (Flux)');
+        // 크레딧 차감 (Flux 이미지: 16크레딧)
+        const fluxCreditResult = await checkAndDeductCredits(req, 16, '이미지 생성 (Flux)');
         if (!fluxCreditResult.ok) {
           return res.status(402).json({
             error: 'insufficient_credits',
-            message: `크레딧이 부족합니다. (현재: ${fluxCreditResult.balance ?? 0}, 필요: 5)`,
+            message: `크레딧이 부족합니다. (현재: ${fluxCreditResult.balance ?? 0}, 필요: 16)`,
             balance: fluxCreditResult.balance,
           });
         }

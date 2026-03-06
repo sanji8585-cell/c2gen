@@ -24,6 +24,17 @@ async function validateSession(supabase: ReturnType<typeof getSupabase>, token: 
   return data || null;
 }
 
+async function validateAdmin(supabase: ReturnType<typeof getSupabase>, token: string): Promise<boolean> {
+  if (!token) return false;
+  const { data } = await supabase
+    .from('c2gen_sessions')
+    .select('email')
+    .eq('token', token)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+  return data?.email === 'admin';
+}
+
 // ── 장착 아이템 조회 헬퍼 ──
 async function resolveEquippedItems(
   supabase: ReturnType<typeof getSupabase>,
@@ -333,6 +344,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const equipped = eqMap[post.email] || { title: null, badges: [], frame: null };
 
         return res.json({ post, assets, liked, sceneGap, equipped });
+      }
+
+      // ══════════════════════════════════════
+      // ── 관리자 전용 (Admin Actions) ──
+      // ══════════════════════════════════════
+
+      case 'admin-playgroundStats': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdmin(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { count: totalPosts } = await supabase.from('playground_posts').select('*', { count: 'exact', head: true });
+        const { count: flaggedPosts } = await supabase.from('playground_posts').select('*', { count: 'exact', head: true }).eq('flagged', true);
+        const { data: authorData } = await supabase.from('playground_posts').select('email');
+        const uniqueAuthors = new Set((authorData || []).map((p: any) => p.email)).size;
+        const { data: likeData } = await supabase.from('playground_posts').select('like_count');
+        const totalLikes = (likeData || []).reduce((s: number, p: any) => s + (p.like_count || 0), 0);
+
+        return res.json({ success: true, totalPosts: totalPosts || 0, flaggedPosts: flaggedPosts || 0, uniqueAuthors, totalLikes });
+      }
+
+      case 'admin-playgroundPosts': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdmin(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { page = 0, limit = 20, search, filter, sort = 'latest' } = params;
+        const lim = Math.min(Number(limit) || 20, 50);
+        const offset = (Number(page) || 0) * lim;
+
+        let query = supabase.from('playground_posts')
+          .select('id, email, author_name, caption, thumbnail, topic, scene_count, like_count, created_at, video_url, flagged', { count: 'exact' });
+
+        if (filter === 'flagged') query = query.eq('flagged', true);
+        if (search) query = query.or(`caption.ilike.%${search}%,author_name.ilike.%${search}%,email.ilike.%${search}%,topic.ilike.%${search}%`);
+
+        if (sort === 'popular') {
+          query = query.order('like_count', { ascending: false });
+        } else {
+          query = query.order('created_at', { ascending: false });
+        }
+
+        const { data: posts, count } = await query.range(offset, offset + lim - 1);
+        return res.json({ success: true, posts: posts || [], total: count || 0 });
+      }
+
+      case 'admin-deletePost': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdmin(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { postId } = params;
+        if (!postId) return res.status(400).json({ error: 'postId 필요' });
+
+        // 게시물 정보 먼저 조회 (Storage 삭제용 email 필요)
+        const { data: post } = await supabase.from('playground_posts').select('email, video_url').eq('id', postId).single();
+        if (!post) return res.status(404).json({ error: '게시물 없음' });
+
+        // 좋아요 삭제
+        await supabase.from('playground_likes').delete().eq('post_id', postId);
+        // 게시물 삭제
+        await supabase.from('playground_posts').delete().eq('id', postId);
+
+        // Storage 영상 파일 삭제
+        if (post.video_url && post.email) {
+          const BUCKET = 'project-assets';
+          await supabase.storage.from(BUCKET).remove([
+            `playground/${post.email}/${postId}.mp4`,
+            `playground/${post.email}/${postId}.webm`,
+          ]);
+        }
+
+        return res.json({ success: true });
+      }
+
+      case 'admin-flagPost': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdmin(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { postId, flagged } = params;
+        if (!postId) return res.status(400).json({ error: 'postId 필요' });
+
+        await supabase.from('playground_posts').update({ flagged: !!flagged }).eq('id', postId);
+        return res.json({ success: true });
       }
 
       default:

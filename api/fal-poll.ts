@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // fal.ai 측 실패 → 크레딧 환불
     if (statusData.status === 'FAILED') {
-      await refundCredits(userEmail, 22, '영상 생성 실패 환불 (fal.ai 오류)');
+      await refundCredits(userEmail, 73, '영상 생성 실패 환불 (fal.ai 오류)');
       return res.json({ ...statusData, refunded: true });
     }
 

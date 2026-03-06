@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (action) {
       // ── 회원가입 ──
       case 'register': {
-        const { name, email, password, termsAgreedAt, marketingAgreed } = params;
+        const { name, email, password, termsAgreedAt, marketingAgreed, referralCode } = params;
         if (!name || !email || !password) {
           return res.status(400).json({ success: false, message: '모든 필드를 입력해주세요.' });
         }
@@ -93,8 +93,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ success: false, message: '이미 가입된 이메일입니다.' });
         }
 
+        // 추천인 코드 검증
+        let referredByEmail: string | null = null;
+        if (referralCode) {
+          const { data: referrer } = await supabase
+            .from('c2gen_users')
+            .select('email')
+            .eq('referral_code', referralCode.toUpperCase().trim())
+            .single();
+          if (referrer && referrer.email !== normalizedEmail) {
+            referredByEmail = referrer.email;
+          }
+        }
+
         const salt = generateSalt();
         const passwordHash = hashPassword(password, salt);
+
+        // 추천 코드 자동 생성
+        const autoCode = normalizedEmail.split('@')[0].slice(0, 6).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
 
         const { error } = await supabase.from('c2gen_users').insert({
           email: normalizedEmail,
@@ -106,6 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           created_at: Date.now(),
           terms_agreed_at: termsAgreedAt || null,
           marketing_agreed: marketingAgreed || false,
+          referral_code: autoCode,
+          referred_by: referredByEmail,
         });
 
         if (error) {
@@ -744,7 +762,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { data: user } = await supabase
           .from('c2gen_users')
-          .select('name')
+          .select('name, referred_by')
           .eq('email', email)
           .single();
 
@@ -752,11 +770,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await supabase.from('c2gen_users').update({ status: 'approved' }).eq('email', email);
 
-        // 가입 보너스 크레딧 지급 (50크레딧)
+        // 가입 보너스 크레딧 지급 (100크레딧)
         try {
           await supabase.rpc('add_credits', {
             p_email: email,
-            p_amount: 50,
+            p_amount: 100,
             p_type: 'bonus',
             p_description: '가입 승인 보너스',
           });
@@ -764,7 +782,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           console.error('[api/auth] 보너스 크레딧 지급 실패:', e);
         }
 
-        return res.json({ success: true, message: `${user.name} 님을 승인했습니다. (50 크레딧 지급)` });
+        // ── 추천인 보상 지급 (다단계) ──
+        if (user.referred_by) {
+          try {
+            const { data: refSettings } = await supabase
+              .from('c2gen_referral_settings')
+              .select('*')
+              .eq('id', 'default')
+              .single();
+
+            if (refSettings?.enabled && refSettings.reward_trigger === 'approved') {
+              const maxTiers = refSettings.max_tiers || 3;
+              const tierRewards = [
+                refSettings.tier1_reward || 0,
+                refSettings.tier2_reward || 0,
+                refSettings.tier3_reward || 0,
+                refSettings.tier4_reward || 0,
+                refSettings.tier5_reward || 0,
+              ];
+
+              // 신규 가입자 보너스
+              if (refSettings.signup_bonus > 0) {
+                await supabase.rpc('add_credits', {
+                  p_email: email,
+                  p_amount: refSettings.signup_bonus,
+                  p_type: 'referral',
+                  p_description: '추천 가입 보너스',
+                });
+              }
+
+              // 다단계 추천인 트리 순회
+              let currentReferrer = user.referred_by;
+              for (let tier = 0; tier < maxTiers && currentReferrer; tier++) {
+                const reward = tierRewards[tier];
+                if (reward <= 0) break;
+
+                // 보상 지급
+                await supabase.rpc('add_credits', {
+                  p_email: currentReferrer,
+                  p_amount: reward,
+                  p_type: 'referral',
+                  p_description: `${tier + 1}단계 추천 보상 (${email})`,
+                });
+
+                // 보상 이력 기록
+                await supabase.from('c2gen_referral_rewards').insert({
+                  referrer_email: currentReferrer,
+                  referred_email: email,
+                  tier: tier + 1,
+                  credits: reward,
+                  status: 'paid',
+                  paid_at: new Date().toISOString(),
+                });
+
+                // 다음 단계 추천인 조회
+                const { data: nextRef } = await supabase
+                  .from('c2gen_users')
+                  .select('referred_by')
+                  .eq('email', currentReferrer)
+                  .single();
+                currentReferrer = nextRef?.referred_by || null;
+              }
+            }
+          } catch (e) {
+            console.error('[api/auth] 추천 보상 지급 실패:', e);
+          }
+        }
+
+        return res.json({ success: true, message: `${user.name} 님을 승인했습니다. (100 크레딧 지급)` });
       }
 
       // ── 유저 거부 ──
@@ -2254,16 +2339,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('token', token).gt('expires_at', new Date().toISOString()).single();
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
-        const { data: usr } = await supabase.from('c2gen_users')
-          .select('gacha_tickets, gacha_pity_epic, gacha_pity_legendary, total_gacha_pulls, credits')
-          .eq('email', session.email).single();
+        // 유저 정보 + 가챠 설정 + 전체 가챠 풀을 병렬 로드
+        const [{ data: usr }, { data: cfgRow }, { data: allPoolItems }] = await Promise.all([
+          supabase.from('c2gen_users')
+            .select('gacha_tickets, gacha_pity_epic, gacha_pity_legendary, total_gacha_pulls, credits')
+            .eq('email', session.email).single(),
+          supabase.from('c2gen_game_config').select('value').eq('key', 'gacha_settings').single(),
+          supabase.from('c2gen_gacha_pool').select('*').eq('is_active', true),
+        ]);
 
         if (!usr || (usr.gacha_tickets || 0) < 1) {
           return res.status(400).json({ error: '뽑기 티켓이 부족합니다.' });
         }
 
-        // 설정 로드 (DB format: rarity_rates: {common:50, uncommon:25, ...}, pity: {epic_threshold:30, legendary_threshold:100})
-        const { data: cfgRow } = await supabase.from('c2gen_game_config').select('value').eq('key', 'gacha_settings').single();
         const gs = cfgRow?.value || { rarity_rates: { common: 50, uncommon: 25, rare: 15, epic: 8, legendary: 2 }, pity: { epic_threshold: 30, legendary_threshold: 100 } };
 
         let pityEpic = (usr.gacha_pity_epic || 0) + 1;
@@ -2275,7 +2363,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else if (pityEpic >= (gs.pity?.epic_threshold || gs.pity?.epic_guarantee || 30)) {
           targetRarity = 'epic'; pityEpic = 0;
         } else {
-          // rarity_rates는 퍼센트 (common:50, uncommon:25 등), 합계 100
           const rates = gs.rarity_rates || gs.rarities || { common: 100 };
           const total = (Object.values(rates) as any[]).reduce((a: number, b: any) => a + (typeof b === 'number' ? b : (b?.rate || 0) * 100), 0);
           const roll = Math.random() * (total as number);
@@ -2287,19 +2374,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
-        const { data: poolItems } = await supabase.from('c2gen_gacha_pool')
-          .select('*').eq('rarity', targetRarity).eq('is_active', true);
-
-        if (!poolItems || poolItems.length === 0) {
+        // 이미 로드된 풀에서 레어리티 필터링
+        const poolItems = (allPoolItems || []).filter((i: any) => i.rarity === targetRarity);
+        if (poolItems.length === 0) {
           return res.status(500).json({ error: 'No gacha items available' });
         }
 
         const picked = poolItems[Math.floor(Math.random() * poolItems.length)];
 
-        const { data: existingRows2 } = await supabase.from('c2gen_user_inventory')
-          .select('id, quantity').eq('email', session.email).eq('item_id', picked.id).order('quantity', { ascending: false }).limit(1);
-        const existing = existingRows2?.[0] ?? null;
+        // 인벤토리 확인 + 유저 업데이트를 병렬 실행
+        let bonusCredits = 0;
+        if (picked.item_type === 'credit_voucher' && picked.effect_value?.credits) {
+          bonusCredits = picked.effect_value.credits;
+        }
 
+        const [{ data: existingRows2 }] = await Promise.all([
+          supabase.from('c2gen_user_inventory')
+            .select('id, quantity').eq('email', session.email).eq('item_id', picked.id).order('quantity', { ascending: false }).limit(1),
+          supabase.from('c2gen_users').update({
+            gacha_tickets: (usr.gacha_tickets || 0) - 1,
+            gacha_pity_epic: pityEpic,
+            gacha_pity_legendary: pityLegendary,
+            total_gacha_pulls: (usr.total_gacha_pulls || 0) + 1,
+            ...(bonusCredits > 0 ? { credits: (usr.credits || 0) + bonusCredits } : {}),
+          }).eq('email', session.email),
+        ]);
+
+        const existing = existingRows2?.[0] ?? null;
         let isNew = false;
         if (existing) {
           await supabase.from('c2gen_user_inventory')
@@ -2311,20 +2412,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             is_active: false, is_equipped: false,
           });
         }
-
-        // 크레딧 바우처 자동 사용
-        let bonusCredits = 0;
-        if (picked.item_type === 'credit_voucher' && picked.effect_value?.credits) {
-          bonusCredits = picked.effect_value.credits;
-        }
-
-        await supabase.from('c2gen_users').update({
-          gacha_tickets: (usr.gacha_tickets || 0) - 1,
-          gacha_pity_epic: pityEpic,
-          gacha_pity_legendary: pityLegendary,
-          total_gacha_pulls: (usr.total_gacha_pulls || 0) + 1,
-          ...(bonusCredits > 0 ? { credits: (usr.credits || 0) + bonusCredits } : {}),
-        }).eq('email', session.email);
 
         return res.json({
           result: {
@@ -2843,6 +2930,159 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }));
 
         return res.json({ success: true, levelDist, achievementRates, gachaRarityDist, questRates });
+      }
+
+      // ══════════════════════════════════════
+      // ── 추천인 제도 (Referral System) ──
+      // ══════════════════════════════════════
+
+      // ── 내 추천 정보 조회 ──
+      case 'referral-getMyInfo': {
+        const refToken = params.token;
+        if (!refToken) return res.status(401).json({ error: '로그인 필요' });
+        const { data: refSession } = await supabase
+          .from('c2gen_sessions')
+          .select('email')
+          .eq('token', refToken)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+        if (!refSession) return res.status(401).json({ error: '세션 만료' });
+        const email = refSession.email;
+
+        // 추천 코드가 없으면 생성
+        const { data: user } = await supabase
+          .from('c2gen_users')
+          .select('referral_code, referred_by')
+          .eq('email', email)
+          .single();
+
+        let referralCode = user?.referral_code;
+        if (!referralCode) {
+          referralCode = email.split('@')[0].slice(0, 6).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+          await supabase.from('c2gen_users').update({ referral_code: referralCode }).eq('email', email);
+        }
+
+        // 내가 추천한 사람들 (1단계)
+        const { data: directReferrals } = await supabase
+          .from('c2gen_users')
+          .select('email, name, status, created_at')
+          .eq('referred_by', email)
+          .order('created_at', { ascending: false });
+
+        // 보상 이력
+        const { data: rewards } = await supabase
+          .from('c2gen_referral_rewards')
+          .select('*')
+          .eq('referrer_email', email)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        // 단계별 추천 수 집계
+        const tierCounts: Record<number, number> = {};
+        let totalEarned = 0;
+        for (const r of (rewards || [])) {
+          if (r.status === 'paid') {
+            tierCounts[r.tier] = (tierCounts[r.tier] || 0) + 1;
+            totalEarned += r.credits;
+          }
+        }
+
+        return res.json({
+          success: true,
+          referralCode,
+          referredBy: user?.referred_by || null,
+          directReferrals: (directReferrals || []).map(r => ({
+            email: r.email,
+            name: r.name,
+            status: r.status,
+            createdAt: r.created_at,
+          })),
+          tierCounts,
+          totalEarned,
+          rewards: (rewards || []).slice(0, 20),
+        });
+      }
+
+      // ── 추천 설정 조회 (관리자) ──
+      case 'referral-getSettings': {
+        const { data: settings } = await supabase
+          .from('c2gen_referral_settings')
+          .select('*')
+          .eq('id', 'default')
+          .single();
+        return res.json({ success: true, settings: settings || {} });
+      }
+
+      // ── 추천 설정 업데이트 (관리자) ──
+      case 'referral-updateSettings': {
+        if (!(await validateAdminSession(supabase, params.token || params.adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+        const { settings: newSettings } = params;
+        if (!newSettings) return res.status(400).json({ error: 'settings 필요' });
+
+        await supabase
+          .from('c2gen_referral_settings')
+          .update({ ...newSettings, updated_at: new Date().toISOString() })
+          .eq('id', 'default');
+
+        return res.json({ success: true });
+      }
+
+      // ── 추천 통계 (관리자) ──
+      case 'referral-adminStats': {
+        if (!(await validateAdminSession(supabase, params.token || params.adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        // 전체 추천 가입자 수
+        const { count: totalReferred } = await supabase
+          .from('c2gen_users')
+          .select('*', { count: 'exact', head: true })
+          .not('referred_by', 'is', null);
+
+        // 총 지급 보상
+        const { data: allRewards } = await supabase
+          .from('c2gen_referral_rewards')
+          .select('credits, status');
+        const totalPaid = (allRewards || []).filter(r => r.status === 'paid').reduce((s, r) => s + r.credits, 0);
+        const totalPending = (allRewards || []).filter(r => r.status === 'pending').reduce((s, r) => s + r.credits, 0);
+
+        // Top 추천인 (지급 완료 기준)
+        const { data: topReferrers } = await supabase
+          .from('c2gen_referral_rewards')
+          .select('referrer_email')
+          .eq('status', 'paid');
+
+        const referrerMap: Record<string, number> = {};
+        for (const r of (topReferrers || [])) {
+          referrerMap[r.referrer_email] = (referrerMap[r.referrer_email] || 0) + 1;
+        }
+        const topList = Object.entries(referrerMap)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([email, count]) => ({ email, count }));
+
+        return res.json({
+          success: true,
+          totalReferred: totalReferred || 0,
+          totalPaid,
+          totalPending,
+          topReferrers: topList,
+        });
+      }
+
+      // ── 추천 코드 유효성 검증 (회원가입 시) ──
+      case 'referral-validateCode': {
+        const { code } = params;
+        if (!code) return res.json({ valid: false });
+
+        const { data: referrer } = await supabase
+          .from('c2gen_users')
+          .select('email, name')
+          .eq('referral_code', code.toUpperCase().trim())
+          .single();
+
+        return res.json({
+          valid: !!referrer,
+          referrerName: referrer?.name || null,
+        });
       }
 
       default:

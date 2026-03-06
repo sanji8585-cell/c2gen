@@ -326,6 +326,7 @@ const AppContent: React.FC<{
   const [userPlan, setUserPlan] = useState<string>('free');
   const [showCreditShop, setShowCreditShop] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
 
   // RPG 게이미피케이션 (v2 — 서버 기반)
@@ -378,6 +379,11 @@ const AppContent: React.FC<{
       const d = await r.json();
       if (d.credits !== undefined) setUserCredits(d.credits);
       if (d.plan) setUserPlan(d.plan);
+      // 아바타 URL 로드 (프로필 API)
+      if (!userAvatarUrl) {
+        fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getProfile', token }) })
+          .then(r => r.json()).then(p => { if (p.avatarUrl) setUserAvatarUrl(p.avatarUrl); }).catch(() => {});
+      }
     } catch { /* ignore */ }
   }, []);
 
@@ -1542,6 +1548,7 @@ const AppContent: React.FC<{
         onShowAchievements={() => setShowAchievements(true)}
         onShowInventory={() => setShowInventory(true)}
         onShowLeaderboard={() => setShowLeaderboard(true)}
+        avatarUrl={userAvatarUrl}
       />
 
       {/* 공지사항 배너 */}

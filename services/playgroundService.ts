@@ -123,36 +123,6 @@ export async function toggleLike(postId: string): Promise<{ liked: boolean; like
   return callPlaygroundAPI('like', { postId });
 }
 
-// ── 놀이터 영상 업로드 ──
-
-async function callStorageAPI(action: string, params: Record<string, any> = {}): Promise<any> {
-  const token = localStorage.getItem('c2gen_session_token');
-  const res = await fetch('/api/storage', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, token: token || undefined, ...params }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `Storage 오류: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function uploadPlaygroundVideo(postId: string, videoBlob: Blob): Promise<string> {
-  // Blob → base64
-  const buffer = await videoBlob.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  const base64 = btoa(binary);
-
-  const result = await callStorageAPI('upload-playground-video', { postId, data: base64 });
-  return result.url;
-}
-
 // ── 게시물 상세 ──
 
 export async function getPostDetail(postId: string): Promise<PostDetailResponse> {

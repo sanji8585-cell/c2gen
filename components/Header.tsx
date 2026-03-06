@@ -160,7 +160,7 @@ const Header: React.FC<HeaderProps> = ({
         backgroundColor: isDark ? 'rgba(15,23,42,0.85)' : 'rgba(255,255,255,0.9)',
       }}
     >
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 h-[52px] flex items-center justify-between gap-2">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 h-[56px] flex items-center justify-between gap-2">
         {/* ===== LEFT: Logo + Tabs ===== */}
         <div className="flex items-center gap-0 min-w-0">
           {/* Logo */}
@@ -206,7 +206,7 @@ const Header: React.FC<HeaderProps> = ({
                     )}
                   </span>
                   {isActive && (
-                    <div className="absolute bottom-[-13px] left-1 right-1 h-[2px] rounded-full bg-brand-500" />
+                    <div className="absolute bottom-[-15px] left-1 right-1 h-[2px] rounded-full bg-brand-500" />
                   )}
                 </button>
               );
@@ -294,14 +294,15 @@ const Header: React.FC<HeaderProps> = ({
                 <button
                   ref={avatarBtnRef}
                   onClick={() => setShowDropdown(!showDropdown)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:ring-2 hover:ring-brand-500/40"
+                  className="rounded-lg flex items-center justify-center transition-all hover:ring-2 hover:ring-brand-500/40"
                   title={userName}
                 >
                   <AvatarFrame
                     name={userName || ''}
-                    size={28}
+                    size={34}
                     rarity={equipped?.frame?.rarity}
                     frameName={equipped?.frame?.name}
+                    avatarUrl={avatarUrl}
                   />
                 </button>
 
@@ -319,7 +320,7 @@ const Header: React.FC<HeaderProps> = ({
                     {/* User info header */}
                     <div className="px-3 py-2.5 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
                       <div className="flex items-center gap-2">
-                        <AvatarFrame name={userName || ''} size={24} rarity={equipped?.frame?.rarity} frameName={equipped?.frame?.name} />
+                        <AvatarFrame name={userName || ''} size={24} rarity={equipped?.frame?.rarity} frameName={equipped?.frame?.name} avatarUrl={avatarUrl} />
                         <div className="min-w-0">
                           <div className="text-[12px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{userName}</div>
                           {levelInfo && (

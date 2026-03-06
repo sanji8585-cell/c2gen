@@ -95,6 +95,20 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
         setPosts(prev => [...prev, ...result.posts]);
       }
       setNextCursor(result.nextCursor);
+
+      // 영상 URL 프리로드 (브라우저 캐시에 미리 로드)
+      result.posts.forEach(p => {
+        if (p.videoUrl) {
+          const link = document.createElement('link');
+          link.rel = 'preload';
+          link.as = 'video';
+          link.href = p.videoUrl;
+          link.crossOrigin = 'anonymous';
+          if (!document.querySelector(`link[href="${p.videoUrl}"]`)) {
+            document.head.appendChild(link);
+          }
+        }
+      });
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -242,31 +256,42 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
           assets,
           (msg) => setShareProgress(msg),
           shareAbortRef.current,
-          { resolution: '720p', bitrateOverride: 2_500_000, sceneGap, enableSubtitles: true }
+          { resolution: '720p', bitrateOverride: 1_500_000, sceneGap, enableSubtitles: true }
         );
 
         if (result?.videoBlob) {
-          const sizeMB = (result.videoBlob.size / 1024 / 1024).toFixed(1);
+          const uploadBlob = result.videoBlob;
+          const isWebM = uploadBlob.type.includes('webm');
+          const ext = isWebM ? 'webm' : 'mp4';
+          const contentType = uploadBlob.type || (isWebM ? 'video/webm' : 'video/mp4');
+
+          console.log('[Share Upload] blob type:', uploadBlob.type, 'size:', uploadBlob.size, 'ext:', ext);
+
+          const sizeMB = (uploadBlob.size / 1024 / 1024).toFixed(1);
           setShareProgress(`영상 업로드 중... (${sizeMB}MB)`);
 
           // 1) 서명된 업로드 URL 획득
           const urlRes = await fetch('/api/storage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'get-playground-upload-url', token, postId: newPost.id }),
+            body: JSON.stringify({ action: 'get-playground-upload-url', token, postId: newPost.id, ext }),
           });
           if (urlRes.ok) {
-            const { uploadUrl, token: uploadToken, publicUrl } = await urlRes.json();
+            const { uploadUrl, publicUrl } = await urlRes.json();
+            console.log('[Share Upload] uploadUrl:', uploadUrl?.slice(0, 80) + '...', 'publicUrl:', publicUrl);
 
             // 2) Supabase Storage에 바이너리 직접 업로드 (Vercel 4.5MB 제한 우회)
             const directUpload = await fetch(uploadUrl, {
               method: 'PUT',
-              headers: {
-                'Content-Type': 'video/mp4',
-                ...(uploadToken ? { 'x-upsert': 'true' } : {}),
-              },
-              body: result.videoBlob,
+              headers: { 'Content-Type': contentType },
+              body: uploadBlob,
             });
+
+            console.log('[Share Upload] response:', directUpload.status, directUpload.statusText);
+            if (!directUpload.ok) {
+              const errText = await directUpload.text().catch(() => '');
+              console.error('[Share Upload] upload failed:', errText);
+            }
 
             if (directUpload.ok) {
               // 3) DB에 video_url 저장
@@ -276,6 +301,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
                 body: JSON.stringify({ action: 'confirm-playground-video', token, postId: newPost.id, publicUrl }),
               });
               newPost.videoUrl = publicUrl;
+              console.log('[Share Upload] confirmed! videoUrl:', publicUrl);
             }
           }
         }
@@ -303,8 +329,24 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
     }
   }, [shareProjectId, shareCaption]);
 
-  // 상세 보기
+  // 상세 보기 — video_url이 있으면 즉시 열기 (API 호출 불필요)
   const handleOpenDetail = useCallback(async (postId: string) => {
+    // 피드에서 이미 가진 post 데이터로 즉시 열기 시도
+    const feedPost = posts.find(p => p.id === postId);
+    if (feedPost?.videoUrl) {
+      // video_url이 있으면 API 호출 없이 즉시 모달 열기
+      setDetailData({
+        post: feedPost,
+        assets: [],
+        liked: feedPost.liked ?? false,
+        sceneGap: 0.3,
+        equipped: feedPost.equipped,
+      });
+      setDetailLoading(false);
+      return;
+    }
+
+    // video_url이 없으면 기존 방식 (PreviewPlayer 폴백용 에셋 로드)
     setDetailLoading(true);
     setDetailData(null);
     try {
@@ -315,7 +357,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [posts]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -460,14 +502,48 @@ const PostCard: React.FC<{
   onLike: () => void;
   onDelete: () => void;
   onClick: () => void;
-}> = ({ post, isMine, onLike, onDelete, onClick }) => (
+}> = ({ post, isMine, onLike, onDelete, onClick }) => {
+  const [hovering, setHovering] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    if (!post.videoUrl) return;
+    hoverTimer.current = setTimeout(() => setHovering(true), 400);
+  };
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHovering(false);
+  };
+
+  useEffect(() => {
+    if (hovering && videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [hovering]);
+
+  return (
   <div
     className="rounded-xl border overflow-hidden transition-all hover:shadow-lg hover:scale-[1.01] cursor-pointer relative group"
     style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
   >
-    {/* 썸네일 */}
-    <div className="relative" style={{ aspectRatio: '16/9' }} onClick={onClick}>
-      {post.thumbnail ? (
+    {/* 썸네일 + 호버 프리뷰 */}
+    <div className="relative" style={{ aspectRatio: '16/9' }} onClick={onClick}
+      onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
+    >
+      {/* 호버 시 영상 프리뷰 */}
+      {post.videoUrl && hovering ? (
+        <video
+          ref={videoRef}
+          src={post.videoUrl}
+          muted
+          playsInline
+          loop
+          preload="none"
+          className="w-full h-full object-cover"
+        />
+      ) : post.thumbnail ? (
         <img src={`data:image/jpeg;base64,${post.thumbnail}`} alt={post.topic} className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)' }}>
@@ -476,8 +552,8 @@ const PostCard: React.FC<{
           </svg>
         </div>
       )}
-      {/* 재생 아이콘 (영상이 있는 게시물) */}
-      {post.videoUrl && (
+      {/* 재생 아이콘 (호버 중이 아닐 때만) */}
+      {post.videoUrl && !hovering && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
             <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
@@ -551,7 +627,8 @@ const PostCard: React.FC<{
       </button>
     </div>
   </div>
-);
+  );
+};
 
 // ── 아바타 ──
 
@@ -861,9 +938,20 @@ const DetailModal: React.FC<{
                   src={data.post.videoUrl}
                   controls
                   autoPlay
-                  preload="metadata"
+                  playsInline
+                  preload="auto"
+                  poster={data.post.thumbnail ? `data:image/jpeg;base64,${data.post.thumbnail}` : undefined}
                   className="w-full max-h-[60vh]"
                   style={{ display: 'block', margin: '0 auto' }}
+                  onError={(e) => console.error('[Playground Video Error]', (e.target as HTMLVideoElement).error)}
+                  ref={(el) => {
+                    if (!el) return;
+                    el.muted = false;
+                    el.play().catch(() => {
+                      el.muted = true;
+                      el.play().catch(() => {});
+                    });
+                  }}
                 />
               </div>
             ) : playerAssets.length > 0 ? (

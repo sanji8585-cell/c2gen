@@ -48,6 +48,8 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
   const [regTermsAgreed, setRegTermsAgreed] = useState(false);
   const [regMarketingAgreed, setRegMarketingAgreed] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [regReferralCode, setRegReferralCode] = useState('');
+  const [referrerName, setReferrerName] = useState<string | null>(null);
 
   // 관리자
   const [adminPassword, setAdminPassword] = useState('');
@@ -57,6 +59,24 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
 
   // OAuth 설정
   const [oauthConfig, setOauthConfig] = useState<{ googleClientId?: string; kakaoJsKey?: string } | null>(null);
+
+  // URL에서 추천 코드 자동 감지
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      setRegReferralCode(refCode.toUpperCase());
+      setTab('register');
+      // 추천인 이름 조회
+      fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'referral-validateCode', code: refCode }),
+      }).then(r => r.json()).then(d => {
+        if (d.valid) setReferrerName(d.referrerName);
+      }).catch(() => {});
+    }
+  }, []);
 
   // 마운트 시 기존 세션 확인 (모달 모드에서는 스킵)
   useEffect(() => {
@@ -152,7 +172,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
     if (!regTermsAgreed) { setError('이용약관 및 개인정보처리방침에 동의해주세요.'); return; }
     setSubmitting(true);
     try {
-      const { ok, data } = await authFetch({ action: 'register', name: regName, email: regEmail, password: regPassword, termsAgreedAt: new Date().toISOString(), marketingAgreed: regMarketingAgreed });
+      const { ok, data } = await authFetch({ action: 'register', name: regName, email: regEmail, password: regPassword, termsAgreedAt: new Date().toISOString(), marketingAgreed: regMarketingAgreed, referralCode: regReferralCode || undefined });
       if (ok && data.success) {
         setSuccess(data.message);
         setRegName(''); setRegEmail(''); setRegPassword(''); setRegConfirm(''); setRegTermsAgreed(false); setRegMarketingAgreed(false);
@@ -499,6 +519,30 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                   마케팅 및 광고성 정보 수신에 동의합니다.
                 </label>
               </div>
+            </div>
+
+            {/* 추천 코드 */}
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>추천 코드 (선택)</label>
+              <input type="text" value={regReferralCode} onChange={e => {
+                const v = e.target.value.toUpperCase();
+                setRegReferralCode(v);
+                setReferrerName(null);
+                if (v.length >= 4) {
+                  fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'referral-validateCode', code: v }) })
+                    .then(r => r.json()).then(d => { if (d.valid) setReferrerName(d.referrerName); }).catch(() => {});
+                }
+              }}
+                placeholder="추천 코드 입력"
+                className="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none"
+                style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
+              />
+              {referrerName && (
+                <p className="text-[11px] mt-1" style={{ color: '#22c55e' }}>
+                  {referrerName} 님의 추천으로 가입합니다. 가입 승인 시 보너스 크레딧을 받을 수 있어요!
+                </p>
+              )}
             </div>
 
             <button
