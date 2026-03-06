@@ -1966,9 +1966,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (poolItems && poolItems.length > 0) {
             const picked = poolItems[Math.floor(Math.random() * poolItems.length)];
 
-            // 인벤토리에 추가/수량 증가
-            const { data: existing } = await supabase.from('c2gen_user_inventory')
-              .select('id, quantity').eq('email', email).eq('item_id', picked.id).single();
+            // 인벤토리에 추가/수량 증가 (중복 행 대비 .single() 미사용)
+            const { data: existingRows1 } = await supabase.from('c2gen_user_inventory')
+              .select('id, quantity').eq('email', email).eq('item_id', picked.id).order('quantity', { ascending: false }).limit(1);
+            const existing = existingRows1?.[0] ?? null;
 
             let isNew = false;
             if (existing) {
@@ -2265,8 +2266,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const picked = poolItems[Math.floor(Math.random() * poolItems.length)];
 
-        const { data: existing } = await supabase.from('c2gen_user_inventory')
-          .select('id, quantity').eq('email', session.email).eq('item_id', picked.id).single();
+        const { data: existingRows2 } = await supabase.from('c2gen_user_inventory')
+          .select('id, quantity').eq('email', session.email).eq('item_id', picked.id).order('quantity', { ascending: false }).limit(1);
+        const existing = existingRows2?.[0] ?? null;
 
         let isNew = false;
         if (existing) {
@@ -2379,10 +2381,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('token', token).gt('expires_at', new Date().toISOString()).single();
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
-        // item_id (gacha pool text ID) 기준으로 조회 — UUID 기반보다 안정적
-        const { data: inv } = await supabase.from('c2gen_user_inventory')
+        // .single() 미사용 — 중복 행 있어도 최대 수량 기준으로 첫 번째 사용
+        const { data: invRows } = await supabase.from('c2gen_user_inventory')
           .select('id, item_id, quantity, is_active')
-          .eq('email', session.email).eq('item_id', inventoryItemId).single();
+          .eq('email', session.email).eq('item_id', inventoryItemId)
+          .order('quantity', { ascending: false })
+          .limit(1);
+        const inv = invRows?.[0] ?? null;
 
         if (!inv || inv.quantity < 1) return res.status(400).json({ error: '아이템이 없습니다.' });
 
@@ -2551,8 +2556,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { adminToken, email, itemId, quantity = 1 } = params;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
 
-        const { data: existing } = await supabase.from('c2gen_user_inventory')
-          .select('id, quantity').eq('email', email).eq('item_id', itemId).single();
+        const { data: existingRows3 } = await supabase.from('c2gen_user_inventory')
+          .select('id, quantity').eq('email', email).eq('item_id', itemId).order('quantity', { ascending: false }).limit(1);
+        const existing = existingRows3?.[0] ?? null;
 
         if (existing) {
           await supabase.from('c2gen_user_inventory').update({ quantity: existing.quantity + quantity }).eq('id', existing.id);
