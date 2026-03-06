@@ -5,7 +5,19 @@
       "Bash(ls:*)",
       "Bash(npm run dev)",
       "Bash(npm run build:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npx vercel env pull .env.local)",
+      "Bash(npx vercel dev)",
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(npx vercel --prod)",
+      "Bash(npm install)",
+      "Bash(npx cap add android)",
+      "Bash(npx cap sync)",
+      "Bash(npx cap open android)",
+      "Bash(npx vercel env ls)",
+      "Bash(npx vercel ls --limit 3)",
+      "Bash(npx vercel ls)"
     ]
   }
 }
