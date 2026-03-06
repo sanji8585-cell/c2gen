@@ -2381,15 +2381,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('token', token).gt('expires_at', new Date().toISOString()).single();
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
-        // 디버그: 이 유저의 인벤토리 전체를 먼저 조회
-        const { data: allUserInv } = await supabase.from('c2gen_user_inventory')
-          .select('id, item_id, quantity, is_active').eq('email', session.email);
-        console.error('[useConsumable] DEBUG email:', session.email, 'requested itemId:', inventoryItemId, 'all_inv:', JSON.stringify(allUserInv));
+        // inventoryItemId = UUID (c2gen_user_inventory.id)
+        const { data: invRows } = await supabase.from('c2gen_user_inventory')
+          .select('id, item_id, quantity, is_active')
+          .eq('id', inventoryItemId)
+          .eq('email', session.email)
+          .limit(1);
+        const inv = invRows?.[0] ?? null;
 
-        const invRows = (allUserInv || []).filter(r => r.item_id === inventoryItemId);
-        const inv = invRows.sort((a, b) => b.quantity - a.quantity)[0] ?? null;
-
-        if (!inv || inv.quantity < 1) return res.status(400).json({ error: '아이템이 없습니다.', _debug: { email: session.email, sentItemId: inventoryItemId, allItems: (allUserInv || []).map(r => ({ item_id: r.item_id, qty: r.quantity })) } });
+        if (!inv || inv.quantity < 1) {
+          // 디버그: 이 유저의 인벤토리 전체 조회
+          const { data: allUserInv } = await supabase.from('c2gen_user_inventory')
+            .select('id, item_id, quantity').eq('email', session.email);
+          const dbStr = (allUserInv || []).map(r => `${r.id.slice(0,8)}...(item_id=${r.item_id},qty=${r.quantity})`).join(' | ');
+          console.error('[useConsumable] NOT FOUND sentId:', inventoryItemId, 'email:', session.email, 'dbItems:', dbStr);
+          return res.status(400).json({ error: '아이템이 없습니다.', _debug: { sentId: inventoryItemId, dbItems: dbStr } });
+        }
 
         const { data: itemDef } = await supabase.from('c2gen_gacha_pool').select('*').eq('id', inv.item_id).single();
         if (!itemDef) return res.status(404).json({ error: 'item def not found' });

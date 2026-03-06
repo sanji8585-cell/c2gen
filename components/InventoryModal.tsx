@@ -293,7 +293,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
 
         {isConsumable && !isActiveConsumable && (
           <button
-            onClick={() => onUseConsumable(item.itemId)}
+            onClick={() => onUseConsumable(item.inventoryId)}
             className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150"
             style={{
               backgroundColor: 'rgba(34,197,94,0.12)',

@@ -255,8 +255,8 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
   }, [inventory, refreshState]);
 
   // 소모품 사용 (옵티미스틱 업데이트)
-  const useConsumableAction = useCallback(async (itemId: string) => {
-    const result = await apiUseConsumable(itemId);
+  const useConsumableAction = useCallback(async (inventoryItemId: string) => {
+    const result = await apiUseConsumable(inventoryItemId);
     if (result?.success) {
       setInventory(prev => {
         if (!prev) return prev;
@@ -265,7 +265,7 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
           ...prev,
           consumables: prev.consumables
             .map(item => {
-              if (item.itemId !== itemId) return item;
+              if (item.inventoryId !== inventoryItemId) return item;
               const newQty = Math.max(0, item.quantity - 1);
               return {
                 ...item,
@@ -277,9 +277,12 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
             .filter(item => item.quantity > 0 || item.isActive),
         };
       });
+    } else {
+      // 실패 시 서버와 인벤토리 동기화 (stale 상태 제거)
+      await refreshState();
     }
     return result;
-  }, []);
+  }, [refreshState]);
 
   // 프레스티지
   const doPrestigeAction = useCallback(async () => {
