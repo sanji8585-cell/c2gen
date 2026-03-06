@@ -346,6 +346,7 @@ const AppContent: React.FC<{
   const [overlayAchievement, setOverlayAchievement] = useState<{name:string;icon:string;description:string;category:string;rewardXp:number;rewardCredits:number}|null>(null);
   const [overlayGacha, setOverlayGacha] = useState<{item:{name:string;emoji:string;rarity:string;itemType:string};isNew:boolean}|null>(null);
   const [overlayMilestone, setOverlayMilestone] = useState<{emoji:string;title:string;xp:number;credits:number}|null>(null);
+  const [consumablePopup, setConsumablePopup] = useState<{type:'credit_voucher'|'xp_booster';credits?:number;multiplier?:number;until?:string}|null>(null);
   // 모달 상태
   const [showAchievements, setShowAchievements] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
@@ -1942,6 +1943,42 @@ const AppContent: React.FC<{
       )}
 
       {/* 마일스톤/콤보 토스트 */}
+      {consumablePopup && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center pointer-events-none">
+          <div
+            className="flex flex-col items-center gap-3 px-10 py-8 rounded-3xl shadow-2xl"
+            style={{
+              background: consumablePopup.type === 'credit_voucher'
+                ? 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)'
+                : 'linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #6d28d9 100%)',
+              border: consumablePopup.type === 'credit_voucher'
+                ? '2px solid rgba(52,211,153,0.5)'
+                : '2px solid rgba(167,139,250,0.5)',
+              boxShadow: consumablePopup.type === 'credit_voucher'
+                ? '0 0 60px rgba(16,185,129,0.4), 0 20px 60px rgba(0,0,0,0.5)'
+                : '0 0 60px rgba(139,92,246,0.4), 0 20px 60px rgba(0,0,0,0.5)',
+              animation: 'overlay-scale-up 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards',
+            }}
+          >
+            <span style={{ fontSize: '4rem', lineHeight: 1, filter: 'drop-shadow(0 0 16px rgba(255,255,255,0.5))' }}>
+              {consumablePopup.type === 'credit_voucher' ? '💰' : '⚡'}
+            </span>
+            <div className="text-center">
+              <div className="text-white font-black" style={{ fontSize: '1.5rem', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+                {consumablePopup.type === 'credit_voucher'
+                  ? `+${consumablePopup.credits} 크레딧 획득!`
+                  : `XP 부스터 활성화!`}
+              </div>
+              <div className="mt-1" style={{ color: consumablePopup.type === 'credit_voucher' ? '#6ee7b7' : '#c4b5fd', fontSize: '1rem', fontWeight: 600 }}>
+                {consumablePopup.type === 'credit_voucher'
+                  ? '크레딧이 지급됐습니다'
+                  : `x${consumablePopup.multiplier} XP · ${consumablePopup.until ? new Date(consumablePopup.until).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}까지`}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toastMessage && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] animate-toast-in">
           <div className="px-6 py-3 rounded-2xl shadow-2xl border text-sm font-bold animate-bounce-in" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}>
@@ -2000,11 +2037,11 @@ const AppContent: React.FC<{
             if (result?.success) {
               if (result.effect?.type === 'credit_voucher') {
                 await fetchCredits();
-                setToastMessage(`+${result.effect.credits} 크레딧이 지급됐습니다!`);
-                setTimeout(() => setToastMessage(null), 3000);
+                setConsumablePopup({ type: 'credit_voucher', credits: result.effect.credits });
+                setTimeout(() => setConsumablePopup(null), 3500);
               } else if (result.effect?.type === 'xp_booster') {
-                setToastMessage(`XP 부스터 활성화! x${result.effect.multiplier} (${new Date(result.effect.until).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}까지)`);
-                setTimeout(() => setToastMessage(null), 4000);
+                setConsumablePopup({ type: 'xp_booster', multiplier: result.effect.multiplier, until: result.effect.until });
+                setTimeout(() => setConsumablePopup(null), 4000);
               }
             }
           }}
