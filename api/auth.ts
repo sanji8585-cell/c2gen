@@ -2381,21 +2381,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('token', token).gt('expires_at', new Date().toISOString()).single();
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
-        // inventoryItemId = UUID (c2gen_user_inventory.id)
-        const { data: invRows } = await supabase.from('c2gen_user_inventory')
-          .select('id, item_id, quantity, is_active')
-          .eq('id', inventoryItemId)
-          .eq('email', session.email)
-          .limit(1);
-        const inv = invRows?.[0] ?? null;
+        // email로 전체 인벤토리 조회 후 메모리에서 매칭 (UUID id 또는 item_id 둘 다 시도)
+        const { data: allUserInv } = await supabase.from('c2gen_user_inventory')
+          .select('id, item_id, quantity, is_active').eq('email', session.email);
+        const inv = (allUserInv || []).find((r: any) => r.id === inventoryItemId || r.item_id === inventoryItemId) ?? null;
 
         if (!inv || inv.quantity < 1) {
-          // 디버그: 이 유저의 인벤토리 전체 조회
-          const { data: allUserInv } = await supabase.from('c2gen_user_inventory')
-            .select('id, item_id, quantity').eq('email', session.email);
-          const dbStr = (allUserInv || []).map(r => `${r.id.slice(0,8)}...(item_id=${r.item_id},qty=${r.quantity})`).join(' | ');
-          console.error('[useConsumable] NOT FOUND sentId:', inventoryItemId, 'email:', session.email, 'dbItems:', dbStr);
-          return res.status(400).json({ error: '아이템이 없습니다.', _debug: { sentId: inventoryItemId, dbItems: dbStr } });
+          const dbStr = (allUserInv || []).map((r: any) => `id:${r.id} item_id:${r.item_id} qty:${r.quantity}`).join(' || ');
+          console.error('[useConsumable] NOT FOUND sentId:', inventoryItemId, 'email:', session.email, 'db:', dbStr);
+          return res.status(400).json({ error: '아이템이 없습니다.', _debug: `sent="${inventoryItemId}" || db=[${dbStr}]` });
         }
 
         const { data: itemDef } = await supabase.from('c2gen_gacha_pool').select('*').eq('id', inv.item_id).single();

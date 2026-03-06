@@ -163,7 +163,8 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
   const renderItemCard = (item: InventoryItem) => {
     const isEquipped = item.isEquipped;
     const isConsumable = activeTab === 'consumables';
-    const isActiveConsumable = isConsumable && item.isActive;
+    const isExpired = item.activeUntil ? new Date(item.activeUntil) <= new Date() : false;
+    const isActiveConsumable = isConsumable && item.isActive && !isExpired;
 
     return (
       <div
@@ -291,7 +292,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
           </button>
         )}
 
-        {isConsumable && !isActiveConsumable && (
+        {isConsumable && !item.isActive && item.quantity > 0 && (
           <button
             onClick={() => onUseConsumable(item.inventoryId)}
             className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150"
