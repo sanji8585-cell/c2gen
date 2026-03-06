@@ -2027,9 +2027,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await supabase.from('c2gen_users').update(updates).eq('email', email);
 
-        // 8) 업적 진행률 업데이트
+        // 8) 업적 진행률 업데이트 (배치 처리 — N번 쿼리 → 2번으로 최적화)
         const achievementsUnlocked: any[] = [];
-        const { data: achDefs } = await supabase.from('c2gen_achievements').select('*').eq('is_active', true);
+        const [{ data: achDefs }, { data: achProgress }] = await Promise.all([
+          supabase.from('c2gen_achievements').select('*').eq('is_active', true),
+          supabase.from('c2gen_user_achievements').select('achievement_id, progress, unlocked').eq('email', email),
+        ]);
+
+        // 기존 진행률 맵
+        const achProgressMap: Record<string, any> = {};
+        for (const ap of (achProgress || [])) achProgressMap[ap.achievement_id] = ap;
+
+        const nowISO2 = new Date().toISOString();
+        const upsertRows: any[] = [];
+        let bonusCredits = 0;
+        let bonusTickets = 0;
 
         for (const ach of (achDefs || [])) {
           let currentValue = 0;
@@ -2048,23 +2060,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             default: continue;
           }
 
-          // upsert 진행률
-          const { data: prev } = await supabase.from('c2gen_user_achievements')
-            .select('id, progress, unlocked').eq('email', email).eq('achievement_id', ach.id).single();
-
+          const prev = achProgressMap[ach.id];
           if (prev?.unlocked) continue;
 
           const newProgress = Math.min(currentValue, ach.condition_target);
-          const justUnlocked = newProgress >= ach.condition_target;
+          if (prev && newProgress <= (prev.progress || 0)) continue; // 진행 없으면 스킵
 
-          const { error: upsertErr } = await supabase.from('c2gen_user_achievements').upsert({
+          const justUnlocked = newProgress >= ach.condition_target;
+          upsertRows.push({
             email, achievement_id: ach.id,
             progress: newProgress,
             unlocked: justUnlocked,
-            unlocked_at: justUnlocked ? new Date().toISOString() : null,
+            unlocked_at: justUnlocked ? nowISO2 : null,
             notified: false,
-          }, { onConflict: 'email,achievement_id' });
-          if (upsertErr) console.error('[ach] upsert error', ach.id, upsertErr.message);
+          });
 
           if (justUnlocked) {
             achievementsUnlocked.push({
@@ -2072,18 +2081,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               category: ach.category, rewardXp: ach.reward_xp, rewardCredits: ach.reward_credits,
               progress: newProgress,
             });
-            // 업적 보상 지급
-            if (ach.reward_credits > 0) {
-              await supabase.from('c2gen_users').update({
-                credits: (usr.credits || 0) + rewardCredits + ach.reward_credits,
-              }).eq('email', email);
-            }
-            if (ach.reward_gacha_tickets > 0) {
-              await supabase.from('c2gen_users').update({
-                gacha_tickets: newGachaTickets + ach.reward_gacha_tickets,
-              }).eq('email', email);
-            }
+            bonusCredits += ach.reward_credits || 0;
+            bonusTickets += ach.reward_gacha_tickets || 0;
           }
+        }
+
+        // 변경된 업적만 한 번에 upsert
+        if (upsertRows.length > 0) {
+          const { error: upsertErr } = await supabase.from('c2gen_user_achievements')
+            .upsert(upsertRows, { onConflict: 'email,achievement_id' });
+          if (upsertErr) console.error('[ach] batch upsert error:', upsertErr.message);
+        }
+        // 보상 지급 (한 번에)
+        if (bonusCredits > 0 || bonusTickets > 0) {
+          await supabase.from('c2gen_users').update({
+            ...(bonusCredits > 0 ? { credits: (usr.credits || 0) + rewardCredits + bonusCredits } : {}),
+            ...(bonusTickets > 0 ? { gacha_tickets: newGachaTickets + bonusTickets } : {}),
+          }).eq('email', email);
         }
 
         // 9) 퀘스트 진행률 업데이트
