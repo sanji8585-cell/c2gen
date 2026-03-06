@@ -152,12 +152,12 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
       });
     }
 
-    // 퀘스트 진행 업데이트
-    if (result.questProgress?.length > 0) {
+    // 퀘스트 진행 업데이트 (questProgress가 있으면 항상 적용)
+    if (result.questProgress && result.questProgress.length > 0) {
       setQuests(prev => prev.map(q => {
         const update = result.questProgress.find((p: any) => p.questId === q.questId);
         if (update) {
-          if (update.justCompleted) playSFX('questComplete');
+          if (update.justCompleted && !q.completed) playSFX('questComplete');
           return { ...q, progress: update.progress, completed: update.justCompleted || q.completed };
         }
         return q;

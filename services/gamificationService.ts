@@ -38,9 +38,7 @@ async function gameApiFetch(body: Record<string, any>): Promise<any> {
   }
   const data = await res.json();
   if (data?.error) {
-    console.error(`[game] API returned error for action=${body.action}:`, data.error);
-  } else {
-    console.log(`[game] API ok for action=${body.action}`, data);
+    console.error(`[game] API error for action=${body.action}:`, data.error);
   }
   return data;
 }
@@ -160,12 +158,10 @@ export async function syncGameState(): Promise<GameSyncResponse | null> {
     const data = await gameApiFetch({ action: 'game-syncState', token });
     if (data?.error) { console.error('[game] syncGameState failed:', data.error); return null; }
     if (data.config) {
-      // 설정 캐시 업데이트
       cachedConfig = data.config;
       configLoadedAt = Date.now();
       localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({ config: cachedConfig, timestamp: configLoadedAt }));
     }
-    console.log('[game] syncGameState ok, user:', data.user);
     return data;
   } catch (e) {
     console.error('[game] syncGameState exception:', e);
@@ -192,7 +188,6 @@ export async function recordGameAction(
       metadata,
     });
     if (data?.error) return null;
-    console.log('[game] recordAction result:', { actionType, xpGained: data?.xpGained, achievementsUnlocked: data?.achievementsUnlocked });
     return data;
   } catch (e) {
     console.error('[game] recordAction exception:', e);

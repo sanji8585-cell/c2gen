@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { LevelInfo, EquippedItems } from '../types/gamification';
 import { getSoundEnabled, setSoundEnabled } from '../services/soundService';
 
@@ -66,9 +66,6 @@ interface HeaderProps {
   onToggleTheme: () => void;
   streak?: number;
   totalGenerations?: number;
-  level?: number;
-  title?: string;
-  xpPercent?: number;
   sessionCombo?: number;
   // 게이미피케이션 v2
   levelInfo?: LevelInfo | null;
@@ -76,11 +73,14 @@ interface HeaderProps {
   onLogoAchievement?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, totalGenerations = 0, level = 1, title = '', xpPercent = 0, sessionCombo = 0, levelInfo, equipped, onLogoAchievement }) => {
+const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, totalGenerations = 0, sessionCombo = 0, levelInfo, equipped, onLogoAchievement }) => {
   // 이스터에그: 로고 5회 빠른 클릭 → 무지개 회전
   const [easterEgg, setEasterEgg] = useState(false);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // stale closure 방지: 항상 최신 prop을 ref로 참조
+  const onLogoAchievementRef = useRef(onLogoAchievement);
+  useEffect(() => { onLogoAchievementRef.current = onLogoAchievement; });
 
   const handleLogoClick = useCallback(() => {
     clickCountRef.current += 1;
@@ -89,7 +89,7 @@ const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, tota
       clickCountRef.current = 0;
       setEasterEgg(true);
       setTimeout(() => setEasterEgg(false), 2000);
-      onLogoAchievement?.();
+      onLogoAchievementRef.current?.();
     } else {
       clickTimerRef.current = setTimeout(() => { clickCountRef.current = 0; }, 1200);
     }
@@ -125,13 +125,13 @@ const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, tota
               ⚡ {totalGenerations}개 생성
             </span>
           )}
-          {/* 레벨 뱃지 — v2 설정 기반 or 레거시 */}
-          {(levelInfo || level >= 1) && (() => {
-            const lv = levelInfo?.level ?? level;
-            const lTitle = equipped?.title?.name || levelInfo?.title || title || '';
-            const lEmoji = levelInfo?.emoji || '';
-            const lColor = levelInfo?.color || '#06b6d4';
-            const lProgress = levelInfo?.progress ?? xpPercent;
+          {/* 레벨 뱃지 — 서버 동기화 시에만 표시 */}
+          {levelInfo && (() => {
+            const lv = levelInfo.level;
+            const lTitle = equipped?.title?.name || levelInfo.title || '';
+            const lEmoji = levelInfo.emoji || '';
+            const lColor = levelInfo.color || '#06b6d4';
+            const lProgress = levelInfo.progress;
             return (
               <div className="ml-1 flex items-center gap-1.5">
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: `${lColor}20`, color: lColor, border: `1px solid ${lColor}50` }}>

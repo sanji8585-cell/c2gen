@@ -2146,6 +2146,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 questId: uq.quest_id, progress: newQProgress,
                 target: def.target, justCompleted,
               });
+            } else {
+              // 변화 없어도 포함 → 클라이언트 상태가 DB와 항상 일치
+              questProgress.push({
+                questId: uq.quest_id, progress: uq.progress,
+                target: def.target, justCompleted: false,
+              });
             }
           }
         }

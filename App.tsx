@@ -43,13 +43,10 @@ const AI_PERSONALITY={
   ERROR:["앗, 잠깐 쉬고 올게요! 다시 도전해볼까요? 😊","AI도 가끔 쉬어야 해요... 잠시만요! 💤","창작의 길에 작은 돌부리... 다시 가봐요! 💪","에러도 성장의 일부! 다시 시도해볼게요 🌱","잠깐의 방해일 뿐, 포기하지 않아요! 🔥","우주적 간섭이 있었나봐요... 다시! 🌌"],
   COMPLETED:["와! 이건 제가 봐도 걸작이에요! 🎬","역시 프로! 이 퀄리티 보세요! ⭐","당신의 창의력 + AI의 기술 = 완벽! 🤝","이 작품, 바이럴 갈 것 같은 느낌... 🚀","AI도 감탄했어요! 대단해요! 👏","마스터피스 완성! 박수! 🎉","이거 포트폴리오에 넣어야 해요! 💼","완벽한 한 편이 탄생했어요! 🌟"],
 };
-const MILESTONES=[{count:1,emoji:'🎉',title:'첫 작품 탄생!'},{count:5,emoji:'🚀',title:'크리에이터의 길로!'},{count:10,emoji:'🏆',title:'프로 크리에이터 등극!'},{count:25,emoji:'👑',title:'마스터 크리에이터!'},{count:50,emoji:'🌟',title:'레전드!'},{count:100,emoji:'💎',title:'다이아몬드 크리에이터!'}];
 function launchConfetti(customColors?:string[]){const c=customColors||['#f43f5e','#8b5cf6','#3b82f6','#10b981','#f59e0b','#ec4899'];for(let i=0;i<40;i++){const e=document.createElement('div');e.className='confetti-piece';e.style.left=Math.random()*100+'vw';e.style.backgroundColor=c[Math.floor(Math.random()*c.length)];e.style.animationDelay=Math.random()*1+'s';e.style.animationDuration=(2+Math.random()*1.5)+'s';e.style.width=(6+Math.random()*8)+'px';e.style.height=(6+Math.random()*8)+'px';document.body.appendChild(e);setTimeout(()=>e.remove(),4000);}}
 function getStorytellingPhase(current:number,total:number):{text:string;icon:string}{const r=total>0?current/total:0;if(r===0)return{text:"AI가 캔버스를 펼쳤어요",icon:"✏️"};if(r<0.3)return{text:"색을 고르고 있어요",icon:"🎨"};if(r<0.6)return{text:"세밀한 디테일 작업 중...",icon:"🔍"};if(r<0.9)return{text:"거의 다 됐어요!",icon:"🖌️"};return{text:"마무리 터치!",icon:"✨"};}
 function getTimeGreeting(streak:number):string{const h=new Date().getHours();let g='';if(h<6)g='새벽의 크리에이터시군요! 🌙';else if(h<12)g='좋은 아침이에요! 오늘도 멋진 작품 만들어볼까요? ☀️';else if(h<18)g='오후의 창작 시간! 영감이 넘치는 시간이에요 🌤️';else g='밤의 창작이 가장 깊어요... 🌜';if(streak>=3)g+=` (${streak}일 연속 접속 중! 대단해요!)`;return g;}
 const PRO_TIPS=[{id:1,text:'참조 이미지를 사용하면 캐릭터의 일관성을 유지할 수 있어요! 📎'},{id:2,text:'화풍을 바꿔보세요 - 크레용, 수채화, 인포그래픽 등 다양한 스타일이 있어요 🎨'},{id:3,text:'대본을 직접 입력하면 더 정확한 영상을 만들 수 있어요 ✍️'},{id:4,text:'Ken Burns 효과로 정적 이미지에 생동감을 더해보세요 🎬'},{id:5,text:'BGM 자동 선택 기능이 분위기에 맞는 음악을 골라줘요 🎵'},{id:6,text:'씬 순서를 드래그로 바꿀 수 있어요! ↕️'},{id:7,text:'이미지가 마음에 안 들면 씬별로 재생성할 수 있어요 🔄'},{id:8,text:'다국어 지원! 한국어, 영어, 일본어로 나레이션을 만들어보세요 🌏'},{id:9,text:'자막 위치와 스타일을 커스텀할 수 있어요 💬'},{id:10,text:'프로젝트는 클라우드에 자동 저장돼요. 언제든 불러오세요! ☁️'}];
-function getGenerationStats(){return{total:parseInt(localStorage.getItem('tubegen_total_generations')||'0',10),lastDate:localStorage.getItem('tubegen_streak_last_date')||'',streak:parseInt(localStorage.getItem('tubegen_streak_count')||'0',10)};}
-function updateGenerationStats():{total:number;streak:number;newMilestone:typeof MILESTONES[0]|null}{const s=getGenerationStats();const today=new Date().toISOString().slice(0,10);const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);const t=s.total+1;let st=1;if(s.lastDate===today)st=s.streak;else if(s.lastDate===yesterday)st=s.streak+1;localStorage.setItem('tubegen_total_generations',String(t));localStorage.setItem('tubegen_streak_last_date',today);localStorage.setItem('tubegen_streak_count',String(st));const a=JSON.parse(localStorage.getItem('tubegen_milestones')||'[]')as number[];const m=MILESTONES.find(x=>x.count===t&&!a.includes(x.count));if(m){a.push(m.count);localStorage.setItem('tubegen_milestones',JSON.stringify(a));}return{total:t,streak:st,newMilestone:m||null};}
 
 // 에러 캐치용 ErrorBoundary
 class GalleryErrorBoundary extends React.Component<
@@ -333,7 +330,6 @@ const AppContent: React.FC<{
   const game = useGameState(isAuthenticated);
 
   // Fun & Gamification 상태
-  const [genStats, setGenStats] = useState(getGenerationStats);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [funTip, setFunTip] = useState('');
   const [completionCompliment, setCompletionCompliment] = useState<string | null>(null);
@@ -342,15 +338,9 @@ const AppContent: React.FC<{
   const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
   const [showIdleParticles, setShowIdleParticles] = useState(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // XP/Level (레거시 — useGameState로 점진적 대체)
-  const [funXp, setFunXp] = useState(() => parseInt(localStorage.getItem('tubegen_fun_xp') || '0', 10));
-  const [funLevel, setFunLevel] = useState(() => parseInt(localStorage.getItem('tubegen_fun_level') || '1', 10));
   // Tip of the Day
   const [showTipOfDay, setShowTipOfDay] = useState(false);
   const [tipOfDay, setTipOfDay] = useState<typeof PRO_TIPS[0] | null>(null);
-  // Gacha (레거시)
-  const [gachaReward, setGachaReward] = useState<{emoji:string;title:string;rarity:string}|null>(null);
-  const [showGachaAnimation, setShowGachaAnimation] = useState(false);
   // Game Overlay (v2)
   const [overlayLevelUp, setOverlayLevelUp] = useState<{level:number;title:string;emoji:string;color:string;reward?:{credits:number;gacha_tickets:number}}|null>(null);
   const [overlayAchievement, setOverlayAchievement] = useState<{name:string;icon:string;description:string;category:string;rewardXp:number;rewardCredits:number}|null>(null);
@@ -449,20 +439,6 @@ const AppContent: React.FC<{
     }
   }, [isAuthenticated, fetchCredits]);
 
-  // 게이미피케이션 v2 → 레거시 상태 동기화
-  useEffect(() => {
-    if (game.synced && game.userState) {
-      setFunXp(game.userState.xp);
-      setFunLevel(game.levelInfo.level);
-      setGenStats({
-        total: game.userState.totalGenerations,
-        streak: game.userState.streakCount,
-        lastDate: game.userState.streakLastDate || '',
-      });
-      localStorage.setItem('tubegen_fun_xp', String(game.userState.xp));
-      localStorage.setItem('tubegen_fun_level', String(game.levelInfo.level));
-    }
-  }, [game.synced, game.userState?.xp, game.levelInfo.level]);
 
   // Fun tip 인터벌 (생성 중일 때만, AI 인격 시스템)
   useEffect(() => {
@@ -535,7 +511,6 @@ const AppContent: React.FC<{
         konamiRef.current = [];
         // 업적 트리거 (ref로 최신 값 참조 — stale closure 방지)
         const { isAuthenticated: auth, synced, recordAction, setOverlayAchievement: setOverlay } = gameRef.current;
-        console.log('[konami] fired! auth:', auth, 'synced:', synced);
         if (auth && synced) {
           recordAction('special_konami', 1).then(result => {
             if (result?.achievementsUnlocked?.length > 0) {
@@ -1001,12 +976,7 @@ const AppContent: React.FC<{
         return nc;
       });
 
-      // 마일스톤 + 통계 (레거시 localStorage 기반 — 비로그인 폴백)
-      const statsResult = updateGenerationStats();
-      setGenStats(getGenerationStats());
-      if (statsResult.newMilestone) { setTimeout(() => { setToastMessage(`${statsResult.newMilestone!.emoji} ${statsResult.newMilestone!.title}`); setTimeout(() => setToastMessage(null), 4000); }, 3500); }
-
-      // 서버 기반 게이미피케이션 (v2) — 로그인 시 서버가 XP/업적/퀘스트/뽑기 모두 처리
+      // 서버 기반 게이미피케이션 — 로그인 시 서버가 XP/업적/퀘스트/뽑기 모두 처리
       const imgCount = assetsRef.current.filter(a => a.imageData).length;
       const audioCount = assetsRef.current.filter(a => a.audioData).length;
       const videoCount = assetsRef.current.filter(a => a.videoData).length;
@@ -1017,14 +987,8 @@ const AppContent: React.FC<{
           imageCount: imgCount, audioCount, videoCount,
           sessionCombo: sessionCombo + 1,
         });
-        console.log('[App] recordAction result:', result, 'synced:', game.synced, 'isAuthenticated:', isAuthenticated);
         if (result) {
-          // 레벨 정보 동기화
-          setFunXp(result.totalXp);
           const newLvl = result.newLevel ?? result.oldLevel;
-          setFunLevel(newLvl);
-          localStorage.setItem('tubegen_fun_xp', String(result.totalXp));
-          localStorage.setItem('tubegen_fun_level', String(newLvl));
 
           // 레벨업 오버레이
           if (result.newLevel && result.newLevel > result.oldLevel) {
@@ -1067,39 +1031,6 @@ const AppContent: React.FC<{
               setOverlayMilestone(result.milestoneReached!);
             }, 4500);
           }
-        }
-      } else {
-        // 비로그인 폴백: 레거시 localStorage XP
-        const xpGain = 10 + imgCount * 5 + audioCount * 3;
-        const currentXp = parseInt(localStorage.getItem('tubegen_fun_xp') || '0', 10);
-        const newXp = currentXp + xpGain;
-        const THRESHOLDS = [0,50,120,200,350,500,750,1000,1500,2500];
-        const TITLES = ['초보 크리에이터','아이디어 탐험가','스토리 위버','아이디어 뱅크','비주얼 아키텍트','영감의 마법사','AI 파트너','마스터 크리에이터','레전드 프로듀서','다이아몬드 아티스트'];
-        let newLv = 1;
-        for (let i = THRESHOLDS.length - 1; i >= 0; i--) { if (newXp >= THRESHOLDS[i]) { newLv = i + 1; break; } }
-        localStorage.setItem('tubegen_fun_xp', String(newXp));
-        localStorage.setItem('tubegen_fun_level', String(newLv));
-        setFunXp(newXp);
-        setFunLevel(prevLv => {
-          if (newLv > prevLv) {
-            setTimeout(() => { launchConfetti(); setTimeout(() => launchConfetti(), 400); setToastMessage(`🎉 레벨 업! Lv.${newLv} ${TITLES[newLv-1]}`); setTimeout(() => setToastMessage(null), 5000); }, 4000);
-          }
-          return newLv;
-        });
-        // 비로그인 뽑기 (5회마다)
-        const gachaCount = parseInt(localStorage.getItem('tubegen_fun_gacha') || '0', 10) + 1;
-        localStorage.setItem('tubegen_fun_gacha', String(gachaCount));
-        if (gachaCount % 5 === 0) {
-          const GACHA = [
-            {emoji:'📖',title:'이야기꾼',rarity:'common'},{emoji:'🎮',title:'픽셀 아티스트',rarity:'common'},{emoji:'🦉',title:'밤의 크리에이터',rarity:'common'},{emoji:'⚡',title:'스피드 러너',rarity:'common'},
-            {emoji:'🌈',title:'색채의 마법사',rarity:'rare'},{emoji:'🔮',title:'비전 아키텍트',rarity:'rare'},{emoji:'✋',title:'황금손',rarity:'rare'},
-            {emoji:'🤖',title:'AI 위스퍼러',rarity:'epic'},{emoji:'🌌',title:'차원 창조자',rarity:'epic'},{emoji:'👑',title:'전설의 크리에이터',rarity:'epic'},
-          ];
-          const roll = Math.random();
-          const rarity = roll < 0.6 ? 'common' : roll < 0.9 ? 'rare' : 'epic';
-          const pool = GACHA.filter(r => r.rarity === rarity);
-          const reward = pool[Math.floor(Math.random() * pool.length)];
-          setTimeout(() => { setGachaReward(reward); setShowGachaAnimation(true); }, 5000);
         }
       }
 
@@ -1551,7 +1482,7 @@ const AppContent: React.FC<{
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={game.synced ? game.userState?.streakCount ?? genStats.streak : genStats.streak} totalGenerations={game.synced ? game.userState?.totalGenerations ?? genStats.total : genStats.total} level={game.synced ? game.levelInfo.level : funLevel} title={game.synced ? '' : (['','초보 크리에이터','아이디어 탐험가','스토리 위버','아이디어 뱅크','비주얼 아키텍트','영감의 마법사','AI 파트너','마스터 크리에이터','레전드 프로듀서','다이아몬드 아티스트'])[funLevel]||''} xpPercent={game.synced ? game.levelInfo.progress : (() => { const T=[0,50,120,200,350,500,750,1000,1500,2500]; const cur=T[funLevel-1]||0; const nxt=T[funLevel]||T[T.length-1]; return nxt>cur?Math.min(100,((funXp-cur)/(nxt-cur))*100):100; })()} sessionCombo={sessionCombo} levelInfo={game.synced ? game.levelInfo : null} equipped={game.synced ? game.equipped : null} onLogoAchievement={() => {
+      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={game.synced ? game.userState?.streakCount ?? 0 : 0} totalGenerations={game.synced ? game.userState?.totalGenerations ?? 0 : 0} sessionCombo={sessionCombo} levelInfo={game.synced ? game.levelInfo : null} equipped={game.synced ? game.equipped : null} onLogoAchievement={() => {
         if (isAuthenticated && game.synced) {
           game.recordAction('special_logo_click', 1).then(result => {
             if (result?.achievementsUnlocked?.length > 0) {
@@ -1768,7 +1699,7 @@ const AppContent: React.FC<{
 
         {step === GenerationStep.IDLE && generatedData.length === 0 && (
           <div className="max-w-7xl mx-auto px-4 text-center py-4">
-            <p className="text-sm animate-fade-sub" style={{ color: 'var(--text-muted)' }}>{getTimeGreeting(genStats.streak)}</p>
+            <p className="text-sm animate-fade-sub" style={{ color: 'var(--text-muted)' }}>{getTimeGreeting(game.synced ? game.userState?.streakCount ?? 0 : 0)}</p>
           </div>
         )}
 
@@ -2000,20 +1931,6 @@ const AppContent: React.FC<{
         </div>
       )}
 
-      {/* 뽑기(가챠) 모달 */}
-      {showGachaAnimation && gachaReward && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowGachaAnimation(false)}>
-          <div className="rounded-2xl border p-8 text-center animate-bounce-in max-w-xs" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }} onClick={e => e.stopPropagation()}>
-            <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: gachaReward.rarity === 'epic' ? '#f59e0b' : gachaReward.rarity === 'rare' ? '#8b5cf6' : 'var(--text-muted)' }}>
-              {gachaReward.rarity === 'epic' ? '★ EPIC ★' : gachaReward.rarity === 'rare' ? '★ RARE' : 'COMMON'}
-            </p>
-            <div className="text-6xl mb-3 animate-slot-reveal">{gachaReward.emoji}</div>
-            <h3 className="text-lg font-black mb-1" style={{ color: 'var(--text-primary)' }}>"{gachaReward.title}"</h3>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>새로운 칭호를 획득했어요!</p>
-            <button onClick={() => setShowGachaAnimation(false)} className="px-5 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-600 to-blue-600 text-white">확인</button>
-          </div>
-        </div>
-      )}
 
       {/* 유휴 파티클 */}
       {showIdleParticles && (
