@@ -134,6 +134,24 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
     if (result.gachaResult) playSFX(getGachaSoundType(result.gachaResult.item.rarity));
     if ((metadata?.sessionCombo || 0) >= 3) playSFX('combo');
 
+    // 업적 로컬 상태 즉시 업데이트
+    if (result.achievementsUnlocked?.length > 0) {
+      setAchievements(prev => {
+        if (!prev) return prev;
+        const updatedProgress = { ...prev.progress };
+        for (const a of result.achievementsUnlocked) {
+          updatedProgress[a.id] = {
+            achievementId: a.id,
+            progress: a.progress,
+            unlocked: true,
+            unlockedAt: new Date().toISOString(),
+            notified: true,
+          };
+        }
+        return { ...prev, progress: updatedProgress };
+      });
+    }
+
     // 퀘스트 진행 업데이트
     if (result.questProgress?.length > 0) {
       setQuests(prev => prev.map(q => {

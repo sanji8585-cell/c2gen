@@ -2057,22 +2057,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const newProgress = Math.min(currentValue, ach.condition_target);
           const justUnlocked = newProgress >= ach.condition_target;
 
-          if (prev) {
-            await supabase.from('c2gen_user_achievements').update({
-              progress: newProgress,
-              unlocked: justUnlocked,
-              unlocked_at: justUnlocked ? new Date().toISOString() : null,
-              notified: false,
-            }).eq('id', prev.id);
-          } else {
-            await supabase.from('c2gen_user_achievements').insert({
-              email, achievement_id: ach.id,
-              progress: newProgress,
-              unlocked: justUnlocked,
-              unlocked_at: justUnlocked ? new Date().toISOString() : null,
-              notified: false,
-            });
-          }
+          const { error: upsertErr } = await supabase.from('c2gen_user_achievements').upsert({
+            email, achievement_id: ach.id,
+            progress: newProgress,
+            unlocked: justUnlocked,
+            unlocked_at: justUnlocked ? new Date().toISOString() : null,
+            notified: false,
+          }, { onConflict: 'email,achievement_id' });
+          if (upsertErr) console.error('[ach] upsert error', ach.id, upsertErr.message);
 
           if (justUnlocked) {
             achievementsUnlocked.push({
