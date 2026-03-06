@@ -1815,9 +1815,63 @@ const AppContent: React.FC<{
               <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
                 스크립트 검토
               </h3>
-              <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
                 아래 {generatedData.length}개 씬의 나레이션(대사) / 이미지 프롬프트를 확인 후 생성시작을 눌러주세요.
               </p>
+              {/* 예상 비용 카드 */}
+              {(() => {
+                const sc = generatedData.length;
+                const imgModel = getSelectedImageModel();
+                const imgPer = imgModel === 'gpt-image-1' ? 7 : 5;
+                const totalChars = generatedData.reduce((s, d) => s + (d.narration?.length || 0), 0);
+                const ttsPer = Math.max(5, Math.ceil((totalChars / sc) / 1000) * 5);
+                const imgTotal = sc * imgPer;
+                const ttsTotal = sc * ttsPer;
+                const est = imgTotal + ttsTotal;
+                const LOW = [
+                  '편의점 삼각김밥보다 싸다니... AI 만세!',
+                  '이 가격에 영상 콘텐츠를? 거의 공짜네!',
+                  '자판기 커피보다 저렴한 프로 영상 제작',
+                  '이거 실화? 택시 기본요금보다 싸잖아!',
+                ];
+                const MID = [
+                  '커피 한잔 4천원인데, 이 가격이면 혜자인데...',
+                  '치킨 반 마리 가격으로 영상 한 편 뚝딱!',
+                  '점심값보다 싼 AI 영상 제작, 나쁘지 않은 딜!',
+                  '영화 한편 볼 돈으로 영상을 만든다니!',
+                ];
+                const HIGH = [
+                  '대작은 좀 투자가 필요한 법이지!',
+                  '할리우드 대비 99.9% 할인된 제작비!',
+                  '이 정도 퀄리티에 이 가격이면 감사해야지~',
+                  '프로 영상 제작사에 맡기면 100배는 나갈걸?',
+                ];
+                const pool = est <= 120 ? LOW : est <= 500 ? MID : HIGH;
+                const quote = pool[Math.floor(Math.random() * pool.length)];
+                return (
+                  <div className="mx-auto max-w-sm mb-5 rounded-xl p-4 border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 60%, transparent)', borderColor: 'var(--border-subtle)' }}>
+                    <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>예상 비용</div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                        <span>🖼️ 이미지 {sc}장 ({imgModel === 'gpt-image-1' ? 'GPT' : 'Gemini'})</span>
+                        <span className="font-bold">{imgTotal} 크레딧</span>
+                      </div>
+                      <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                        <span>🔊 TTS {sc}건 (~{Math.round(totalChars / sc)}자/씬)</span>
+                        <span className="font-bold">{ttsTotal} 크레딧</span>
+                      </div>
+                      <div className="border-t my-1.5" style={{ borderColor: 'var(--border-subtle)' }} />
+                      <div className="flex justify-between text-sm font-black" style={{ color: '#f59e0b' }}>
+                        <span>💰 예상 합계</span>
+                        <span>{est} 크레딧</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] mt-3 italic text-center" style={{ color: 'var(--text-muted)' }}>
+                      💬 "{quote}"
+                    </p>
+                  </div>
+                );
+              })()}
               <div className="flex justify-center gap-3">
                 <button
                   onClick={handleRegenerateScript}
