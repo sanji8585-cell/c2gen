@@ -38,7 +38,7 @@ async function gameApiFetch(body: Record<string, any>): Promise<any> {
   }
   const data = await res.json();
   if (data?.error) {
-    console.error(`[game] API error for action=${body.action}:`, data.error);
+    console.error(`[game] API error for action=${body.action}:`, data);
   }
   return data;
 }

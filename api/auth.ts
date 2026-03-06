@@ -2381,15 +2381,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('token', token).gt('expires_at', new Date().toISOString()).single();
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
-        // .single() 미사용 — 중복 행 있어도 최대 수량 기준으로 첫 번째 사용
-        const { data: invRows } = await supabase.from('c2gen_user_inventory')
-          .select('id, item_id, quantity, is_active')
-          .eq('email', session.email).eq('item_id', inventoryItemId)
-          .order('quantity', { ascending: false })
-          .limit(1);
-        const inv = invRows?.[0] ?? null;
+        // 디버그: 이 유저의 인벤토리 전체를 먼저 조회
+        const { data: allUserInv } = await supabase.from('c2gen_user_inventory')
+          .select('id, item_id, quantity, is_active').eq('email', session.email);
+        console.error('[useConsumable] DEBUG email:', session.email, 'requested itemId:', inventoryItemId, 'all_inv:', JSON.stringify(allUserInv));
 
-        if (!inv || inv.quantity < 1) return res.status(400).json({ error: '아이템이 없습니다.' });
+        const invRows = (allUserInv || []).filter(r => r.item_id === inventoryItemId);
+        const inv = invRows.sort((a, b) => b.quantity - a.quantity)[0] ?? null;
+
+        if (!inv || inv.quantity < 1) return res.status(400).json({ error: '아이템이 없습니다.', _debug: { email: session.email, sentItemId: inventoryItemId, allItems: (allUserInv || []).map(r => ({ item_id: r.item_id, qty: r.quantity })) } });
 
         const { data: itemDef } = await supabase.from('c2gen_gacha_pool').select('*').eq('id', inv.item_id).single();
         if (!itemDef) return res.status(404).json({ error: 'item def not found' });
