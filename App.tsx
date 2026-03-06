@@ -535,6 +535,7 @@ const AppContent: React.FC<{
         konamiRef.current = [];
         // 업적 트리거 (ref로 최신 값 참조 — stale closure 방지)
         const { isAuthenticated: auth, synced, recordAction, setOverlayAchievement: setOverlay } = gameRef.current;
+        console.log('[konami] fired! auth:', auth, 'synced:', synced);
         if (auth && synced) {
           recordAction('special_konami', 1).then(result => {
             if (result?.achievementsUnlocked?.length > 0) {
