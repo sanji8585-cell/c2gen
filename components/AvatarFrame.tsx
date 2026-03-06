@@ -6,6 +6,7 @@ interface AvatarFrameProps {
   size: number;
   rarity?: Rarity | null;
   frameName?: string;
+  avatarUrl?: string | null;
 }
 
 const RARITY_COLORS: Record<Rarity, string> = {
@@ -16,7 +17,7 @@ const RARITY_COLORS: Record<Rarity, string> = {
   legendary: '#ef4444',
 };
 
-const AvatarFrame: React.FC<AvatarFrameProps> = ({ name, size, rarity, frameName }) => {
+const AvatarFrame: React.FC<AvatarFrameProps> = ({ name, size, rarity, frameName, avatarUrl }) => {
   const initials = useMemo(() => {
     const parts = name.trim().split(/\s+/);
     return parts.length >= 2
@@ -41,7 +42,7 @@ const AvatarFrame: React.FC<AvatarFrameProps> = ({ name, size, rarity, frameName
           color: 'var(--text-muted)',
         }}
       >
-        {initials}
+        {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initials}
       </div>
     );
   }
@@ -118,9 +119,10 @@ const AvatarFrame: React.FC<AvatarFrameProps> = ({ name, size, rarity, frameName
             fontSize,
             fontWeight: 700,
             color: 'var(--text-muted)',
+            overflow: 'hidden',
           }}
         >
-          {initials}
+          {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initials}
         </div>
       </div>
     );
@@ -143,7 +145,7 @@ const AvatarFrame: React.FC<AvatarFrameProps> = ({ name, size, rarity, frameName
         }}
         title={frameName}
       >
-        {initials}
+        {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initials}
       </div>
     );
   }
@@ -165,7 +167,7 @@ const AvatarFrame: React.FC<AvatarFrameProps> = ({ name, size, rarity, frameName
         }}
         title={frameName}
       >
-        {initials}
+        {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initials}
       </div>
     );
   }
@@ -189,7 +191,7 @@ const AvatarFrame: React.FC<AvatarFrameProps> = ({ name, size, rarity, frameName
       }}
       title={frameName}
     >
-      {initials}
+      {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initials}
     </div>
   );
 };

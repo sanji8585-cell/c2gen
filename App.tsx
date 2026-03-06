@@ -1882,6 +1882,14 @@ const AppContent: React.FC<{
           currentPlan={userPlan}
           userName={userName || ''}
           onNameChange={onNameChange}
+          gameState={{
+            levelInfo: game.levelInfo,
+            userState: game.userState,
+            equipped: game.equipped,
+            achievements: game.achievements,
+            inventory: game.inventory,
+            synced: game.synced,
+          }}
         />
       )}
 

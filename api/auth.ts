@@ -2025,6 +2025,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await supabase.from('c2gen_users').update(updates).eq('email', email);
 
+        // 레벨업 보상 트랜잭션 기록
+        if (rewardCredits > 0) {
+          supabase.from('c2gen_credit_transactions').insert({
+            email, amount: rewardCredits, balance_after: (usr.credits || 0) + rewardCredits,
+            type: 'bonus', description: `레벨업 보상: Lv.${newLevel}`,
+          }).then(() => {});
+        }
+
         // 8) 업적 진행률 업데이트 (배치 처리 — N번 쿼리 → 2번으로 최적화)
         const achievementsUnlocked: any[] = [];
         const [{ data: achDefs }, { data: achProgress }] = await Promise.all([
@@ -2096,6 +2104,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ...(bonusCredits > 0 ? { credits: (usr.credits || 0) + rewardCredits + bonusCredits } : {}),
             ...(bonusTickets > 0 ? { gacha_tickets: newGachaTickets + bonusTickets } : {}),
           }).eq('email', email);
+
+          // 업적 보상 트랜잭션 기록
+          if (bonusCredits > 0) {
+            const achNames = achievementsUnlocked.map((a: any) => a.name).join(', ');
+            supabase.from('c2gen_credit_transactions').insert({
+              email, amount: bonusCredits, balance_after: (usr.credits || 0) + rewardCredits + bonusCredits,
+              type: 'bonus', description: `업적 보상: ${achNames}`,
+            }).then(() => {});
+          }
         }
 
         // 9) 퀘스트 진행률 업데이트
@@ -2213,6 +2230,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           xp: (usr?.xp || 0) + rewardXp,
           credits: (usr?.credits || 0) + rewardCr,
         }).eq('email', session.email);
+
+        // 퀘스트 보상 트랜잭션 기록
+        if (rewardCr > 0) {
+          supabase.from('c2gen_credit_transactions').insert({
+            email: session.email, amount: rewardCr, balance_after: (usr?.credits || 0) + rewardCr,
+            type: 'bonus', description: `퀘스트 보상`,
+          }).then(() => {});
+        }
 
         await supabase.from('c2gen_user_quests').update({ reward_claimed: true }).eq('id', uq.id);
 
