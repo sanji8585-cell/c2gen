@@ -255,8 +255,8 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
   }, [inventory, refreshState]);
 
   // 소모품 사용 (옵티미스틱 업데이트)
-  const useConsumableAction = useCallback(async (inventoryItemId: string) => {
-    const result = await apiUseConsumable(inventoryItemId);
+  const useConsumableAction = useCallback(async (itemId: string) => {
+    const result = await apiUseConsumable(itemId);
     if (result?.success) {
       setInventory(prev => {
         if (!prev) return prev;
@@ -265,7 +265,7 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
           ...prev,
           consumables: prev.consumables
             .map(item => {
-              if (item.inventoryId !== inventoryItemId) return item;
+              if (item.itemId !== itemId) return item;
               const newQty = Math.max(0, item.quantity - 1);
               return {
                 ...item,

@@ -2379,9 +2379,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('token', token).gt('expires_at', new Date().toISOString()).single();
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
+        // item_id (gacha pool text ID) 기준으로 조회 — UUID 기반보다 안정적
         const { data: inv } = await supabase.from('c2gen_user_inventory')
           .select('id, item_id, quantity, is_active')
-          .eq('email', session.email).eq('id', inventoryItemId).single();
+          .eq('email', session.email).eq('item_id', inventoryItemId).single();
 
         if (!inv || inv.quantity < 1) return res.status(400).json({ error: '아이템이 없습니다.' });
 
