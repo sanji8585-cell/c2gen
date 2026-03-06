@@ -151,6 +151,27 @@
       /* ── XP 바 ── */
       .xp-bar-fill { transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
+      /* ── 생성 완료 결과 화면 ── */
+      @keyframes result-title-bounce {
+        0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+        60% { transform: scale(1.2) rotate(3deg); }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      @keyframes result-slide-in {
+        0% { transform: translateX(-20px); opacity: 0; }
+        100% { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes result-stamp {
+        0% { transform: scale(3) rotate(-15deg); opacity: 0; }
+        50% { transform: scale(0.9) rotate(3deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      @keyframes result-total-pop {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+        100% { transform: scale(1); }
+      }
+
       /* ── 아바타 프레임 등급별 효과 ── */
       @property --frame-angle {
         syntax: '<angle>';

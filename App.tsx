@@ -26,6 +26,7 @@ import AchievementShowcase from './components/AchievementShowcase';
 import InventoryModal from './components/InventoryModal';
 import LeaderboardWidget from './components/LeaderboardWidget';
 import AvatarFrame from './components/AvatarFrame';
+import CompletionScreen from './components/CompletionScreen';
 
 import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW, ResolutionTier, Language, BGM_LIBRARY, LANGUAGE_CONFIG, BgmMood } from './config';
@@ -338,6 +339,11 @@ const AppContent: React.FC<{
   const [sessionCombo, setSessionCombo] = useState(0);
   const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
   const [showIdleParticles] = useState(false); // 유휴 파티클 비활성화
+  const generationStartRef = useRef<number>(0);
+  const [completionData, setCompletionData] = useState<{
+    cost: any; sceneCount: number; xpGained: number; combo: number;
+    elapsedSeconds: number; questProgress?: { completed: number; total: number }; gachaTickets?: number;
+  } | null>(null);
   // Tip of the Day
   const [showTipOfDay, setShowTipOfDay] = useState(false);
   const [tipOfDay, setTipOfDay] = useState<typeof PRO_TIPS[0] | null>(null);
@@ -641,6 +647,7 @@ const AppContent: React.FC<{
 
     isProcessingRef.current = true;
     isAbortedRef.current = false;
+    generationStartRef.current = Date.now();
 
     setStep(GenerationStep.SCRIPTING);
     setProgressMessage('V9.2 Ultra 엔진 부팅 중...');
@@ -1018,7 +1025,41 @@ const AppContent: React.FC<{
               setOverlayMilestone(result.milestoneReached!);
             }, 4500);
           }
+
+          // 결과 화면 데이터 설정
+          const elapsed = Math.round((Date.now() - generationStartRef.current) / 1000);
+          const questCompleted = result.questProgress?.filter((q: any) => q.justCompleted).length || 0;
+          const questTotal = result.questProgress?.length || 0;
+          setCompletionData({
+            cost: { ...costRef.current },
+            sceneCount: assetsRef.current.length,
+            xpGained: result.xpGained || 0,
+            combo: sessionCombo + 1,
+            elapsedSeconds: elapsed,
+            questProgress: questTotal > 0 ? { completed: questCompleted, total: questTotal } : undefined,
+            gachaTickets: result.gachaResult ? 1 : undefined,
+          });
+        } else {
+          // 비로그인 또는 recordAction 실패 시에도 결과 화면 표시
+          const elapsed = Math.round((Date.now() - generationStartRef.current) / 1000);
+          setCompletionData({
+            cost: { ...costRef.current },
+            sceneCount: assetsRef.current.length,
+            xpGained: 0,
+            combo: sessionCombo + 1,
+            elapsedSeconds: elapsed,
+          });
         }
+      } else {
+        // 비로그인 시 결과 화면
+        const elapsed = Math.round((Date.now() - generationStartRef.current) / 1000);
+        setCompletionData({
+          cost: { ...costRef.current },
+          sceneCount: assetsRef.current.length,
+          xpGained: 0,
+          combo: sessionCombo + 1,
+          elapsedSeconds: elapsed,
+        });
       }
 
       // 다이나믹 테마 악센트
@@ -1530,7 +1571,7 @@ const AppContent: React.FC<{
                 className="flex items-center gap-1.5 text-[11px] hover:underline transition-all cursor-pointer"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                <AvatarFrame name={userName || ''} size={22} rarity={game.equipped?.frame?.rarity} frameName={game.equipped?.frame?.name} />
+                <AvatarFrame name={userName || ''} size={22} />
                 <span className="text-cyan-400 font-medium">{userName}</span> 님
               </button>
               <button
@@ -2008,6 +2049,14 @@ const AppContent: React.FC<{
           milestone={overlayMilestone}
           gachaSettings={game.config?.gachaSettings}
           onDismiss={() => { setOverlayLevelUp(null); setOverlayAchievement(null); setOverlayGacha(null); setOverlayMilestone(null); }}
+        />
+      )}
+
+      {/* 생성 완료 결과 화면 */}
+      {completionData && (
+        <CompletionScreen
+          {...completionData}
+          onClose={() => setCompletionData(null)}
         />
       )}
 
