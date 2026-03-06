@@ -363,6 +363,11 @@ const AppContent: React.FC<{
   // Konami
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiRef = useRef<string[]>([]);
+  // 항상 최신 game 상태를 ref로 유지 (stale closure 방지)
+  const gameRef = useRef({ isAuthenticated, synced: game.synced, recordAction: game.recordAction, setOverlayAchievement });
+  useEffect(() => {
+    gameRef.current = { isAuthenticated, synced: game.synced, recordAction: game.recordAction, setOverlayAchievement };
+  });
 
   const fetchCredits = useCallback(async () => {
     const token = localStorage.getItem('c2gen_session_token');
@@ -528,12 +533,13 @@ const AppContent: React.FC<{
         } catch {}
         setTimeout(() => { setKonamiActive(false); document.documentElement.classList.remove('retro-mode'); document.getElementById('konami-scanline')?.remove(); }, 10000);
         konamiRef.current = [];
-        // 업적 트리거
-        if (isAuthenticated && game.synced) {
-          game.recordAction('special_konami', 1).then(result => {
+        // 업적 트리거 (ref로 최신 값 참조 — stale closure 방지)
+        const { isAuthenticated: auth, synced, recordAction, setOverlayAchievement: setOverlay } = gameRef.current;
+        if (auth && synced) {
+          recordAction('special_konami', 1).then(result => {
             if (result?.achievementsUnlocked?.length > 0) {
               const a = result.achievementsUnlocked[0];
-              setTimeout(() => setOverlayAchievement({ name: a.name, icon: a.icon, description: a.description, category: a.category, rewardXp: a.rewardXp, rewardCredits: a.rewardCredits }), 1000);
+              setTimeout(() => setOverlay({ name: a.name, icon: a.icon, description: a.description, category: a.category, rewardXp: a.rewardXp, rewardCredits: a.rewardCredits }), 1000);
             }
           });
         }
