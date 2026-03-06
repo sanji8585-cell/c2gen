@@ -87,10 +87,13 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
     setLoading(false);
   }, []);
 
-  // 인증 변경 시 동기화
+  // 인증 변경 시 동기화 + 로그인 퀘스트 기록
   useEffect(() => {
     if (isAuthenticated) {
-      refreshState();
+      refreshState().then(() => {
+        // 로그인 퀘스트 진행 (daily_login)
+        recordGameAction('daily_login', 1).catch(() => {});
+      });
     } else {
       setUserState(null);
       setEquipped(DEFAULT_EQUIPPED);

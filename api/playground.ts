@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let query = supabase
           .from('playground_posts')
-          .select('id, email, project_id, author_name, author_avatar_url, caption, thumbnail, topic, scene_count, like_count, created_at');
+          .select('id, email, project_id, author_name, author_avatar_url, caption, thumbnail, topic, scene_count, like_count, created_at, video_url');
 
         if (sort === 'popular') {
           if (cursor) {

@@ -367,6 +367,7 @@ export interface VideoExportOptions {
   bgmDuckingEnabled?: boolean;   // BGM 자동 볼륨 조절 (기본: false)
   bgmDuckingAmount?: number;     // 덕킹 시 볼륨 비율 (0.1~0.5, 기본 0.3 = 30%)
   resolution?: ResolutionTier;   // 해상도 티어 (기본: '720p')
+  bitrateOverride?: number;      // 비트레이트 직접 지정 (놀이터 경량 렌더링용)
 }
 
 // 실제 렌더링된 자막 타이밍 기록용 인터페이스
@@ -601,7 +602,7 @@ export const generateVideo = async (
 
   const recorder = new MediaRecorder(combinedStream, {
     mimeType,
-    videoBitsPerSecond: resConfig.bitrate
+    videoBitsPerSecond: options?.bitrateOverride ?? resConfig.bitrate
   });
 
   const chunks: Blob[] = [];

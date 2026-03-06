@@ -6,18 +6,11 @@
       "Bash(npm run dev)",
       "Bash(npm run build:*)",
       "WebSearch",
-      "Bash(npx vercel env pull .env.local)",
-      "Bash(npx vercel dev)",
-      "Bash(node --version)",
-      "Bash(npm --version)",
-      "Bash(npx vercel --prod)",
-      "Bash(npm install)",
-      "Bash(npx cap add android)",
-      "Bash(npx cap sync)",
-      "Bash(npx cap open android)",
-      "Bash(npx vercel env ls)",
-      "Bash(npx vercel ls --limit 3)",
-      "Bash(npx vercel ls)"
+      "Bash(find:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(wc -l /c/Users/USER/Desktop/자동화컨텐츠AI/자동화컨텐츠/services/*.ts)",
+      "Bash(xargs grep -l \"SUPABASE\")",
+      "Bash(python3 -c \":*)"
     ]
   }
 }

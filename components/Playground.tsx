@@ -6,13 +6,11 @@ import {
   deletePlaygroundPost,
   toggleLike,
   getPostDetail,
-  uploadPlaygroundVideo,
   type PlaygroundPost,
   type PostDetailResponse,
   type PlaygroundEquippedItem,
   type PlaygroundEquippedItems,
 } from '../services/playgroundService';
-import { generateVideo } from '../services/videoService';
 import PreviewPlayer from './PreviewPlayer';
 
 // ── 레어리티 색상 (InventoryModal과 동일) ──
@@ -166,54 +164,120 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
     shareAbortRef.current = { current: false };
 
     try {
-      // 1) DB에 게시물 먼저 생성
+      console.log('[Share] Step 0: start');
+      const token = localStorage.getItem('c2gen_session_token');
+      console.log('[Share] Step 1: token ok');
+
+      // 1) DB에 게시물 먼저 생성 (직접 fetch)
       setShareProgress('게시물 생성 중...');
-      const newPost = await shareToPlayground(shareProjectId, shareCaption);
+      console.log('[Share] Step 2: calling share API');
+      const shareRes = await fetch('/api/playground', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'share', token, projectId: shareProjectId, caption: shareCaption }),
+      });
+      if (!shareRes.ok) {
+        const err = await shareRes.json().catch(() => ({ error: shareRes.statusText }));
+        throw new Error(err.error || `공유 실패: ${shareRes.status}`);
+      }
+      console.log('[Share] Step 3: share API response ok');
+      const shareData = await shareRes.json();
+      console.log('[Share] Step 4: parsed share response', shareData?.post?.id);
+      const newPost: PlaygroundPost = {
+        id: shareData.post.id,
+        email: shareData.post.email,
+        projectId: shareData.post.project_id,
+        authorName: shareData.post.author_name,
+        authorAvatarUrl: shareData.post.author_avatar_url,
+        caption: shareData.post.caption,
+        thumbnail: shareData.post.thumbnail,
+        topic: shareData.post.topic,
+        sceneCount: shareData.post.scene_count,
+        likeCount: shareData.post.like_count || 0,
+        createdAt: shareData.post.created_at,
+        liked: false,
+        videoUrl: null,
+      };
 
-      // 2) 프로젝트 에셋 로드
+      console.log('[Share] Step 5: newPost created');
+      // 2) 프로젝트 에셋 로드 (직접 fetch)
       setShareProgress('프로젝트 에셋 로딩 중...');
-      const detail = await getPostDetail(newPost.id);
-      const assets = detail.assets
-        .filter(a => a.imageUrl)
-        .map(a => ({
-          sceneNumber: a.sceneNumber,
-          narration: a.narration,
-          visualPrompt: a.visualPrompt,
-          imageData: a.imageUrl,
-          imageUrl: a.imageUrl,
-          audioData: null,
-          audioUrl: a.audioUrl,
-          audioDuration: a.audioDuration,
-          subtitleData: a.subtitleData,
-          customDuration: a.customDuration,
-          videoData: a.videoData,
-          videoDuration: a.videoDuration,
-          zoomEffect: a.zoomEffect as any,
-          transition: a.transition as any,
-          status: 'completed' as const,
-        })) as GeneratedAsset[];
+      const detailRes = await fetch('/api/playground', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'detail', token, postId: newPost.id }),
+      });
+      let sceneGap = 0.3;
+      let assets: GeneratedAsset[] = [];
+      if (detailRes.ok) {
+        const detailData2 = await detailRes.json();
+        sceneGap = detailData2.sceneGap ?? 0.3;
+        assets = (detailData2.assets || [])
+          .filter((a: any) => a.imageUrl)
+          .map((a: any) => ({
+            sceneNumber: a.sceneNumber,
+            narration: a.narration,
+            visualPrompt: a.visualPrompt,
+            imageData: a.imageUrl,
+            imageUrl: a.imageUrl,
+            audioData: null,
+            audioUrl: a.audioUrl,
+            audioDuration: a.audioDuration,
+            subtitleData: a.subtitleData,
+            customDuration: a.customDuration,
+            videoData: a.videoData,
+            videoDuration: a.videoDuration,
+            zoomEffect: a.zoomEffect || 'zoomIn',
+            transition: a.transition || 'none',
+            status: 'completed' as const,
+          })) as GeneratedAsset[];
+      }
 
+      console.log('[Share] Step 6: assets loaded, count=', assets.length);
       if (assets.length > 0) {
         // 3) 경량 MP4 렌더링 (720p, 2.5Mbps)
         setShareProgress('영상 렌더링 중...');
+        const { generateVideo } = await import('../services/videoService');
         const result = await generateVideo(
           assets,
           (msg) => setShareProgress(msg),
           shareAbortRef.current,
-          {
-            resolution: '720p',
-            bitrateOverride: 2_500_000,
-            sceneGap: detail.sceneGap,
-            enableSubtitles: true,
-          }
+          { resolution: '720p', bitrateOverride: 2_500_000, sceneGap, enableSubtitles: true }
         );
 
         if (result?.videoBlob) {
-          // 4) Supabase Storage에 업로드
           const sizeMB = (result.videoBlob.size / 1024 / 1024).toFixed(1);
           setShareProgress(`영상 업로드 중... (${sizeMB}MB)`);
-          const videoUrl = await uploadPlaygroundVideo(newPost.id, result.videoBlob);
-          newPost.videoUrl = videoUrl;
+
+          // 1) 서명된 업로드 URL 획득
+          const urlRes = await fetch('/api/storage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'get-playground-upload-url', token, postId: newPost.id }),
+          });
+          if (urlRes.ok) {
+            const { uploadUrl, token: uploadToken, publicUrl } = await urlRes.json();
+
+            // 2) Supabase Storage에 바이너리 직접 업로드 (Vercel 4.5MB 제한 우회)
+            const directUpload = await fetch(uploadUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'video/mp4',
+                ...(uploadToken ? { 'x-upsert': 'true' } : {}),
+              },
+              body: result.videoBlob,
+            });
+
+            if (directUpload.ok) {
+              // 3) DB에 video_url 저장
+              await fetch('/api/storage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'confirm-playground-video', token, postId: newPost.id, publicUrl }),
+              });
+              newPost.videoUrl = publicUrl;
+            }
+          }
         }
       }
 
@@ -222,8 +286,17 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       setShareProjectId('');
       setShareCaption('');
       setShareProgress('');
+      // 공유 퀘스트 진행
+      try {
+        const tkn = localStorage.getItem('c2gen_session_token');
+        if (tkn) {
+          fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'game-recordAction', token: tkn, actionType: 'share_project', count: 1 }) }).catch(() => {});
+        }
+      } catch {};
     } catch (e: any) {
-      setShareError(e.message);
+      console.error('[Playground Share Error]', e);
+      setShareError(`[${e.name}] ${e.message}`);
       setShareProgress('');
     } finally {
       setSharing(false);

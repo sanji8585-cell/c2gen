@@ -26,6 +26,13 @@ function verifyPassword(password: string, hash: string, salt: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
 }
 
+// ── KST 날짜 헬퍼 (UTC+9) ──
+function getKSTDateStr(offsetDays = 0): string {
+  const now = new Date(Date.now() + offsetDays * 86400000);
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
 // ── 타입 ──
 
 interface SessionData {
@@ -1569,7 +1576,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const email = session.email;
         const q = (query: PromiseLike<any>) => Promise.resolve(query);
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = getKSTDateStr();
         const nowISO = new Date().toISOString();
 
         // ── 1단계: 독립 쿼리 7개를 병렬 실행 ──
@@ -1824,12 +1831,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 2) 스트릭 업데이트 + 배율
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getKSTDateStr();
         let newStreak = usr.streak_count || 0;
         let streakBonus = 0;
         let streakMilestoneReward = null;
         if (usr.streak_last_date !== today) {
-          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+          const yesterday = getKSTDateStr(-1);
           if (usr.streak_last_date === yesterday) {
             newStreak = (usr.streak_count || 0) + 1;
           } else if (!usr.streak_last_date) {
@@ -2093,10 +2100,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // 9) 퀘스트 진행률 업데이트
         const questProgress: any[] = [];
-        const todayQ = new Date().toISOString().slice(0, 10);
-        const { data: userQuests } = await supabase.from('c2gen_user_quests')
+        const todayQ = getKSTDateStr();
+        console.log(`[Quest Debug] todayQ=${todayQ}, actionType=${actionType}, email=${email}, imageCount=${imageCount}`);
+        const { data: userQuests, error: questErr } = await supabase.from('c2gen_user_quests')
           .select('id, quest_id, progress, completed, reward_claimed')
           .eq('email', email).eq('assigned_date', todayQ);
+        console.log(`[Quest Debug] userQuests found: ${userQuests?.length ?? 0}, error: ${questErr?.message || 'none'}`);
 
         if (userQuests && userQuests.length > 0) {
           const qIds = userQuests.map((q: any) => q.quest_id);
@@ -2118,11 +2127,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!def) continue;
 
             let increment = 0;
-            if (def.quest_type === 'generate_content' && actionType === 'generation_complete') increment = 1;
-            else if (def.quest_type === 'generate_images') increment = imageCount;
-            else if (def.quest_type === 'generate_audio') increment = audioCount;
-            else if (def.quest_type === 'create_video') increment = videoCount;
-            else if (def.quest_type === 'combo_reach' && sessionCombo >= def.target) increment = def.target;
+            const qt = def.quest_type;
+            if ((qt === 'generate_content' || qt === 'generate_script') && actionType === 'generation_complete') increment = 1;
+            else if (qt === 'generate_images' && actionType === 'generation_complete') increment = imageCount;
+            else if (qt === 'generate_audio' && actionType === 'generation_complete') increment = audioCount;
+            else if ((qt === 'create_video' || qt === 'generate_video') && actionType === 'generation_complete') increment = videoCount;
+            else if (qt === 'combo_reach' && sessionCombo >= def.target) increment = def.target;
+            else if (qt === 'login' && actionType === 'daily_login') increment = 1;
+            else if (qt === 'gacha_pull' && actionType === 'gacha_pull') increment = 1;
+            else if (qt === 'share_project' && actionType === 'share_project') increment = 1;
+            console.log(`[Quest Debug] quest=${uq.quest_id}, qt=${qt}, actionType=${actionType}, increment=${increment}, progress=${uq.progress}`);
 
             if (increment > 0) {
               const newQProgress = Math.min(uq.progress + increment, def.target);
@@ -2151,6 +2165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const emojis = levelsConfig.emojis || [];
         const colors = levelsConfig.colors || [];
 
+        console.log(`[Quest Debug] FINAL questProgress count=${questProgress.length}, xpGained=${xpGained}, achievementsUnlocked=${achievementsUnlocked.length}`);
         return res.json({
           xpGained,
           totalXp: newXp,
@@ -2179,10 +2194,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('token', token).gt('expires_at', new Date().toISOString()).single();
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayKST = getKSTDateStr();
         const { data: uq } = await supabase.from('c2gen_user_quests')
           .select('id, completed, reward_claimed')
-          .eq('email', session.email).eq('quest_id', questId).eq('assigned_date', todayStr).single();
+          .eq('email', session.email).eq('quest_id', questId).eq('assigned_date', todayKST).single();
 
         if (!uq) return res.status(404).json({ error: 'quest not found' });
         if (!uq.completed) return res.status(400).json({ error: 'quest not completed' });
@@ -2453,13 +2468,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { adminToken } = params;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
         const { data } = await supabase.from('c2gen_achievements').select('*').order('sort_order');
-        return res.json({ achievements: data || [] });
+        const achievements = (data || []).map((a: any) => ({ ...a, active: a.is_active ?? a.active ?? false, hidden: a.is_hidden ?? a.hidden ?? false }));
+        return res.json({ achievements });
       }
 
       case 'game-admin-upsertAchievement': {
         const { adminToken, achievement } = params;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
-        const { error } = await supabase.from('c2gen_achievements').upsert(achievement, { onConflict: 'id' });
+        const dbAch: Record<string, any> = { ...achievement };
+        if ('active' in dbAch) { dbAch.is_active = dbAch.active; delete dbAch.active; }
+        if ('hidden' in dbAch) { dbAch.is_hidden = dbAch.hidden; delete dbAch.hidden; }
+        const { error } = await supabase.from('c2gen_achievements').upsert(dbAch, { onConflict: 'id' });
         if (error) return res.status(500).json({ error: error.message });
         return res.json({ success: true });
       }
@@ -2476,13 +2495,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { adminToken } = params;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
         const { data } = await supabase.from('c2gen_quest_pool').select('*').order('created_at');
-        return res.json({ quests: data || [] });
+        // DB is_active → 프론트 active 매핑
+        const quests = (data || []).map((q: any) => ({ ...q, active: q.is_active ?? q.active ?? false }));
+        return res.json({ quests });
       }
 
       case 'game-admin-upsertQuest': {
         const { adminToken, quest } = params;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(401).json({ error: '관리자 인증이 필요합니다.' });
-        const { error } = await supabase.from('c2gen_quest_pool').upsert(quest, { onConflict: 'id' });
+        // 프론트 active → DB is_active 매핑
+        const dbQuest: Record<string, any> = { ...quest };
+        if ('active' in dbQuest) {
+          dbQuest.is_active = dbQuest.active;
+          delete dbQuest.active;
+        }
+        const { error } = await supabase.from('c2gen_quest_pool').upsert(dbQuest, { onConflict: 'id' });
         if (error) return res.status(500).json({ error: error.message });
         return res.json({ success: true });
       }

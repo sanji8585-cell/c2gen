@@ -187,7 +187,8 @@ export async function recordGameAction(
       count,
       metadata,
     });
-    if (data?.error) return null;
+    if (data?.error) { console.error('[game] recordAction server error:', data.error); return null; }
+    console.log('[game] recordAction OK:', actionType, 'questProgress:', data?.questProgress?.length ?? 0);
     return data;
   } catch (e) {
     console.error('[game] recordAction exception:', e);

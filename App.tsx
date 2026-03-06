@@ -978,14 +978,15 @@ const AppContent: React.FC<{
         return nc;
       });
 
-      // 서버 기반 게이미피케이션 — 로그인 시 서버가 XP/업적/퀘스트/뽑기 모두 처리
+      // 서버 기반 게이미피케이션 — gameRef로 최신 상태 참조 (stale closure 방지)
       const imgCount = assetsRef.current.filter(a => a.imageData).length;
       const audioCount = assetsRef.current.filter(a => a.audioData).length;
       const videoCount = assetsRef.current.filter(a => a.videoData).length;
+      const { isAuthenticated: authNow, synced: syncedNow, recordAction: recordNow } = gameRef.current;
 
-      if (isAuthenticated && game.synced) {
+      if (authNow && syncedNow) {
         // 서버에 recordAction → 모든 결과를 응답으로 받음
-        const result = await game.recordAction('generation_complete', 1, {
+        const result = await recordNow('generation_complete', 1, {
           imageCount: imgCount, audioCount, videoCount,
           sessionCombo: sessionCombo + 1,
         });
@@ -1209,6 +1210,9 @@ const AppContent: React.FC<{
         // 영상 비용 추가
         addCost('video', PRICING.VIDEO.perVideo, 1);
         setProgressMessage(`씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`);
+        // 영상 퀘스트 진행
+        const { isAuthenticated: authV, synced: syncV, recordAction: recordV } = gameRef.current;
+        if (authV && syncV) recordV('generation_complete', 1, { videoCount: 1 }).catch(() => {});
       } else {
         setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
       }
@@ -2051,7 +2055,8 @@ const AppContent: React.FC<{
             const result = await game.pullGacha();
             if (result?.item) {
               setOverlayGacha({ item: result.item, isNew: result.isNew });
-              // 인벤토리 갱신
+              // 뽑기 퀘스트 진행
+              await game.recordAction('gacha_pull', 1);
               await game.refreshState();
             }
           }}

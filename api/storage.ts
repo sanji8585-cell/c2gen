@@ -158,6 +158,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ success: true, deleted: files?.length || 0 });
       }
 
+      // ── 놀이터 영상 업로드 ──
+      case 'upload-playground-video': {
+        const { postId, data: videoBase64 } = params;
+        if (!postId || !videoBase64) {
+          return res.status(400).json({ error: 'postId, data 필요' });
+        }
+
+        // 50MB 제한 (base64 인코딩 오버헤드 감안)
+        if (videoBase64.length > 50 * 1024 * 1024 * 1.4) {
+          return res.status(400).json({ error: '영상 크기는 50MB 이하여야 합니다.' });
+        }
+
+        const buffer = Buffer.from(videoBase64, 'base64');
+        const path = `playground/${email}/${postId}.mp4`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, buffer, { contentType: 'video/mp4', upsert: true });
+
+        if (uploadErr) {
+          console.error('[storage] playground video upload error:', uploadErr);
+          return res.status(500).json({ error: uploadErr.message });
+        }
+
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+
+        // playground_posts 테이블에 video_url 저장
+        await supabase
+          .from('playground_posts')
+          .update({ video_url: urlData.publicUrl })
+          .eq('id', postId)
+          .eq('email', email);
+
+        return res.json({ url: urlData.publicUrl });
+      }
+
+      // ── 놀이터 영상 삭제 ──
+      case 'delete-playground-video': {
+        const { postId: delPostId } = params;
+        if (!delPostId) return res.status(400).json({ error: 'postId 필요' });
+
+        const path = `playground/${email}/${delPostId}.mp4`;
+        await supabase.storage.from(BUCKET).remove([path]);
+        return res.json({ success: true });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
