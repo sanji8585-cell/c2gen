@@ -151,6 +151,38 @@
       /* ── XP 바 ── */
       .xp-bar-fill { transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
+      /* ── 아바타 프레임 등급별 효과 ── */
+      @property --frame-angle {
+        syntax: '<angle>';
+        initial-value: 0deg;
+        inherits: false;
+      }
+      @keyframes frame-rare-pulse {
+        0%, 100% { box-shadow: 0 0 6px #8b5cf666, 0 0 14px #8b5cf633; }
+        50% { box-shadow: 0 0 10px #8b5cf699, 0 0 20px #8b5cf644; }
+      }
+      @keyframes frame-epic-glow {
+        0%, 100% { box-shadow: 0 0 8px #f59e0b66, 0 0 16px #f59e0b33; filter: hue-rotate(0deg); }
+        50% { box-shadow: 0 0 12px #f59e0b88, 0 0 20px #f59e0b44; filter: hue-rotate(20deg); }
+      }
+      @keyframes frame-legendary-spin {
+        0% { --frame-angle: 0deg; }
+        100% { --frame-angle: 360deg; }
+      }
+      @keyframes frame-legendary-glow {
+        0%, 100% { box-shadow: 0 0 10px #ef444488, 0 0 20px #f59e0b44, 0 0 30px #ef444422; }
+        33% { box-shadow: 0 0 14px #f59e0b88, 0 0 24px #ec489944, 0 0 34px #f59e0b22; }
+        66% { box-shadow: 0 0 12px #ec489988, 0 0 22px #8b5cf644, 0 0 32px #ec489922; }
+      }
+      @keyframes frame-legendary-sparkle {
+        0%, 100% { opacity: 0; transform: scale(0); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .frame-animated { animation: none !important; }
+        .frame-legendary-ring { animation: none !important; }
+      }
+
       /* ── 카운트다운 ── */
       @keyframes countdown-pulse {
         0% { transform: scale(2.5); opacity: 0; }

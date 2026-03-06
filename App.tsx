@@ -25,6 +25,7 @@ import EventBanner from './components/EventBanner';
 import AchievementShowcase from './components/AchievementShowcase';
 import InventoryModal from './components/InventoryModal';
 import LeaderboardWidget from './components/LeaderboardWidget';
+import AvatarFrame from './components/AvatarFrame';
 
 import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW, ResolutionTier, Language, BGM_LIBRARY, LANGUAGE_CONFIG, BgmMood } from './config';
@@ -1483,7 +1484,7 @@ const AppContent: React.FC<{
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={game.synced ? game.userState?.streakCount ?? 0 : 0} totalGenerations={game.synced ? game.userState?.totalGenerations ?? 0 : 0} sessionCombo={sessionCombo} levelInfo={game.synced ? game.levelInfo : null} equipped={game.synced ? game.equipped : null} onLogoAchievement={() => {
+      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={isAuthenticated ? (game.synced ? game.userState?.streakCount ?? 0 : 0) : 0} totalGenerations={isAuthenticated ? (game.synced ? game.userState?.totalGenerations ?? 0 : 0) : 0} sessionCombo={isAuthenticated ? sessionCombo : 0} levelInfo={isAuthenticated && game.synced ? game.levelInfo : null} equipped={isAuthenticated && game.synced ? game.equipped : null} userName={isAuthenticated ? userName || undefined : undefined} onLogoAchievement={() => {
         if (isAuthenticated && game.synced) {
           game.recordAction('special_logo_click', 1).then(result => {
             if (result?.achievementsUnlocked?.length > 0) {
@@ -1538,9 +1539,10 @@ const AppContent: React.FC<{
               )}
               <button
                 onClick={() => setShowUserProfile(true)}
-                className="text-[11px] hover:underline transition-all cursor-pointer"
+                className="flex items-center gap-1.5 text-[11px] hover:underline transition-all cursor-pointer"
                 style={{ color: 'var(--text-secondary)' }}
               >
+                <AvatarFrame name={userName || ''} size={22} rarity={game.equipped?.frame?.rarity} frameName={game.equipped?.frame?.name} />
                 <span className="text-cyan-400 font-medium">{userName}</span> 님
               </button>
               <button

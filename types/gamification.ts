@@ -183,10 +183,17 @@ export interface InventoryItem {
   effectValue?: { xp_multiplier?: number; duration_hours?: number; credits?: number };
 }
 
+export interface EquippedItemInfo {
+  id: string;
+  name: string;
+  emoji: string;
+  rarity: Rarity;
+}
+
 export interface EquippedItems {
-  title: { id: string; name: string; emoji: string } | null;
-  badges: { id: string; name: string; emoji: string }[];
-  frame: { id: string; name: string; emoji: string } | null;
+  title: EquippedItemInfo | null;
+  badges: EquippedItemInfo[];
+  frame: EquippedItemInfo | null;
 }
 
 // ── 이벤트 타입 ──

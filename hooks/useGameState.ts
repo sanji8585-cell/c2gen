@@ -210,17 +210,18 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
     setEquipped(prev => {
       const next = { ...prev };
       if (slot === 'title') {
-        next.title = targetItem ? { id: targetItem.itemId, name: targetItem.name, emoji: targetItem.emoji } : null;
+        next.title = targetItem ? { id: targetItem.itemId, name: targetItem.name, emoji: targetItem.emoji, rarity: targetItem.rarity } : null;
       } else if (slot === 'frame') {
-        next.frame = targetItem ? { id: targetItem.itemId, name: targetItem.name, emoji: targetItem.emoji } : null;
+        next.frame = targetItem ? { id: targetItem.itemId, name: targetItem.name, emoji: targetItem.emoji, rarity: targetItem.rarity } : null;
       } else if (slot === 'badge') {
         if (targetItem) {
-          const entry = { id: targetItem.itemId, name: targetItem.name, emoji: targetItem.emoji };
-          if (!prev.badges.some(b => b.id === entry.id) && prev.badges.length < 3) {
+          const existing = prev.badges.findIndex(b => b.id === targetItem.itemId);
+          if (existing >= 0) {
+            next.badges = prev.badges.filter((_, i) => i !== existing);
+          } else if (prev.badges.length < 3) {
+            const entry = { id: targetItem.itemId, name: targetItem.name, emoji: targetItem.emoji, rarity: targetItem.rarity };
             next.badges = [...prev.badges, entry];
           }
-        } else if (prev.badges.length > 0) {
-          next.badges = prev.badges.slice(0, -1);
         }
       }
       return next;
@@ -238,7 +239,7 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
             return { ...item, isEquipped: !!(targetItem && item.inventoryId === targetItem.inventoryId) };
           }
           if (slot === 'badge' && item.itemType === 'badge' && targetItem && item.inventoryId === targetItem.inventoryId) {
-            return { ...item, isEquipped: true };
+            return { ...item, isEquipped: !item.isEquipped }; // 토글
           }
           return item;
         });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { SavedProject, GeneratedAsset } from '../types';
 import {
   getPlaygroundFeed,
@@ -6,11 +6,13 @@ import {
   deletePlaygroundPost,
   toggleLike,
   getPostDetail,
+  uploadPlaygroundVideo,
   type PlaygroundPost,
   type PostDetailResponse,
   type PlaygroundEquippedItem,
   type PlaygroundEquippedItems,
 } from '../services/playgroundService';
+import { generateVideo } from '../services/videoService';
 import PreviewPlayer from './PreviewPlayer';
 
 // ── 레어리티 색상 (InventoryModal과 동일) ──
@@ -54,6 +56,8 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
   const [shareCaption, setShareCaption] = useState('');
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [shareProgress, setShareProgress] = useState('');
+  const shareAbortRef = useRef({ current: false });
 
   // 상세 모달
   const [detailData, setDetailData] = useState<PostDetailResponse | null>(null);
@@ -153,19 +157,74 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
     }
   }, [detailData]);
 
-  // 공유
+  // 공유 (렌더링 → 업로드 → DB 저장)
   const handleShare = useCallback(async () => {
     if (!shareProjectId) { setShareError('프로젝트를 선택해주세요.'); return; }
     setSharing(true);
     setShareError(null);
+    setShareProgress('공유 준비 중...');
+    shareAbortRef.current = { current: false };
+
     try {
+      // 1) DB에 게시물 먼저 생성
+      setShareProgress('게시물 생성 중...');
       const newPost = await shareToPlayground(shareProjectId, shareCaption);
+
+      // 2) 프로젝트 에셋 로드
+      setShareProgress('프로젝트 에셋 로딩 중...');
+      const detail = await getPostDetail(newPost.id);
+      const assets = detail.assets
+        .filter(a => a.imageUrl)
+        .map(a => ({
+          sceneNumber: a.sceneNumber,
+          narration: a.narration,
+          visualPrompt: a.visualPrompt,
+          imageData: a.imageUrl,
+          imageUrl: a.imageUrl,
+          audioData: null,
+          audioUrl: a.audioUrl,
+          audioDuration: a.audioDuration,
+          subtitleData: a.subtitleData,
+          customDuration: a.customDuration,
+          videoData: a.videoData,
+          videoDuration: a.videoDuration,
+          zoomEffect: a.zoomEffect as any,
+          transition: a.transition as any,
+          status: 'completed' as const,
+        })) as GeneratedAsset[];
+
+      if (assets.length > 0) {
+        // 3) 경량 MP4 렌더링 (720p, 2.5Mbps)
+        setShareProgress('영상 렌더링 중...');
+        const result = await generateVideo(
+          assets,
+          (msg) => setShareProgress(msg),
+          shareAbortRef.current,
+          {
+            resolution: '720p',
+            bitrateOverride: 2_500_000,
+            sceneGap: detail.sceneGap,
+            enableSubtitles: true,
+          }
+        );
+
+        if (result?.videoBlob) {
+          // 4) Supabase Storage에 업로드
+          const sizeMB = (result.videoBlob.size / 1024 / 1024).toFixed(1);
+          setShareProgress(`영상 업로드 중... (${sizeMB}MB)`);
+          const videoUrl = await uploadPlaygroundVideo(newPost.id, result.videoBlob);
+          newPost.videoUrl = videoUrl;
+        }
+      }
+
       setPosts(prev => [newPost, ...prev]);
       setShowShareModal(false);
       setShareProjectId('');
       setShareCaption('');
+      setShareProgress('');
     } catch (e: any) {
       setShareError(e.message);
+      setShareProgress('');
     } finally {
       setSharing(false);
     }
@@ -187,6 +246,13 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
+      {/* 소개 */}
+      <div className="mb-4">
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          다른 사용자들이 만든 AI 영상을 구경하고, 내 프로젝트도 공유해보세요.
+        </p>
+      </div>
+
       {/* 상단 바 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
@@ -287,11 +353,12 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
           projectId={shareProjectId}
           caption={shareCaption}
           sharing={sharing}
+          progress={shareProgress}
           error={shareError}
           onSelectProject={setShareProjectId}
           onChangeCaption={setShareCaption}
           onSubmit={handleShare}
-          onClose={() => { setShowShareModal(false); setShareError(null); }}
+          onClose={() => { if (!sharing) { setShowShareModal(false); setShareError(null); setShareProgress(''); } }}
         />
       )}
 
@@ -334,6 +401,16 @@ const PostCard: React.FC<{
           <svg className="w-10 h-10 opacity-20" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
           </svg>
+        </div>
+      )}
+      {/* 재생 아이콘 (영상이 있는 게시물) */}
+      {post.videoUrl && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+            <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
         </div>
       )}
       {/* 씬 수 배지 */}
@@ -418,7 +495,7 @@ const Avatar: React.FC<{ name: string; url: string | null; size: number }> = ({ 
   );
 };
 
-// ── 프레임 아바타 (장착 프레임 glow 효과) ──
+// ── 프레임 아바타 (등급별 효과) ──
 
 const FramedAvatar: React.FC<{
   name: string;
@@ -426,22 +503,52 @@ const FramedAvatar: React.FC<{
   size: number;
   frame?: PlaygroundEquippedItem | null;
 }> = ({ name, url, size, frame }) => {
-  const color = frame ? RARITY_COLORS[frame.rarity] || null : null;
-  if (!color) return <Avatar name={name} url={url} size={size} />;
+  const rarity = frame?.rarity as string | undefined;
+  const color = rarity ? RARITY_COLORS[rarity] || null : null;
+  if (!color || !rarity) return <Avatar name={name} url={url} size={size} />;
 
-  const borderW = size >= 36 ? 2 : 1.5;
+  const borderW = size >= 36 ? 2.5 : 2;
+  const innerSize = size - borderW * 2;
+
+  // 전설: 회전 conic-gradient 테두리 + 스파클
+  if (rarity === 'legendary') {
+    const ringPad = borderW + 1;
+    const outerSize = size + ringPad * 2;
+    return (
+      <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: outerSize, height: outerSize }} title={frame?.name}>
+        <div className="absolute inset-0 rounded-full frame-legendary-ring frame-animated" style={{ background: 'conic-gradient(from var(--frame-angle, 0deg), #ef4444, #f59e0b, #ec4899, #8b5cf6, #ef4444)', animation: 'frame-legendary-spin 3s linear infinite', opacity: 0.7 }} />
+        <div className="absolute rounded-full frame-animated" style={{ inset: ringPad - borderW, animation: 'frame-legendary-glow 2s ease-in-out infinite' }} />
+        <div className="absolute frame-animated" style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: '#fbbf24', top: 0, left: '50%', transform: 'translateX(-50%)', animation: 'frame-legendary-sparkle 2s ease-in-out infinite' }} />
+        <div className="absolute frame-animated" style={{ width: 3, height: 3, borderRadius: '50%', backgroundColor: '#ec4899', bottom: 1, right: 2, animation: 'frame-legendary-sparkle 2s ease-in-out infinite 0.7s' }} />
+        <div className="relative rounded-full overflow-hidden z-10" style={{ width: size, height: size }}>
+          <Avatar name={name} url={url} size={size} />
+        </div>
+      </div>
+    );
+  }
+
+  // 영웅: 금빛 글로우 맥동
+  if (rarity === 'epic') {
+    return (
+      <div className="rounded-full flex items-center justify-center flex-shrink-0 frame-animated" style={{ width: size, height: size, border: `${borderW}px solid ${color}`, animation: 'frame-epic-glow 3s ease-in-out infinite' }} title={frame?.name}>
+        <Avatar name={name} url={url} size={innerSize} />
+      </div>
+    );
+  }
+
+  // 희귀: 맥동 글로우
+  if (rarity === 'rare') {
+    return (
+      <div className="rounded-full flex items-center justify-center flex-shrink-0 frame-animated" style={{ width: size, height: size, border: `${borderW}px solid ${color}`, animation: 'frame-rare-pulse 2s ease-in-out infinite' }} title={frame?.name}>
+        <Avatar name={name} url={url} size={innerSize} />
+      </div>
+    );
+  }
+
+  // 고급: 정적 글로우 / 일반: 테두리만
   return (
-    <div
-      className="rounded-full flex items-center justify-center flex-shrink-0"
-      style={{
-        width: size,
-        height: size,
-        border: `${borderW}px solid ${color}`,
-        boxShadow: `0 0 ${Math.round(size * 0.25)}px ${color}44, 0 0 ${Math.round(size * 0.5)}px ${color}22`,
-      }}
-      title={frame.name}
-    >
-      <Avatar name={name} url={url} size={size - borderW * 2} />
+    <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: size, height: size, border: `${rarity === 'uncommon' ? 2 : 1.5}px solid ${color}`, boxShadow: rarity === 'uncommon' ? `0 0 6px ${color}44, 0 0 12px ${color}22` : undefined }} title={frame?.name}>
+      <Avatar name={name} url={url} size={size - (rarity === 'uncommon' ? 4 : 3)} />
     </div>
   );
 };
@@ -500,23 +607,28 @@ const ShareModal: React.FC<{
   projectId: string;
   caption: string;
   sharing: boolean;
+  progress: string;
   error: string | null;
   onSelectProject: (id: string) => void;
   onChangeCaption: (v: string) => void;
   onSubmit: () => void;
   onClose: () => void;
-}> = ({ projects, projectId, caption, sharing, error, onSelectProject, onChangeCaption, onSubmit, onClose }) => (
+}> = ({ projects, projectId, caption, sharing, progress, error, onSelectProject, onChangeCaption, onSubmit, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
     <div className="w-full max-w-md rounded-2xl border p-5 space-y-4"
       style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
       onClick={e => e.stopPropagation()}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>프로젝트 공유</h3>
+        <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>놀이터에 공유</h3>
         <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
+
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        선택한 프로젝트가 놀이터 피드에 공개됩니다. 다른 사용자들이 내 작품을 감상하고 좋아요를 누를 수 있어요.
+      </p>
 
       {/* 프로젝트 선택 */}
       <div>
@@ -568,11 +680,18 @@ const ShareModal: React.FC<{
 
       {error && <p className="text-xs" style={{ color: '#f87171' }}>{error}</p>}
 
+      {sharing && progress && (
+        <div className="flex items-center gap-2.5 p-3 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+          <div className="w-5 h-5 border-2 rounded-full animate-spin flex-shrink-0" style={{ borderColor: 'var(--brand-500)', borderTopColor: 'transparent' }} />
+          <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{progress}</p>
+        </div>
+      )}
+
       <button onClick={onSubmit} disabled={sharing || projects.length === 0}
         className="w-full py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
-        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}
+        style={{ background: sharing ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: sharing ? 'var(--text-muted)' : '#fff' }}
       >
-        {sharing ? '공유 중...' : '공유하기'}
+        {sharing ? '영상 준비 중...' : '공유하기'}
       </button>
     </div>
   </div>
@@ -662,8 +781,19 @@ const DetailModal: React.FC<{
 
         {data && (
           <div className="p-4 space-y-4">
-            {/* 영상 플레이어 */}
-            {playerAssets.length > 0 ? (
+            {/* 영상 플레이어: video_url이 있으면 네이티브 재생, 없으면 PreviewPlayer 폴백 */}
+            {data.post.videoUrl ? (
+              <div className="rounded-xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+                <video
+                  src={data.post.videoUrl}
+                  controls
+                  autoPlay
+                  preload="metadata"
+                  className="w-full max-h-[60vh]"
+                  style={{ display: 'block', margin: '0 auto' }}
+                />
+              </div>
+            ) : playerAssets.length > 0 ? (
               <PreviewPlayer
                 assets={playerAssets}
                 sceneGap={data.sceneGap}

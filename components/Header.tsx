@@ -2,6 +2,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { LevelInfo, EquippedItems } from '../types/gamification';
 import { getSoundEnabled, setSoundEnabled } from '../services/soundService';
+import AvatarFrame from './AvatarFrame';
 
 const FourLeafClover: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
   <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -70,10 +71,11 @@ interface HeaderProps {
   // 게이미피케이션 v2
   levelInfo?: LevelInfo | null;
   equipped?: EquippedItems | null;
+  userName?: string;
   onLogoAchievement?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, totalGenerations = 0, sessionCombo = 0, levelInfo, equipped, onLogoAchievement }) => {
+const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, totalGenerations = 0, sessionCombo = 0, levelInfo, equipped, userName, onLogoAchievement }) => {
   // 이스터에그: 로고 5회 빠른 클릭 → 무지개 회전
   const [easterEgg, setEasterEgg] = useState(false);
   const clickCountRef = useRef(0);
@@ -124,6 +126,12 @@ const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, tota
             <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 hidden sm:inline-flex">
               ⚡ {totalGenerations}개 생성
             </span>
+          )}
+          {/* 프레임 아바타 */}
+          {equipped?.frame && userName && (
+            <div className="ml-1 hidden sm:block">
+              <AvatarFrame name={userName} size={26} rarity={equipped.frame.rarity} frameName={equipped.frame.name} />
+            </div>
           )}
           {/* 레벨 뱃지 — 서버 동기화 시에만 표시 */}
           {levelInfo && (() => {

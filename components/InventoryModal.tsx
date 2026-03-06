@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { InventoryItem, EquippedItems, Rarity } from '../types/gamification';
+import AvatarFrame from './AvatarFrame';
 
 // ── 타입 정의 ──
 
@@ -160,7 +161,8 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
     const slot = slotMap[item.itemType];
     if (!slot) return;
 
-    if (item.isEquipped) {
+    // 뱃지는 토글 방식 — 장착 해제 시에도 inventoryId를 보내야 어떤 뱃지인지 식별 가능
+    if (item.isEquipped && slot !== 'badge') {
       onEquipItem(slot, null);
     } else {
       onEquipItem(slot, item.inventoryId);
@@ -529,8 +531,13 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {/* 프레임 미리보기 */}
+            <div className="flex flex-col items-center gap-1 min-w-[72px]" style={{ padding: 8, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', border: equipped.frame ? '2px solid #f59e0b' : `1px dashed ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}` }}>
+              <span className="text-[10px] font-medium opacity-50 uppercase tracking-wider">프레임</span>
+              <AvatarFrame name="ME" size={36} rarity={equipped.frame?.rarity} frameName={equipped.frame?.name} />
+              <span className="text-[11px] font-medium text-center leading-tight truncate max-w-[64px]">{equipped.frame?.name || <span className="opacity-30">비어있음</span>}</span>
+            </div>
             <EquippedSlot label="칭호" item={equipped.title} isDark={isDark} />
-            <EquippedSlot label="프레임" item={equipped.frame} isDark={isDark} />
             {/* 뱃지 슬롯들 (최대 3개 표시) */}
             {[0, 1, 2].map((idx) => (
               <EquippedSlot

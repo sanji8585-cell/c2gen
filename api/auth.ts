@@ -1568,12 +1568,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!session) return res.status(401).json({ error: 'invalid session' });
 
         const email = session.email;
+        const q = (query: PromiseLike<any>) => Promise.resolve(query);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const nowISO = new Date().toISOString();
 
-        // 1) 설정 로드
-        const { data: configRows } = await supabase.from('c2gen_game_config').select('key, value');
+        // ── 1단계: 독립 쿼리 7개를 병렬 실행 ──
+        const [
+          { data: configRows },
+          { data: usr },
+          { data: eqData },
+          { data: achDefs },
+          { data: achProgress },
+          { data: questResult },
+          { data: events },
+          { data: invData },
+        ] = await Promise.all([
+          q(supabase.from('c2gen_game_config').select('key, value')),
+          q(supabase.from('c2gen_users')
+            .select('xp, level, total_generations, total_images, total_audio, total_videos, streak_count, streak_last_date, gacha_count, gacha_tickets, gacha_pity_epic, gacha_pity_legendary, total_gacha_pulls, max_combo, prestige_level, prestige_xp_bonus, login_days, sound_enabled')
+            .eq('email', email).single()),
+          q(supabase.from('c2gen_user_equipped').select('equipped_title, equipped_badges, equipped_frame')
+            .eq('email', email).single()),
+          q(supabase.from('c2gen_achievements').select('*').eq('is_active', true).order('sort_order')),
+          q(supabase.from('c2gen_user_achievements').select('*').eq('email', email)),
+          q(supabase.from('c2gen_user_quests').select('quest_id, progress, completed, reward_claimed')
+            .eq('email', email).eq('assigned_date', todayStr)),
+          q(supabase.from('c2gen_events').select('*').eq('is_active', true).lte('start_at', nowISO).gte('end_at', nowISO)),
+          q(supabase.from('c2gen_user_inventory').select('id, item_id, quantity, obtained_via, is_equipped, is_active, active_until')
+            .eq('email', email)),
+        ]);
+
+        // ── 설정 파싱 ──
         const configMap: Record<string, any> = {};
         for (const row of (configRows || [])) configMap[row.key] = row.value;
-
         const config = {
           levels: configMap.levels || null,
           xpRates: configMap.xp_rates || null,
@@ -1583,74 +1610,107 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           prestigeSettings: configMap.prestige_settings || null,
         };
 
-        // 2) 유저 데이터
-        const { data: usr } = await supabase
-          .from('c2gen_users')
-          .select('xp, level, total_generations, total_images, total_audio, total_videos, streak_count, streak_last_date, gacha_count, gacha_tickets, gacha_pity_epic, gacha_pity_legendary, total_gacha_pulls, max_combo, prestige_level, prestige_xp_bonus, login_days, sound_enabled')
-          .eq('email', email).single();
-
+        // ── 유저 데이터 ──
         const user = {
-          xp: usr?.xp ?? 0,
-          level: usr?.level ?? 1,
+          xp: usr?.xp ?? 0, level: usr?.level ?? 1,
           totalGenerations: usr?.total_generations ?? 0,
-          totalImages: usr?.total_images ?? 0,
-          totalAudio: usr?.total_audio ?? 0,
+          totalImages: usr?.total_images ?? 0, totalAudio: usr?.total_audio ?? 0,
           totalVideos: usr?.total_videos ?? 0,
-          streakCount: usr?.streak_count ?? 0,
-          streakLastDate: usr?.streak_last_date ?? null,
+          streakCount: usr?.streak_count ?? 0, streakLastDate: usr?.streak_last_date ?? null,
           gachaTickets: usr?.gacha_tickets ?? 0,
-          gachaPityEpic: usr?.gacha_pity_epic ?? 0,
-          gachaPityLegendary: usr?.gacha_pity_legendary ?? 0,
+          gachaPityEpic: usr?.gacha_pity_epic ?? 0, gachaPityLegendary: usr?.gacha_pity_legendary ?? 0,
           totalGachaPulls: usr?.total_gacha_pulls ?? 0,
           maxCombo: usr?.max_combo ?? 0,
-          prestigeLevel: usr?.prestige_level ?? 0,
-          prestigeXpBonus: usr?.prestige_xp_bonus ?? 0,
-          loginDays: usr?.login_days ?? 0,
-          soundEnabled: usr?.sound_enabled ?? false,
+          prestigeLevel: usr?.prestige_level ?? 0, prestigeXpBonus: usr?.prestige_xp_bonus ?? 0,
+          loginDays: usr?.login_days ?? 0, soundEnabled: usr?.sound_enabled ?? false,
         };
 
-        // 3) 장착 정보
-        const { data: eqData } = await supabase
-          .from('c2gen_user_equipped').select('equipped_title, equipped_badges, equipped_frame')
-          .eq('email', email).single();
+        // ── 2단계: 장착 아이템 + 인벤토리 아이템 + 퀘스트 정의를 병렬로 조회 ──
+        // 장착 아이템 ID 수집
+        const equippedItemIds: string[] = [];
+        if (eqData?.equipped_title) equippedItemIds.push(eqData.equipped_title);
+        if (eqData?.equipped_frame) equippedItemIds.push(eqData.equipped_frame);
+        if (eqData?.equipped_badges?.length > 0) equippedItemIds.push(...eqData.equipped_badges);
 
-        let equipped = { title: null as any, badges: [] as any[], frame: null as any };
-        if (eqData) {
-          if (eqData.equipped_title) {
-            const { data: ti } = await supabase.from('c2gen_gacha_pool').select('id, name, emoji').eq('id', eqData.equipped_title).single();
-            if (ti) equipped.title = ti;
+        // 인벤토리 아이템 ID 수집
+        const invItemIds = [...new Set((invData || []).map((i: any) => i.item_id))];
+
+        // 모든 필요한 gacha_pool ID를 합쳐서 한 번에 조회
+        const allGachaIds = [...new Set([...equippedItemIds, ...invItemIds])];
+
+        // 퀘스트 처리 준비
+        let todayQuests = questResult;
+
+        // 퀘스트 미배정 시 자동 배정 (이건 순차 처리 필요)
+        if (!todayQuests || todayQuests.length === 0) {
+          const { data: pool } = await q(supabase.from('c2gen_quest_pool')
+            .select('*').eq('is_active', true).lte('min_level', user.level));
+          const eligible = (pool || []).filter((qst: any) => !qst.max_level || qst.max_level >= user.level);
+          if (eligible.length > 0) {
+            const selected: any[] = [];
+            const remaining = [...eligible];
+            for (let i = 0; i < Math.min(3, remaining.length); i++) {
+              const totalWeight = remaining.reduce((s: number, qst: any) => s + (qst.weight || 10), 0);
+              let r = Math.random() * totalWeight;
+              let pick = remaining[0];
+              for (const qst of remaining) { r -= (qst.weight || 10); if (r <= 0) { pick = qst; break; } }
+              selected.push(pick);
+              remaining.splice(remaining.indexOf(pick), 1);
+            }
+            await Promise.all(selected.map(qst => q(supabase.from('c2gen_user_quests').upsert({
+              email, quest_id: qst.id, assigned_date: todayStr,
+              progress: 0, completed: false, reward_claimed: false,
+            }, { onConflict: 'email,quest_id,assigned_date' }))));
+            todayQuests = selected.map((qst: any) => ({ quest_id: qst.id, progress: 0, completed: false, reward_claimed: false }));
           }
-          if (eqData.equipped_frame) {
-            const { data: fi } = await supabase.from('c2gen_gacha_pool').select('id, name, emoji').eq('id', eqData.equipped_frame).single();
-            if (fi) equipped.frame = fi;
-          }
-          const badgeIds = eqData.equipped_badges || [];
-          if (badgeIds.length > 0) {
-            const { data: bi } = await supabase.from('c2gen_gacha_pool').select('id, name, emoji').in('id', badgeIds);
-            equipped.badges = bi || [];
-          }
-        } else {
-          // 첫 접속: equipped 행 생성
-          await supabase.from('c2gen_user_equipped').upsert({ email, equipped_title: null, equipped_badges: [], equipped_frame: null }, { onConflict: 'email' });
         }
 
-        // 4) 업적
-        const { data: achDefs } = await supabase.from('c2gen_achievements').select('*').eq('is_active', true).order('sort_order');
-        const { data: achProgress } = await supabase.from('c2gen_user_achievements').select('*').eq('email', email);
+        const questIds = (todayQuests || []).map((qst: any) => qst.quest_id);
 
+        // ── gacha_pool 조회 + 퀘스트 정의 조회 병렬 ──
+        const [{ data: allGachaDefs }, { data: questDefs }] = await Promise.all([
+          allGachaIds.length > 0
+            ? q(supabase.from('c2gen_gacha_pool').select('*').in('id', allGachaIds))
+            : Promise.resolve({ data: [] }),
+          questIds.length > 0
+            ? q(supabase.from('c2gen_quest_pool').select('*').in('id', questIds))
+            : Promise.resolve({ data: [] }),
+        ]);
+
+        const gachaDefMap: Record<string, any> = {};
+        for (const g of (allGachaDefs || [])) gachaDefMap[g.id] = g;
+
+        // ── 장착 정보 조립 ──
+        let equipped = { title: null as any, badges: [] as any[], frame: null as any };
+        if (eqData) {
+          if (eqData.equipped_title && gachaDefMap[eqData.equipped_title]) {
+            const ti = gachaDefMap[eqData.equipped_title];
+            equipped.title = { id: ti.id, name: ti.name, emoji: ti.emoji, rarity: ti.rarity || 'common' };
+          }
+          if (eqData.equipped_frame && gachaDefMap[eqData.equipped_frame]) {
+            const fi = gachaDefMap[eqData.equipped_frame];
+            equipped.frame = { id: fi.id, name: fi.name, emoji: fi.emoji, rarity: fi.rarity || 'common' };
+          }
+          for (const bid of (eqData.equipped_badges || [])) {
+            if (gachaDefMap[bid]) {
+              const bi = gachaDefMap[bid];
+              equipped.badges.push({ id: bi.id, name: bi.name, emoji: bi.emoji, rarity: bi.rarity || 'common' });
+            }
+          }
+        } else {
+          await q(supabase.from('c2gen_user_equipped').upsert({ email, equipped_title: null, equipped_badges: [], equipped_frame: null }, { onConflict: 'email' }));
+        }
+
+        // ── 업적 ──
         const progressMap: Record<string, any> = {};
         const newlyUnlocked: string[] = [];
         for (const ap of (achProgress || [])) {
           progressMap[ap.achievement_id] = {
-            achievementId: ap.achievement_id,
-            progress: ap.progress,
-            unlocked: ap.unlocked,
-            unlockedAt: ap.unlocked_at,
-            notified: ap.notified,
+            achievementId: ap.achievement_id, progress: ap.progress,
+            unlocked: ap.unlocked, unlockedAt: ap.unlocked_at, notified: ap.notified,
           };
           if (ap.unlocked && !ap.notified) newlyUnlocked.push(ap.achievement_id);
         }
-
         const definitions = (achDefs || []).map((a: any) => ({
           id: a.id, name: a.name, description: a.description, icon: a.icon,
           category: a.category, conditionType: a.condition_type, conditionTarget: a.condition_target,
@@ -1660,79 +1720,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           isHidden: a.is_hidden, isActive: a.is_active, sortOrder: a.sort_order,
         }));
 
-        // 5) 오늘 퀘스트
-        const todayStr = new Date().toISOString().slice(0, 10);
-        let { data: todayQuests } = await supabase
-          .from('c2gen_user_quests')
-          .select('quest_id, progress, completed, reward_claimed')
-          .eq('email', email).eq('assigned_date', todayStr);
-
-        // 퀘스트 미배정 시 자동 배정
-        if (!todayQuests || todayQuests.length === 0) {
-          const { data: pool } = await supabase.from('c2gen_quest_pool')
-            .select('*').eq('is_active', true)
-            .lte('min_level', user.level);
-
-          const eligible = (pool || []).filter((q: any) => !q.max_level || q.max_level >= user.level);
-          if (eligible.length > 0) {
-            // 가중치 기반 랜덤 선택 3개
-            const selected: any[] = [];
-            const remaining = [...eligible];
-            for (let i = 0; i < Math.min(3, remaining.length); i++) {
-              const totalWeight = remaining.reduce((s: number, q: any) => s + (q.weight || 10), 0);
-              let r = Math.random() * totalWeight;
-              let pick = remaining[0];
-              for (const q of remaining) {
-                r -= (q.weight || 10);
-                if (r <= 0) { pick = q; break; }
-              }
-              selected.push(pick);
-              remaining.splice(remaining.indexOf(pick), 1);
-            }
-
-            for (const q of selected) {
-              await supabase.from('c2gen_user_quests').upsert({
-                email, quest_id: q.id, assigned_date: todayStr,
-                progress: 0, completed: false, reward_claimed: false,
-              }, { onConflict: 'email,quest_id,assigned_date' });
-            }
-
-            todayQuests = selected.map((q: any) => ({
-              quest_id: q.id, progress: 0, completed: false, reward_claimed: false,
-            }));
-          }
-        }
-
-        // 퀘스트 풀 조회해서 이름 등 매핑
-        const questIds = (todayQuests || []).map((q: any) => q.quest_id);
-        const { data: questDefs } = questIds.length > 0
-          ? await supabase.from('c2gen_quest_pool').select('*').in('id', questIds)
-          : { data: [] };
+        // ── 퀘스트 ──
         const questDefMap: Record<string, any> = {};
         for (const qd of (questDefs || [])) questDefMap[qd.id] = qd;
-
-        const quests = (todayQuests || []).map((q: any) => {
-          const def = questDefMap[q.quest_id];
+        const quests = (todayQuests || []).map((qst: any) => {
+          const def = questDefMap[qst.quest_id];
           return {
-            questId: q.quest_id,
-            name: def?.name || q.quest_id,
-            description: def?.description || '',
-            icon: def?.icon || '📋',
-            questType: def?.quest_type || 'generate_content',
-            target: def?.target || 1,
-            progress: q.progress,
-            completed: q.completed,
-            rewardClaimed: q.reward_claimed,
-            rewardXp: def?.reward_xp || 10,
-            rewardCredits: def?.reward_credits || 5,
+            questId: qst.quest_id, name: def?.name || qst.quest_id,
+            description: def?.description || '', icon: def?.icon || '📋',
+            questType: def?.quest_type || 'generate_content', target: def?.target || 1,
+            progress: qst.progress, completed: qst.completed, rewardClaimed: qst.reward_claimed,
+            rewardXp: def?.reward_xp || 10, rewardCredits: def?.reward_credits || 5,
           };
         });
 
-        // 6) 활성 이벤트
-        const now = new Date().toISOString();
-        const { data: events } = await supabase.from('c2gen_events').select('*')
-          .eq('is_active', true).lte('start_at', now).gte('end_at', now);
-
+        // ── 이벤트 ──
         const activeEvents = (events || []).map((e: any) => ({
           id: e.id, name: e.name, description: e.description, icon: e.icon,
           startAt: e.start_at, endAt: e.end_at,
@@ -1740,22 +1742,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           specialGachaItems: e.special_gacha_items || [], isActive: e.is_active,
         }));
 
-        // 7) 인벤토리
-        const { data: invData } = await supabase
-          .from('c2gen_user_inventory')
-          .select('id, item_id, quantity, obtained_via, is_equipped, is_active, active_until')
-          .eq('email', email);
-
-        const itemIds = [...new Set((invData || []).map((i: any) => i.item_id))];
-        const { data: itemDefs } = itemIds.length > 0
-          ? await supabase.from('c2gen_gacha_pool').select('*').in('id', itemIds)
-          : { data: [] };
-        const itemDefMap: Record<string, any> = {};
-        for (const id of (itemDefs || [])) itemDefMap[id.id] = id;
-
+        // ── 인벤토리 ──
         const inventory = { titles: [] as any[], badges: [] as any[], frames: [] as any[], consumables: [] as any[] };
         for (const inv of (invData || [])) {
-          const def = itemDefMap[inv.item_id];
+          const def = gachaDefMap[inv.item_id];
           if (!def) continue;
           const item = {
             inventoryId: inv.id, itemId: inv.item_id,
@@ -2355,14 +2345,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else if (slot === 'badge') {
           let badges: string[] = prev?.equipped_badges || [];
           if (gachaItemId) {
-            if (!badges.includes(gachaItemId) && badges.length < 3) {
+            if (badges.includes(gachaItemId)) {
+              // 이미 장착된 뱃지 → 해제 (토글)
+              badges = badges.filter(b => b !== gachaItemId);
+              writes.push(q(supabase.from('c2gen_user_inventory').update({ is_equipped: false }).eq('email', eEmail).eq('item_id', gachaItemId)));
+            } else if (badges.length < 3) {
+              // 새 뱃지 장착
               badges = [...badges, gachaItemId];
               writes.push(q(supabase.from('c2gen_user_inventory').update({ is_equipped: true }).eq('email', eEmail).eq('item_id', gachaItemId)));
             }
-          } else if (badges.length > 0) {
-            const removedId = badges[badges.length - 1];
-            badges = badges.slice(0, -1);
-            writes.push(q(supabase.from('c2gen_user_inventory').update({ is_equipped: false }).eq('email', eEmail).eq('item_id', removedId)));
           }
           writes.push(q(supabase.from('c2gen_user_equipped').upsert({ email: eEmail, equipped_badges: badges, updated_at: now }, { onConflict: 'email' })));
         }
