@@ -1944,7 +1944,7 @@ const AppContent: React.FC<{
 
       {/* 마일스톤/콤보 토스트 */}
       {consumablePopup && (
-        <div className="fixed inset-0 z-[9998] flex items-center justify-center pointer-events-none">
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center pointer-events-none">
           <div
             className="flex flex-col items-center gap-3 px-10 py-8 rounded-3xl shadow-2xl"
             style={{
