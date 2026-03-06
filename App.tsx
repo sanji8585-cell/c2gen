@@ -337,8 +337,7 @@ const AppContent: React.FC<{
   const [showReactions, setShowReactions] = useState(false);
   const [sessionCombo, setSessionCombo] = useState(0);
   const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
-  const [showIdleParticles, setShowIdleParticles] = useState(false);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showIdleParticles] = useState(false); // 유휴 파티클 비활성화
   // Tip of the Day
   const [showTipOfDay, setShowTipOfDay] = useState(false);
   const [tipOfDay, setTipOfDay] = useState<typeof PRO_TIPS[0] | null>(null);
@@ -526,21 +525,6 @@ const AppContent: React.FC<{
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
-
-  // 유휴 파티클 (30초 무조작)
-  const resetIdleTimer = useCallback(() => {
-    setShowIdleParticles(false);
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => {
-      if (step === GenerationStep.IDLE || step === GenerationStep.COMPLETED) setShowIdleParticles(true);
-    }, 30000);
-  }, [step]);
-  useEffect(() => {
-    const events = ['mousemove','keydown','click','scroll','touchstart'] as const;
-    events.forEach(e => window.addEventListener(e, resetIdleTimer, { passive: true }));
-    resetIdleTimer();
-    return () => { events.forEach(e => window.removeEventListener(e, resetIdleTimer)); if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
-  }, [resetIdleTimer]);
 
   // 프로젝트 목록 새로고침
   const refreshProjects = useCallback(async () => {

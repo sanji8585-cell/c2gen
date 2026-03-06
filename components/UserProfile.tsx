@@ -20,7 +20,7 @@ interface UserProfileProps {
   };
 }
 
-type Tab = 'info' | 'game' | 'usage' | 'payments' | 'security';
+type Tab = 'info' | 'game' | 'usage' | 'payments' | 'security' | 'referral';
 
 interface ProfileData {
   email: string;
@@ -43,22 +43,22 @@ interface PaymentRecord {
 }
 
 const PLAN_LABELS: Record<string, { name: string; color: string; bg: string }> = {
-  free: { name: '\uBB34\uB8CC', color: 'text-slate-400', bg: 'bg-slate-500/20 border-slate-500/30' },
-  basic: { name: '\uBCA0\uC774\uC9C1', color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
-  pro: { name: '\uD504\uB85C', color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
-  operator: { name: '\uC6B4\uC601\uC790', color: 'text-orange-400', bg: 'bg-orange-500/20 border-orange-500/30' },
+  free: { name: '무료', color: 'text-slate-400', bg: 'bg-slate-500/20 border-slate-500/30' },
+  basic: { name: '베이직', color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
+  pro: { name: '프로', color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
+  operator: { name: '운영자', color: 'text-orange-400', bg: 'bg-orange-500/20 border-orange-500/30' },
 };
 
 const USAGE_TYPE_ICONS: Record<string, string> = {
-  image: '\uD83D\uDDBC\uFE0F',
-  tts: '\uD83D\uDD0A',
-  video: '\uD83C\uDFAC',
-  script: '\uD83D\uDCDD',
-  bonus: '\uD83C\uDF81',
-  signup: '\uD83C\uDF89',
-  purchase: '\uD83D\uDCB3',
-  deduct: '\u2796',
-  refund: '\uD83D\uDD04',
+  image: '🖼️',
+  tts: '🔊',
+  video: '🎬',
+  script: '📝',
+  bonus: '🎁',
+  signup: '🎉',
+  purchase: '💳',
+  deduct: '➖',
+  refund: '🔄',
 };
 
 const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, currentPlan, userName, onNameChange, gameState }) => {
@@ -71,19 +71,19 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [usageFilter, setUsageFilter] = useState<string>('all');
 
-  // \uD504\uB85C\uD544 \uD3B8\uC9D1
+  // 프로필 편집
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // \uBE44\uBC00\uBC88\uD638 \uBCC0\uACBD
+  // 비밀번호 변경
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // \uC544\uBC14\uD0C0 \uC5C5\uB85C\uB4DC
+  // 아바타 업로드
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -159,12 +159,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
         localStorage.setItem('c2gen_user_name', newName.trim());
         onNameChange(newName.trim());
         setEditingName(false);
-        setMessage({ type: 'success', text: '\uB2C9\uB124\uC784\uC774 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' });
+        setMessage({ type: 'success', text: '닉네임이 변경되었습니다.' });
       } else {
-        setMessage({ type: 'error', text: d.error || '\uBCC0\uACBD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+        setMessage({ type: 'error', text: d.error || '변경에 실패했습니다.' });
       }
     } catch {
-      setMessage({ type: 'error', text: '\uC11C\uBC84 \uC5F0\uACB0\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+      setMessage({ type: 'error', text: '서버 연결에 실패했습니다.' });
     }
     setSaving(false);
   };
@@ -191,7 +191,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
         resolve(dataUrl.split(',')[1]);
         URL.revokeObjectURL(img.src);
       };
-      img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('\uC774\uBBF8\uC9C0\uB97C \uC77D\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.')); };
+      img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('이미지를 읽을 수 없습니다.')); };
       img.src = URL.createObjectURL(file);
     });
   };
@@ -200,7 +200,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
     const file = e.target.files?.[0];
     if (!file || !token) return;
     if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: '\uC774\uBBF8\uC9C0 \uD30C\uC77C\uB9CC \uC5C5\uB85C\uB4DC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.' });
+      setMessage({ type: 'error', text: '이미지 파일만 업로드할 수 있습니다.' });
       return;
     }
 
@@ -217,12 +217,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
       const d = await r.json();
       if (r.ok && d.url) {
         setProfile(p => p ? { ...p, avatarUrl: d.url } : p);
-        setMessage({ type: 'success', text: '\uD504\uB85C\uD544 \uC774\uBBF8\uC9C0\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' });
+        setMessage({ type: 'success', text: '프로필 이미지가 변경되었습니다.' });
       } else {
-        setMessage({ type: 'error', text: d.error || '\uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+        setMessage({ type: 'error', text: d.error || '업로드에 실패했습니다.' });
       }
     } catch {
-      setMessage({ type: 'error', text: '\uC5C5\uB85C\uB4DC \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.' });
+      setMessage({ type: 'error', text: '업로드 중 오류가 발생했습니다.' });
     }
     setUploadingAvatar(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -231,15 +231,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
   const handleChangePassword = async () => {
     if (!token) return;
     if (!currentPassword || !newPassword) {
-      setMessage({ type: 'error', text: '\uBE44\uBC00\uBC88\uD638\uB97C \uC785\uB825\uD574\uC8FC\uC138\uC694.' });
+      setMessage({ type: 'error', text: '비밀번호를 입력해주세요.' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: '\uC0C8 \uBE44\uBC00\uBC88\uD638\uAC00 \uC77C\uCE58\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.' });
+      setMessage({ type: 'error', text: '새 비밀번호가 일치하지 않습니다.' });
       return;
     }
     if (newPassword.length < 4) {
-      setMessage({ type: 'error', text: '\uC0C8 \uBE44\uBC00\uBC88\uD638\uB294 4\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.' });
+      setMessage({ type: 'error', text: '새 비밀번호는 4자 이상이어야 합니다.' });
       return;
     }
 
@@ -253,15 +253,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
       });
       const d = await r.json();
       if (r.ok && d.success) {
-        setMessage({ type: 'success', text: '\uBE44\uBC00\uBC88\uD638\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' });
+        setMessage({ type: 'success', text: '비밀번호가 변경되었습니다.' });
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setMessage({ type: 'error', text: d.error || '\uBCC0\uACBD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+        setMessage({ type: 'error', text: d.error || '변경에 실패했습니다.' });
       }
     } catch {
-      setMessage({ type: 'error', text: '\uC11C\uBC84 \uC5F0\uACB0\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+      setMessage({ type: 'error', text: '서버 연결에 실패했습니다.' });
     }
     setChangingPassword(false);
   };
@@ -288,7 +288,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
 
   const filteredHistory = usageFilter === 'all'
     ? history
-    : history.filter(tx => tx.type === usageFilter);
+    : history.filter(tx => {
+        const desc = (tx.description || '').toLowerCase();
+        switch (usageFilter) {
+          case 'image': return desc.includes('이미지') || desc.includes('image') || desc.includes('gemini');
+          case 'tts': return desc.includes('tts') || desc.includes('음성') || desc.includes('elevenlabs');
+          case 'video': return desc.includes('영상') || desc.includes('video') || desc.includes('pixverse');
+          case 'bonus': return tx.type === 'bonus' || tx.type === 'admin' || tx.amount > 0;
+          case 'purchase': return tx.type === 'charge' || tx.type === 'subscription';
+          default: return true;
+        }
+      });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -297,26 +307,27 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
         style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* \uD5E4\uB354 */}
+        {/* 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-default)' }}>
-          <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>\uB0B4 \uD504\uB85C\uD544</h2>
+          <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>내 프로필</h2>
           <button
             onClick={onClose}
             className="text-xl transition-colors"
             style={{ color: 'var(--text-muted)' }}
             onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
             onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-          >{'\u2715'}</button>
+          >{'\✕'}</button>
         </div>
 
-        {/* \uD0ED */}
+        {/* 탭 */}
         <div className="flex border-b px-4" style={{ borderColor: 'var(--border-default)' }}>
           {([
-            { id: 'info' as Tab, label: '\uB0B4 \uC815\uBCF4' },
-            { id: 'game' as Tab, label: '\uD83C\uDFAE \uAC8C\uC784' },
-            { id: 'usage' as Tab, label: '\uC0AC\uC6A9 \uB0B4\uC5ED' },
-            { id: 'payments' as Tab, label: '\uACB0\uC81C \uB0B4\uC5ED' },
-            { id: 'security' as Tab, label: '\uBCF4\uC548' },
+            { id: 'info' as Tab, label: '내 정보' },
+            { id: 'game' as Tab, label: '🎮 게임' },
+            { id: 'usage' as Tab, label: '사용 내역' },
+            { id: 'payments' as Tab, label: '결제 내역' },
+            { id: 'security' as Tab, label: '보안' },
+            { id: 'referral' as Tab, label: '추천' },
           ]).map(t => (
             <button
               key={t.id}
@@ -330,7 +341,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
           ))}
         </div>
 
-        {/* \uBA54\uC2DC\uC9C0 */}
+        {/* 메시지 */}
         {message && (
           <div className={`mx-6 mt-3 px-3 py-2 rounded-lg text-xs font-bold ${
             message.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
@@ -339,15 +350,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
           </div>
         )}
 
-        {/* \uCEE8\uD150\uCE20 */}
+        {/* 컨텐츠 */}
         <div className="overflow-y-auto p-6 flex-1">
-          {/* === \uB0B4 \uC815\uBCF4 \uD0ED === */}
+          {/* === 내 정보 탭 === */}
           {activeTab === 'info' && (
             loading ? (
-              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>\uB85C\uB529 \uC911...</div>
+              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>로딩 중...</div>
             ) : profile ? (
               <div className="space-y-5">
-                {/* \uD504\uB85C\uD544 \uC774\uBBF8\uC9C0 + \uC774\uB984 */}
+                {/* 프로필 이미지 + 이름 */}
                 <div className="flex items-center gap-4">
                   <div className="relative group">
                     <button
@@ -394,14 +405,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                           disabled={saving || !newName.trim()}
                           className="px-3 py-1.5 bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 rounded-lg text-xs font-bold border border-brand-500/30 transition-all disabled:opacity-50"
                         >
-                          {saving ? '...' : '\uC800\uC7A5'}
+                          {saving ? '...' : '저장'}
                         </button>
                         <button
                           onClick={() => { setEditingName(false); setNewName(profile.name); }}
                           className="px-2 py-1.5 text-xs transition-colors"
                           style={{ color: 'var(--text-muted)' }}
                         >
-                          \uCDE8\uC18C
+                          취소
                         </button>
                       </div>
                     ) : (
@@ -419,14 +430,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                           </button>
-                          {/* \uC7A5\uCC29 \uCE6D\uD638 */}
+                          {/* 장착 칭호 */}
                           {equipped?.title && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full border font-bold" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
                               {equipped.title.name}
                             </span>
                           )}
                         </div>
-                        {/* \uC7A5\uCC29 \uBC30\uC9C0 */}
+                        {/* 장착 배지 */}
                         {equipped?.badges && equipped.badges.length > 0 && (
                           <div className="flex items-center gap-1 mt-1">
                             {equipped.badges.map((b, i) => (
@@ -442,7 +453,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                   </div>
                 </div>
 
-                {/* \uB808\uBCA8 + XP \uBC14 */}
+                {/* 레벨 + XP 바 */}
                 {gs?.synced && lvl && (
                   <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                     <div className="flex items-center justify-between mb-1.5">
@@ -471,86 +482,86 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                   </div>
                 )}
 
-                {/* \uC815\uBCF4 \uCE74\uB4DC */}
+                {/* 정보 카드 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>\uB4F1\uAE09</p>
+                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>등급</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full border font-bold ${planInfo.bg} ${planInfo.color}`}>
                       {planInfo.name}
                     </span>
                   </div>
                   <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>\uD06C\uB808\uB527</p>
+                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>크레딧</p>
                     <span className={`text-sm font-bold ${currentPlan === 'operator' ? 'text-orange-400' : 'text-emerald-400'}`}>
-                      {currentPlan === 'operator' ? '\uBB34\uC81C\uD55C' : currentCredits.toLocaleString()}
+                      {currentPlan === 'operator' ? '무제한' : currentCredits.toLocaleString()}
                     </span>
                   </div>
                   {gs?.synced && usr ? (
                     <>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>\uC5F0\uC18D \uCD9C\uC11D</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>연속 출석</p>
                         <span className="text-sm font-bold" style={{ color: usr.streakCount >= 7 ? '#f59e0b' : 'var(--text-secondary)' }}>
-                          {usr.streakCount}\uC77C
+                          {usr.streakCount}일
                         </span>
                       </div>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>\uCD1D \uB85C\uADF8\uC778</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>총 로그인</p>
                         <span className="text-sm font-bold" style={{ color: 'var(--text-secondary)' }}>
-                          {usr.loginDays}\uC77C
+                          {usr.loginDays}일
                         </span>
                       </div>
                     </>
                   ) : (
                     <>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>\uAC00\uC785\uC77C</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>가입일</p>
                         <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                           {new Date(profile.createdAt).toLocaleDateString('ko-KR')}
                         </span>
                       </div>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>\uB85C\uADF8\uC778 \uBC29\uC2DD</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>로그인 방식</p>
                         <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                          {profile.oauthProvider === 'google' ? 'Google' : profile.oauthProvider === 'kakao' ? 'Kakao' : '\uC774\uBA54\uC77C'}
+                          {profile.oauthProvider === 'google' ? 'Google' : profile.oauthProvider === 'kakao' ? 'Kakao' : '이메일'}
                         </span>
                       </div>
                     </>
                   )}
                 </div>
 
-                {/* \uD06C\uB808\uB527 \uB2E8\uAC00 \uC548\uB0B4 */}
+                {/* 크레딧 단가 안내 */}
                 <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 30%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                  <p className="text-[10px] mb-2 font-bold" style={{ color: 'var(--text-muted)' }}>\uD06C\uB808\uB527 \uC0AC\uC6A9 \uB2E8\uAC00</p>
+                  <p className="text-[10px] mb-2 font-bold" style={{ color: 'var(--text-muted)' }}>크레딧 사용 단가</p>
                   <div className="grid grid-cols-2 gap-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
                     {Object.entries(CREDIT_CONFIG.COSTS).map(([key, cost]) => (
                       <div key={key} className="flex justify-between">
-                        <span>{key === 'gemini-2.5-flash-image' ? 'Gemini \uC774\uBBF8\uC9C0' : key === 'gpt-image-1' ? 'GPT \uC774\uBBF8\uC9C0' : key === 'tts_per_1000_chars' ? 'TTS (1000\uC790)' : key === 'video' ? '\uC601\uC0C1 \uBCC0\uD658' : key === 'script' ? '\uC2A4\uD06C\uB9BD\uD2B8' : key}</span>
-                        <span className="font-bold">{cost} \uD06C\uB808\uB527</span>
+                        <span>{key === 'gemini-2.5-flash-image' ? 'Gemini 이미지' : key === 'gpt-image-1' ? 'GPT 이미지' : key === 'tts_per_1000_chars' ? 'TTS (1000자)' : key === 'video' ? '영상 변환' : key === 'script' ? '스크립트' : key}</span>
+                        <span className="font-bold">{cost} 크레딧</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>\uD504\uB85C\uD544\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.</div>
+              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>프로필을 불러올 수 없습니다.</div>
             )
           )}
 
-          {/* === \uAC8C\uC784 \uD0ED === */}
+          {/* === 게임 탭 === */}
           {activeTab === 'game' && (
             gs?.synced && usr ? (
               <div className="space-y-4">
-                {/* \uD1B5\uACC4 \uADF8\uB9AC\uB4DC */}
+                {/* 통계 그리드 */}
                 <div>
-                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>\uD65C\uB3D9 \uD1B5\uACC4</p>
+                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>활동 통계</p>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { label: '\uCD1D \uC0DD\uC131', value: usr.totalGenerations, icon: '\uD83D\uDCCA' },
-                      { label: '\uC774\uBBF8\uC9C0', value: usr.totalImages, icon: '\uD83D\uDDBC\uFE0F' },
-                      { label: '\uC624\uB514\uC624', value: usr.totalAudio, icon: '\uD83D\uDD0A' },
-                      { label: '\uC601\uC0C1', value: usr.totalVideos, icon: '\uD83C\uDFAC' },
-                      { label: '\uB85C\uADF8\uC778', value: `${usr.loginDays}\uC77C`, icon: '\uD83D\uDCC5' },
-                      { label: '\uCD5C\uACE0 \uCF64\uBCF4', value: usr.maxCombo, icon: '\uD83D\uDD25' },
+                      { label: '총 생성', value: usr.totalGenerations, icon: '📝' },
+                      { label: '이미지', value: usr.totalImages, icon: '🖼️' },
+                      { label: '오디오', value: usr.totalAudio, icon: '🔊' },
+                      { label: '영상', value: usr.totalVideos, icon: '🎬' },
+                      { label: '로그인', value: `${usr.loginDays}일`, icon: '📅' },
+                      { label: '최고 콤보', value: usr.maxCombo, icon: '⚡' },
                     ].map((s, i) => (
                       <div key={i} className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                         <div className="text-sm mb-0.5">{s.icon}</div>
@@ -561,14 +572,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                   </div>
                 </div>
 
-                {/* \uC5C5\uC801 \uC694\uC57D */}
+                {/* 업적 요약 */}
                 {achievements && (
                   <div>
-                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>\uC5C5\uC801</p>
+                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>업적</p>
                     <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {Object.values(achievements.progress).filter(a => a.unlocked).length} / {achievements.definitions.length} \uB2EC\uC131
+                          {Object.values(achievements.progress).filter(a => a.unlocked).length} / {achievements.definitions.length} 달성
                         </span>
                         <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                           {Math.round((Object.values(achievements.progress).filter(a => a.unlocked).length / Math.max(1, achievements.definitions.length)) * 100)}%
@@ -580,7 +591,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                           style={{ width: `${(Object.values(achievements.progress).filter(a => a.unlocked).length / Math.max(1, achievements.definitions.length)) * 100}%` }}
                         />
                       </div>
-                      {/* \uCD5C\uADFC \uC5C5\uC801 3\uAC1C */}
+                      {/* 최근 업적 3개 */}
                       <div className="space-y-1">
                         {achievements.definitions
                           .filter(a => achievements.progress[a.id]?.unlocked)
@@ -593,42 +604,42 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                             </div>
                           ))}
                         {Object.values(achievements.progress).filter(a => a.unlocked).length === 0 && (
-                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>\uC544\uC9C1 \uB2EC\uC131\uD55C \uC5C5\uC801\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>아직 달성한 업적이 없습니다.</p>
                         )}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* \uBFD1\uAE30 \uC694\uC57D */}
+                {/* 뿑기 요약 */}
                 <div>
-                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>\uBFD1\uAE30 (Gacha)</p>
+                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>뿑기 (Gacha)</p>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{usr.totalGachaPulls}</div>
-                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>\uCD1D \uBFD1\uAE30</div>
+                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>총 뿑기</div>
                     </div>
                     <div className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="text-sm font-bold" style={{ color: usr.gachaTickets > 0 ? '#22c55e' : 'var(--text-primary)' }}>{usr.gachaTickets}</div>
-                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>\uD2F0\uCF13</div>
+                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>티켓</div>
                     </div>
                     <div className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="text-sm font-bold" style={{ color: '#f59e0b' }}>{usr.gachaPityLegendary}</div>
-                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>\uCC9C\uC7A5 \uCE74\uC6B4\uD130</div>
+                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>천장 카운터</div>
                     </div>
                   </div>
                 </div>
 
-                {/* \uC778\uBCA4\uD1A0\uB9AC \uC694\uC57D */}
+                {/* 인벤토리 요약 */}
                 {inventory && (
                   <div>
-                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>\uC778\uBCA4\uD1A0\uB9AC</p>
+                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>인벤토리</p>
                     <div className="grid grid-cols-4 gap-2">
                       {[
-                        { label: '\uCE6D\uD638', count: inventory.titles.length },
-                        { label: '\uBC30\uC9C0', count: inventory.badges.length },
-                        { label: '\uD504\uB808\uC784', count: inventory.frames.length },
-                        { label: '\uC18C\uBAA8\uD488', count: inventory.consumables.length },
+                        { label: '칭호', count: inventory.titles.length },
+                        { label: '배지', count: inventory.badges.length },
+                        { label: '프레임', count: inventory.frames.length },
+                        { label: '소모품', count: inventory.consumables.length },
                       ].map((inv, i) => (
                         <div key={i} className="p-2 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                           <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{inv.count}</div>
@@ -639,9 +650,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                   </div>
                 )}
 
-                {/* \uC5F0\uC18D \uCD9C\uC11D \uB9C8\uC77C\uC2A4\uD1A4 */}
+                {/* 연속 출석 마일스톤 */}
                 <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 30%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                  <p className="text-[10px] font-bold mb-1.5" style={{ color: 'var(--text-muted)' }}>\uC5F0\uC18D \uCD9C\uC11D \uB9C8\uC77C\uC2A4\uD1A4</p>
+                  <p className="text-[10px] font-bold mb-1.5" style={{ color: 'var(--text-muted)' }}>연속 출석 마일스톤</p>
                   <div className="flex items-center gap-1">
                     {[3, 7, 14, 30].map(d => (
                       <div
@@ -653,7 +664,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                           border: `1px solid ${usr.streakCount >= d ? 'rgba(234, 179, 8, 0.3)' : 'var(--border-subtle)'}`,
                         }}
                       >
-                        {d}\uC77C
+                        {d}일
                       </div>
                     ))}
                   </div>
@@ -661,25 +672,25 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="text-3xl mb-3">{'\uD83C\uDFAE'}</div>
-                <p className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>\uAC8C\uC774\uBBF8\uD53C\uCF00\uC774\uC158</p>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>\uB85C\uADF8\uC778 \uD6C4 \uAC8C\uC784 \uB370\uC774\uD130\uAC00 \uB3D9\uAE30\uD654\uB418\uBA74 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.</p>
+                <div className="text-3xl mb-3">{'🎮'}</div>
+                <p className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>게이미피케이션</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>로그인 후 게임 데이터가 동기화되면 확인할 수 있습니다.</p>
               </div>
             )
           )}
 
-          {/* === \uC0AC\uC6A9 \uB0B4\uC5ED \uD0ED === */}
+          {/* === 사용 내역 탭 === */}
           {activeTab === 'usage' && (
             <div>
-              {/* \uD544\uD130 \uBC84\uD2BC */}
+              {/* 필터 버튼 */}
               <div className="flex flex-wrap gap-1 mb-3">
                 {[
-                  { id: 'all', label: '\uC804\uCCB4' },
-                  { id: 'image', label: '\uD83D\uDDBC\uFE0F \uC774\uBBF8\uC9C0' },
-                  { id: 'tts', label: '\uD83D\uDD0A TTS' },
-                  { id: 'video', label: '\uD83C\uDFAC \uC601\uC0C1' },
-                  { id: 'bonus', label: '\uD83C\uDF81 \uBCF4\uC0C1' },
-                  { id: 'purchase', label: '\uD83D\uDCB3 \uCDA9\uC804' },
+                  { id: 'all', label: '전체' },
+                  { id: 'image', label: '🖼️ 이미지' },
+                  { id: 'tts', label: '🔊 TTS' },
+                  { id: 'video', label: '🎬 영상' },
+                  { id: 'bonus', label: '🎁 보상' },
+                  { id: 'purchase', label: '💳 충전' },
                 ].map(f => (
                   <button
                     key={f.id}
@@ -697,15 +708,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
               </div>
 
               {historyLoading ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>\uB85C\uB529 \uC911...</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>로딩 중...</div>
               ) : filteredHistory.length === 0 ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>\uC0AC\uC6A9 \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>사용 내역이 없습니다.</div>
               ) : (
                 <div className="space-y-1">
                   {filteredHistory.map(tx => (
                     <div key={tx.id} className="flex items-center justify-between px-3 py-2 rounded-lg transition-colors" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 30%, transparent)' }} onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)'; }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--bg-elevated) 30%, transparent)'; }}>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm">{USAGE_TYPE_ICONS[tx.type] || '\u2022'}</span>
+                        <span className="text-sm">{USAGE_TYPE_ICONS[tx.type] || '\•'}</span>
                         <div>
                           <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>{tx.description || tx.type}</div>
                           <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
@@ -717,7 +728,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                         <div className={`text-sm font-bold ${txTypeColor(tx.type, tx.amount)}`}>
                           {tx.amount > 0 ? '+' : ''}{tx.amount}
                         </div>
-                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tx.balance_after.toLocaleString()} \uC794\uC561</div>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tx.balance_after.toLocaleString()} 잔액</div>
                       </div>
                     </div>
                   ))}
@@ -726,13 +737,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
             </div>
           )}
 
-          {/* === \uACB0\uC81C \uB0B4\uC5ED \uD0ED === */}
+          {/* === 결제 내역 탭 === */}
           {activeTab === 'payments' && (
             <div>
               {paymentsLoading ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>\uB85C\uB529 \uC911...</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>로딩 중...</div>
               ) : payments.length === 0 ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>\uACB0\uC81C \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>결제 내역이 없습니다.</div>
               ) : (
                 <div className="space-y-1">
                   {payments.map(p => (
@@ -740,23 +751,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                            {p.credits.toLocaleString()} \uD06C\uB808\uB527
+                            {p.credits.toLocaleString()} 크레딧
                           </span>
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${
                             p.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
                             p.status === 'failed' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
                             'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                           }`}>
-                            {p.status === 'completed' ? '\uC644\uB8CC' : p.status === 'failed' ? '\uC2E4\uD328' : '\uB300\uAE30'}
+                            {p.status === 'completed' ? '완료' : p.status === 'failed' ? '실패' : '대기'}
                           </span>
                         </div>
                         <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {p.provider === 'toss' ? 'Toss' : 'Stripe'} {'\u00B7'} {new Date(p.created_at).toLocaleString('ko-KR')}
+                          {p.provider === 'toss' ? 'Toss' : 'Stripe'} {'\·'} {new Date(p.created_at).toLocaleString('ko-KR')}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                          {p.amount.toLocaleString()}\uC6D0
+                          {p.amount.toLocaleString()}원
                         </div>
                       </div>
                     </div>
@@ -766,7 +777,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
             </div>
           )}
 
-          {/* === \uBCF4\uC548 \uD0ED === */}
+          {/* === 보안 탭 === */}
           {activeTab === 'security' && (
             <div>
               {profile?.oauthProvider ? (
@@ -777,17 +788,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     </svg>
                   </div>
                   <p className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                    {profile.oauthProvider === 'google' ? 'Google' : 'Kakao'} \uACC4\uC815\uC73C\uB85C \uB85C\uADF8\uC778 \uC911
+                    {profile.oauthProvider === 'google' ? 'Google' : 'Kakao'} 계정으로 로그인 중
                   </p>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    \uC18C\uC15C \uB85C\uADF8\uC778 \uACC4\uC815\uC740 \uBE44\uBC00\uBC88\uD638\uB97C \uBCC4\uB3C4\uB85C \uAD00\uB9AC\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.
+                    소셜 로그인 계정은 비밀번호를 별도로 관리하지 않습니다.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>\uBE44\uBC00\uBC88\uD638 \uBCC0\uACBD</h3>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>비밀번호 변경</h3>
                   <div>
-                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>\uD604\uC7AC \uBE44\uBC00\uBC88\uD638</label>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>현재 비밀번호</label>
                     <input
                       type="password"
                       value={currentPassword}
@@ -797,7 +808,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>\uC0C8 \uBE44\uBC00\uBC88\uD638</label>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>새 비밀번호</label>
                     <input
                       type="password"
                       value={newPassword}
@@ -807,7 +818,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>\uC0C8 \uBE44\uBC00\uBC88\uD638 \uD655\uC778</label>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>새 비밀번호 확인</label>
                     <input
                       type="password"
                       value={confirmPassword}
@@ -821,16 +832,31 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
                     className="w-full py-2.5 rounded-lg bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 text-sm font-bold border border-brand-500/30 transition-all disabled:opacity-50"
                   >
-                    {changingPassword ? '\uBCC0\uACBD \uC911...' : '\uBE44\uBC00\uBC88\uD638 \uBCC0\uACBD'}
+                    {changingPassword ? '변경 중...' : '비밀번호 변경'}
                   </button>
                 </div>
               )}
             </div>
           )}
+
+          {/* === 추천 탭 === */}
+          {activeTab === 'referral' && (
+            <ReferralPanelLazy />
+          )}
         </div>
       </div>
     </div>
   );
+};
+
+// 추천 패널 lazy import (모듈 초기화 순서 문제 방지)
+const ReferralPanelLazy: React.FC = () => {
+  const [Panel, setPanel] = useState<React.FC | null>(null);
+  useEffect(() => {
+    import('./ReferralPanel').then(m => setPanel(() => m.default));
+  }, []);
+  if (!Panel) return <div className="flex justify-center py-8"><div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--brand-500)', borderTopColor: 'transparent' }} /></div>;
+  return <Panel />;
 };
 
 export default UserProfile;
