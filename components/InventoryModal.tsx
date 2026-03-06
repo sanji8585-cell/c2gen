@@ -119,7 +119,17 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
 
   const sortedItems = useMemo(() => {
     if (activeTab === 'gacha') return [];
-    const items = [...(inventory[activeTab] || [])];
+    let items = [...(inventory[activeTab] || [])];
+    // 소모품: qty=0이고 비활성인 아이템, 만료된 부스터 제거
+    if (activeTab === 'consumables') {
+      const now = new Date();
+      items = items.filter(item => {
+        const isExpired = item.activeUntil ? new Date(item.activeUntil) <= now : false;
+        if (item.isActive && isExpired) return false; // 만료된 부스터 숨김
+        if (!item.isActive && item.quantity <= 0) return false; // 소진된 아이템 숨김
+        return true;
+      });
+    }
     items.sort((a, b) => {
       if (a.isEquipped !== b.isEquipped) return a.isEquipped ? -1 : 1;
       const ra = RARITY_ORDER[a.rarity] ?? 5;
@@ -540,10 +550,20 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
         >
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key;
-            const count =
-              tab.key === 'gacha'
-                ? gachaTickets
-                : (inventory[tab.key as keyof typeof inventory] || []).length;
+            let count: number;
+            if (tab.key === 'gacha') {
+              count = gachaTickets;
+            } else if (tab.key === 'consumables') {
+              const now = new Date();
+              count = (inventory.consumables || []).filter(item => {
+                const isExpired = item.activeUntil ? new Date(item.activeUntil) <= now : false;
+                if (item.isActive && isExpired) return false;
+                if (!item.isActive && item.quantity <= 0) return false;
+                return true;
+              }).length;
+            } else {
+              count = (inventory[tab.key as keyof typeof inventory] || []).length;
+            }
             return (
               <button
                 key={tab.key}
