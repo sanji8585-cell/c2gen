@@ -36,14 +36,15 @@ export default function CompletionScreen({
   const totalCredits = scriptCredits + imgCredits + ttsCredits + videoCredits;
 
   const creditsPerScene = sceneCount > 0 ? totalCredits / sceneCount : 999;
-  const grade = creditsPerScene <= 8 ? 'S' : creditsPerScene <= 12 ? 'A' : creditsPerScene <= 18 ? 'B' : 'C';
-  const gradeColors: Record<string, string> = {
-    S: '#fbbf24',
-    A: '#22c55e',
-    B: '#60a5fa',
-    C: '#94a3b8',
+  const grade = creditsPerScene <= 15 ? 'SS' : creditsPerScene <= 22 ? 'S' : creditsPerScene <= 30 ? 'AA' : 'A';
+  const gradeColors: Record<string, { color: string; glow: string; label: string }> = {
+    SS: { color: '#fbbf24', glow: '#fbbf2466', label: '전설의 효율!' },
+    S: { color: '#f59e0b', glow: '#f59e0b44', label: '최고의 선택!' },
+    AA: { color: '#22c55e', glow: '#22c55e44', label: '훌륭해요!' },
+    A: { color: '#60a5fa', glow: '#60a5fa44', label: '잘했어요!' },
   };
-  const gradeColor = gradeColors[grade];
+  const gi = gradeColors[grade];
+  const gradeColor = gi.color;
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
@@ -141,8 +142,8 @@ export default function CompletionScreen({
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 500 }}>{row.count}</span>
                 {row.credits > 0 && (
-                  <span style={{ color: '#ef4444', fontSize: 13, fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
-                    -{row.credits} cr
+                  <span style={{ color: '#ef4444', fontSize: 13, fontWeight: 600, minWidth: 70, textAlign: 'right' }}>
+                    -{row.credits} 크레딧
                   </span>
                 )}
               </div>
@@ -168,7 +169,7 @@ export default function CompletionScreen({
               총 크레딧
             </span>
             <span style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>
-              -{totalCredits} cr
+              -{totalCredits} 크레딧
             </span>
           </div>
         </div>
@@ -236,24 +237,32 @@ export default function CompletionScreen({
             )}
           </div>
 
-          {/* 등급 배지 */}
-          <div style={{
-            width: 56,
-            height: 56,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 28,
-            fontWeight: 900,
-            color: gradeColor,
-            border: `3px solid ${gradeColor}`,
-            boxShadow: `0 0 16px ${gradeColor}44, 0 0 32px ${gradeColor}22`,
-            opacity: 0,
-            animation: 'result-stamp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 1.5s forwards',
-            fontFamily: 'system-ui, sans-serif',
-          }}>
-            {grade}
+          {/* 등급 배지 (도장 효과) */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div style={{
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: grade === 'SS' ? 24 : 28,
+              fontWeight: 900,
+              color: gradeColor,
+              border: `3px solid ${gradeColor}`,
+              boxShadow: `0 0 20px ${gi.glow}, 0 0 40px ${gi.glow}, inset 0 0 12px ${gi.glow}`,
+              opacity: 0,
+              animation: 'result-stamp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 1.5s forwards',
+              fontFamily: 'system-ui, sans-serif',
+              letterSpacing: grade === 'SS' ? -1 : 0,
+              background: `linear-gradient(135deg, ${gradeColor}11, ${gradeColor}08)`,
+              transform: 'rotate(-3deg)',
+            }}>
+              {grade}
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: gradeColor, opacity: 0, animation: 'result-slide-in 0.4s ease-out 2s forwards' }}>
+              {gi.label}
+            </span>
           </div>
         </div>
 

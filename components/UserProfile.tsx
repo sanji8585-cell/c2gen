@@ -441,8 +441,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                         {equipped?.badges && equipped.badges.length > 0 && (
                           <div className="flex items-center gap-1 mt-1">
                             {equipped.badges.map((b, i) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded border" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}>
-                                {b.name}
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded border" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }} title={b.name}>
+                                {b.emoji} {b.name}
                               </span>
                             ))}
                           </div>

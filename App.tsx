@@ -25,7 +25,7 @@ import EventBanner from './components/EventBanner';
 import AchievementShowcase from './components/AchievementShowcase';
 import InventoryModal from './components/InventoryModal';
 import LeaderboardWidget from './components/LeaderboardWidget';
-import AvatarFrame from './components/AvatarFrame';
+// AvatarFrame moved into Header component
 import CompletionScreen from './components/CompletionScreen';
 
 import { SavedProject } from './types';
@@ -1513,90 +1513,36 @@ const AppContent: React.FC<{
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)' }}>
-      <Header isDark={isDark} onToggleTheme={onToggleTheme} streak={isAuthenticated ? (game.synced ? game.userState?.streakCount ?? 0 : 0) : 0} totalGenerations={isAuthenticated ? (game.synced ? game.userState?.totalGenerations ?? 0 : 0) : 0} sessionCombo={isAuthenticated ? sessionCombo : 0} levelInfo={isAuthenticated && game.synced ? game.levelInfo : null} equipped={isAuthenticated && game.synced ? game.equipped : null} userName={isAuthenticated ? userName || undefined : undefined} onLogoAchievement={() => {
-        if (isAuthenticated && game.synced) {
-          game.recordAction('special_logo_click', 1).then(result => {
-            if (result?.achievementsUnlocked?.length > 0) {
-              const a = result.achievementsUnlocked[0];
-              setTimeout(() => setOverlayAchievement({ name: a.name, icon: a.icon, description: a.description, category: a.category, rewardXp: a.rewardXp, rewardCredits: a.rewardCredits }), 500);
-            }
-          });
-        }
-      }} />
-
-      {/* 유저 정보 바 */}
-      <div className="border-b" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 50%, transparent)', borderColor: 'var(--border-default)' }}>
-        <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-end gap-3">
-          {isAuthenticated && userName ? (
-            <>
-              {/* 크레딧 표시 */}
-              <div className="flex items-center gap-1.5">
-                {userPlan === 'operator' ? (
-                  <span className="text-[11px] font-bold text-orange-400">무제한</span>
-                ) : (
-                  <span className={`text-[11px] font-bold ${userCredits <= 10 ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`}>
-                    {userCredits.toLocaleString()} 크레딧
-                  </span>
-                )}
-                {userPlan === 'operator' && (
-                  <span className="text-[9px] px-1.5 py-0.5 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full font-bold">
-                    운영자
-                  </span>
-                )}
-                {userPlan !== 'free' && userPlan !== 'operator' && (
-                  <span className="text-[9px] px-1.5 py-0.5 bg-brand-500/20 text-brand-400 rounded-full font-bold uppercase">
-                    {userPlan}
-                  </span>
-                )}
-              </div>
-              {userPlan !== 'operator' && (
-                <button
-                  onClick={() => setShowCreditShop(true)}
-                  className="text-[10px] px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 rounded-md border border-emerald-700/50 transition-all font-bold"
-                >
-                  충전
-                </button>
-              )}
-              <div className="w-px h-4" style={{ backgroundColor: 'var(--border-subtle)' }} />
-              {/* 게이미피케이션 v2 바로가기 */}
-              {game.synced && (
-                <>
-                  <button onClick={() => setShowAchievements(true)} className="text-[10px] px-2 py-0.5 rounded-md hover:bg-amber-900/30 transition-all" style={{ color: 'var(--text-muted)' }} title="업적">🏆</button>
-                  <button onClick={() => setShowInventory(true)} className="text-[10px] px-2 py-0.5 rounded-md hover:bg-purple-900/30 transition-all" style={{ color: 'var(--text-muted)' }} title="인벤토리">🎒</button>
-                  <button onClick={() => setShowLeaderboard(true)} className="text-[10px] px-2 py-0.5 rounded-md hover:bg-cyan-900/30 transition-all" style={{ color: 'var(--text-muted)' }} title="리더보드">🏅</button>
-                </>
-              )}
-              <button
-                onClick={() => setShowUserProfile(true)}
-                className="flex items-center gap-1.5 text-[11px] hover:underline transition-all cursor-pointer"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                <AvatarFrame name={userName || ''} size={22} />
-                <span className="text-cyan-400 font-medium">{userName}</span> 님
-              </button>
-              <button
-                onClick={onLogout}
-                className="text-[10px] px-2.5 py-1 hover:bg-red-900/40 hover:text-red-400 rounded-md transition-all"
-                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
-              >
-                로그아웃
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                로그인하면 AI 콘텐츠를 생성할 수 있습니다
-              </span>
-              <button
-                onClick={onShowAuthModal}
-                className="text-[11px] px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-md transition-all font-bold"
-              >
-                로그인 / 회원가입
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      <Header
+        isDark={isDark}
+        onToggleTheme={onToggleTheme}
+        levelInfo={isAuthenticated && game.synced ? game.levelInfo : null}
+        equipped={isAuthenticated && game.synced ? game.equipped : null}
+        userName={isAuthenticated ? userName || undefined : undefined}
+        onLogoAchievement={() => {
+          if (isAuthenticated && game.synced) {
+            game.recordAction('special_logo_click', 1).then(result => {
+              if (result?.achievementsUnlocked?.length > 0) {
+                const a = result.achievementsUnlocked[0];
+                setTimeout(() => setOverlayAchievement({ name: a.name, icon: a.icon, description: a.description, category: a.category, rewardXp: a.rewardXp, rewardCredits: a.rewardCredits }), 500);
+              }
+            });
+          }
+        }}
+        isAuthenticated={isAuthenticated}
+        credits={userCredits}
+        plan={userPlan}
+        onShowCreditShop={() => setShowCreditShop(true)}
+        onShowProfile={() => setShowUserProfile(true)}
+        onShowAuthModal={onShowAuthModal}
+        onLogout={onLogout}
+        activeTab={viewMode}
+        onTabChange={setViewMode}
+        projectCount={savedProjects.length}
+        onShowAchievements={() => setShowAchievements(true)}
+        onShowInventory={() => setShowInventory(true)}
+        onShowLeaderboard={() => setShowLeaderboard(true)}
+      />
 
       {/* 공지사항 배너 */}
       {visibleAnnouncements.length > 0 && (
@@ -1622,57 +1568,6 @@ const AppContent: React.FC<{
           </div>
         </div>
       )}
-
-      {/* 네비게이션 탭 */}
-      <div className="border-b" style={{ borderColor: 'var(--border-default)' }}>
-        <div className="max-w-7xl mx-auto px-4 flex items-center gap-1">
-          <button
-            onClick={() => setViewMode('main')}
-            className={`px-4 py-3 text-sm font-bold transition-colors relative ${
-              viewMode === 'main'
-                ? 'text-brand-400'
-                : ''
-            }`}
-            style={viewMode !== 'main' ? { color: 'var(--text-secondary)' } : undefined}
-          >
-            스토리보드 생성
-            {viewMode === 'main' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
-            )}
-          </button>
-          <button
-            onClick={() => setViewMode('gallery')}
-            className={`px-4 py-3 text-sm font-bold transition-colors relative flex items-center gap-2 ${
-              viewMode === 'gallery'
-                ? 'text-brand-400'
-                : ''
-            }`}
-            style={viewMode !== 'gallery' ? { color: 'var(--text-secondary)' } : undefined}
-          >
-            저장된 프로젝트
-            {savedProjects.length > 0 && (
-              <span className="px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
-                {savedProjects.length}
-              </span>
-            )}
-            {viewMode === 'gallery' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
-            )}
-          </button>
-          <button
-            onClick={() => setViewMode('playground')}
-            className={`px-4 py-3 text-sm font-bold transition-colors relative ${
-              viewMode === 'playground' ? 'text-brand-400' : ''
-            }`}
-            style={viewMode !== 'playground' ? { color: 'var(--text-secondary)' } : undefined}
-          >
-            놀이터
-            {viewMode === 'playground' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />
-            )}
-          </button>
-        </div>
-      </div>
 
       {needsKey && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 flex items-center justify-center gap-4 animate-in fade-in slide-in-from-top-4">
@@ -1824,10 +1719,9 @@ const AppContent: React.FC<{
                 const imgModel = getSelectedImageModel();
                 const imgPer = imgModel === 'gpt-image-1' ? 21 : 16;
                 const totalChars = generatedData.reduce((s, d) => s + (d.narration?.length || 0), 0);
-                const ttsPer = Math.max(15, Math.ceil((totalChars / sc) / 1000) * 15);
                 const scriptCost = 5;
                 const imgTotal = sc * imgPer;
-                const ttsTotal = sc * ttsPer;
+                const ttsTotal = Math.max(15, Math.ceil(totalChars / 1000) * 15);
                 const est = scriptCost + imgTotal + ttsTotal;
                 // 음식 비유 시스템
                 const krwEst = est * 10;
@@ -1841,8 +1735,8 @@ const AppContent: React.FC<{
                     '편의점 들를 뻔한 돈으로 뚝딱! 🏪',
                   ]},
                   { max: 200, label: '햄버거 반개 🍔', quotes: [
-                    '햄버거 반개 값이라니...! 살도빼고 개이득! 🍔',
-                    '라면 보다도 싸다고?? 라면먹기전에 만들어준다고!? 🍜',
+                    '햄버거 반개 값이라니...! 살도 빼고 개이득! 🍔',
+                    '라면 보다도 싸다고?? 라면 다 먹기 전에 만들어 준다고!? 🍜',
                   ]},
                   { max: 300, label: '떡볶이 한 접시 🍢', quotes: [
                     '떡볶이 한 접시 값이면 끝! 매운 건 참자 🍢',
@@ -1910,7 +1804,7 @@ const AppContent: React.FC<{
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(34,197,94,0.15)' }}>🔊</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>TTS {sc}건 <span className="text-[10px] opacity-60">(~{Math.round(totalChars / sc)}자/씬)</span></span>
+                          <span style={{ color: 'var(--text-secondary)' }}>TTS <span className="text-[10px] opacity-60">({totalChars}자)</span></span>
                         </div>
                         <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{ttsTotal}</span>
                       </div>
@@ -2205,9 +2099,8 @@ const AppContent: React.FC<{
             const result = await game.pullGacha();
             if (result?.item) {
               setOverlayGacha({ item: result.item, isNew: result.isNew });
-              // 뽑기 퀘스트 진행
-              await game.recordAction('gacha_pull', 1);
-              await game.refreshState();
+              // 뽑기 퀘스트 + 상태 새로고침을 병렬 & 백그라운드 처리
+              Promise.all([game.recordAction('gacha_pull', 1), game.refreshState()]).catch(() => {});
             }
           }}
           isDark={isDark}

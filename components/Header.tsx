@@ -44,16 +44,16 @@ const SoundToggle: React.FC = () => {
   return (
     <button
       onClick={() => { const next = !on; setSoundEnabled(next); setOn(next); }}
-      className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-110"
+      className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110"
       style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
       title={on ? '효과음 끄기' : '효과음 켜기'}
     >
       {on ? (
-        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--text-secondary)' }}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--text-secondary)' }}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
         </svg>
       ) : (
-        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
         </svg>
@@ -65,24 +65,68 @@ const SoundToggle: React.FC = () => {
 interface HeaderProps {
   isDark: boolean;
   onToggleTheme: () => void;
-  streak?: number;
-  totalGenerations?: number;
-  sessionCombo?: number;
-  // 게이미피케이션 v2
+  // Gamification (simplified)
   levelInfo?: LevelInfo | null;
   equipped?: EquippedItems | null;
   userName?: string;
   onLogoAchievement?: () => void;
+  // Credits & user
+  isAuthenticated?: boolean;
+  credits?: number;
+  plan?: string;
+  onShowCreditShop?: () => void;
+  onShowProfile?: () => void;
+  onShowAuthModal?: () => void;
+  onLogout?: () => void;
+  // Tab navigation
+  activeTab?: 'main' | 'gallery' | 'playground';
+  onTabChange?: (tab: 'main' | 'gallery' | 'playground') => void;
+  projectCount?: number;
+  // Gamification shortcuts
+  onShowAchievements?: () => void;
+  onShowInventory?: () => void;
+  onShowLeaderboard?: () => void;
+  // Avatar
+  avatarUrl?: string | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, totalGenerations = 0, sessionCombo = 0, levelInfo, equipped, userName, onLogoAchievement }) => {
-  // 이스터에그: 로고 5회 빠른 클릭 → 무지개 회전
+const Header: React.FC<HeaderProps> = ({
+  isDark, onToggleTheme,
+  levelInfo, equipped, userName, onLogoAchievement,
+  isAuthenticated, credits = 0, plan = 'free',
+  onShowCreditShop, onShowProfile, onShowAuthModal, onLogout,
+  activeTab = 'main', onTabChange, projectCount = 0,
+  onShowAchievements, onShowInventory, onShowLeaderboard,
+  avatarUrl,
+}) => {
+  // Easter egg: 5 rapid clicks on logo → rainbow spin
   const [easterEgg, setEasterEgg] = useState(false);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // stale closure 방지: 항상 최신 prop을 ref로 참조
   const onLogoAchievementRef = useRef(onLogoAchievement);
   useEffect(() => { onLogoAchievementRef.current = onLogoAchievement; });
+
+  // Avatar dropdown
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const avatarBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Mobile menu
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        avatarBtnRef.current && !avatarBtnRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    if (showDropdown) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDropdown]);
 
   const handleLogoClick = useCallback(() => {
     clickCountRef.current += 1;
@@ -97,105 +141,296 @@ const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, streak = 0, tota
     }
   }, []);
 
+  const tabs: { key: 'main' | 'gallery' | 'playground'; label: string; count?: number }[] = [
+    { key: 'main', label: '스토리보드 생성' },
+    { key: 'gallery', label: '저장된 프로젝트', count: projectCount },
+    { key: 'playground', label: '놀이터' },
+  ];
+
+  const lv = levelInfo?.level;
+  const lColor = levelInfo?.color || '#06b6d4';
+  const lEmoji = levelInfo?.emoji || '';
+  const lProgress = levelInfo?.progress ?? 0;
+
   return (
-    <header className="border-b backdrop-blur-md sticky top-0 z-50" style={{ borderColor: 'var(--border-default)', backgroundColor: isDark ? 'rgba(15,23,42,0.5)' : 'rgba(255,255,255,0.8)' }}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-9 h-9 bg-gradient-to-br from-green-900/60 to-emerald-900/60 rounded-xl flex items-center justify-center shadow-lg shadow-green-900/30 border border-green-700/30 cursor-pointer select-none"
-            onClick={handleLogoClick}
-            title="C2 GEN"
-          >
-            <FourLeafClover className={`w-7 h-7 ${easterEgg ? 'animate-rainbow-spin' : ''}`} />
-          </div>
-          <div className="flex items-baseline gap-1">
-            <span className={`text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-green-300 via-emerald-200 to-white' : 'from-green-600 via-emerald-500 to-slate-800'}`}>
-              C2
-            </span>
-            <span className={`text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-white to-slate-400' : 'from-slate-800 to-slate-500'}`}>
-              GEN
-            </span>
-          </div>
-          {/* Streak / Milestone 뱃지 */}
-          {streak >= 2 && (
-            <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 hidden sm:inline-flex">
-              🔥 {streak}일 연속
-            </span>
-          )}
-          {totalGenerations >= 5 && (
-            <span className="ml-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 hidden sm:inline-flex">
-              ⚡ {totalGenerations}개 생성
-            </span>
-          )}
-          {/* 프레임 아바타 */}
-          {equipped?.frame && userName && (
-            <div className="ml-1 hidden sm:block">
-              <AvatarFrame name={userName} size={26} rarity={equipped.frame.rarity} frameName={equipped.frame.name} />
+    <header
+      className="border-b backdrop-blur-md sticky top-0 z-50"
+      style={{
+        borderColor: 'var(--border-default)',
+        backgroundColor: isDark ? 'rgba(15,23,42,0.85)' : 'rgba(255,255,255,0.9)',
+      }}
+    >
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 h-[52px] flex items-center justify-between gap-2">
+        {/* ===== LEFT: Logo + Tabs ===== */}
+        <div className="flex items-center gap-0 min-w-0">
+          {/* Logo */}
+          <div className="flex items-center gap-2 flex-shrink-0 cursor-pointer select-none" onClick={handleLogoClick} title="C2 GEN">
+            <div className="w-8 h-8 bg-gradient-to-br from-green-900/60 to-emerald-900/60 rounded-lg flex items-center justify-center shadow-md shadow-green-900/20 border border-green-700/30">
+              <FourLeafClover className={`w-6 h-6 ${easterEgg ? 'animate-rainbow-spin' : ''}`} />
             </div>
-          )}
-          {/* 레벨 뱃지 — 서버 동기화 시에만 표시 */}
-          {levelInfo && (() => {
-            const lv = levelInfo.level;
-            const lTitle = equipped?.title?.name || levelInfo.title || '';
-            const lEmoji = levelInfo.emoji || '';
-            const lColor = levelInfo.color || '#06b6d4';
-            const lProgress = levelInfo.progress;
-            return (
-              <div className="ml-1 flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: `${lColor}20`, color: lColor, border: `1px solid ${lColor}50` }}>
-                  {lEmoji} Lv.{lv}{lTitle ? <span className="hidden sm:inline"> {lTitle}</span> : ''}
-                </span>
-                <div className="hidden sm:block w-16 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-elevated)' }}>
-                  <div className="h-full rounded-full xp-bar-fill" style={{ width: `${lProgress}%`, backgroundColor: lColor }} />
-                </div>
-              </div>
-            );
-          })()}
-          {/* 장착된 뱃지 표시 */}
-          {equipped?.badges && equipped.badges.length > 0 && (
-            <div className="ml-0.5 flex items-center gap-0.5">
-              {equipped.badges.slice(0, 3).map(b => (
-                <span key={b.id} className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25" title={b.name}>
-                  {b.emoji}
-                </span>
-              ))}
+            <div className="flex items-baseline gap-0.5">
+              <span className={`text-base font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-green-300 via-emerald-200 to-white' : 'from-green-600 via-emerald-500 to-slate-800'}`}>
+                C2
+              </span>
+              <span className={`text-base font-bold bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-white to-slate-400' : 'from-slate-800 to-slate-500'}`}>
+                GEN
+              </span>
             </div>
-          )}
-          {sessionCombo >= 2 && (
-            <span key={sessionCombo} className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 animate-combo-pop hidden sm:inline-flex">
-              ⚡ {sessionCombo}x 콤보
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {/* 사운드 토글 */}
-          <SoundToggle />
-          {/* 테마 토글 */}
+          </div>
+
+          {/* Divider */}
+          <div className="hidden sm:block w-px h-5 mx-3 flex-shrink-0" style={{ backgroundColor: 'var(--border-subtle)' }} />
+
+          {/* Tab navigation — desktop */}
+          <nav className="hidden sm:flex items-center gap-0.5">
+            {tabs.map(tab => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => onTabChange?.(tab.key)}
+                  className={`relative px-3 py-1.5 text-[13px] font-semibold rounded-md transition-colors ${
+                    isActive ? 'text-brand-400' : 'hover:bg-white/5'
+                  }`}
+                  style={!isActive ? { color: 'var(--text-secondary)' } : undefined}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {tab.label}
+                    {tab.count !== undefined && tab.count > 0 && (
+                      <span
+                        className="text-[10px] px-1.5 py-px rounded-full font-bold"
+                        style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
+                      >
+                        {tab.count}
+                      </span>
+                    )}
+                  </span>
+                  {isActive && (
+                    <div className="absolute bottom-[-13px] left-1 right-1 h-[2px] rounded-full bg-brand-500" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Mobile hamburger */}
           <button
-            onClick={onToggleTheme}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-110"
+            className="sm:hidden ml-2 w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
-            title={isDark ? '라이트 모드' : '다크 모드'}
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
           >
-            {isDark ? (
-              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="4" fill="currentColor" />
-                <path strokeLinecap="round" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07 7.07l-1.41-1.41M8.34 8.34L6.93 6.93m12.14 0l-1.41 1.41M8.34 15.66l-1.41 1.41" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
-                <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            )}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--text-secondary)' }}>
+              {showMobileMenu
+                ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />}
+            </svg>
           </button>
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            AI Content Studio
-          </div>
+        </div>
+
+        {/* ===== RIGHT: Actions + Avatar ===== */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isAuthenticated && userName ? (
+            <>
+              {/* Level chip */}
+              {levelInfo && lv != null && (
+                <button
+                  onClick={onShowProfile}
+                  className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md transition-all hover:brightness-110 cursor-pointer"
+                  style={{ backgroundColor: `${lColor}15`, border: `1px solid ${lColor}30` }}
+                  title={`Lv.${lv} — 프로필 보기`}
+                >
+                  <span className="text-[11px] font-bold" style={{ color: lColor }}>
+                    {lEmoji} Lv.{lv}
+                  </span>
+                  <div className="w-10 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${lColor}20` }}>
+                    <div className="h-full rounded-full transition-all duration-500 xp-bar-fill" style={{ width: `${lProgress}%`, backgroundColor: lColor }} />
+                  </div>
+                </button>
+              )}
+
+              {/* Credits badge */}
+              <button
+                onClick={plan !== 'operator' ? onShowCreditShop : undefined}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
+                  plan !== 'operator' ? 'hover:brightness-110 cursor-pointer' : 'cursor-default'
+                } ${credits <= 10 && plan !== 'operator' ? 'animate-pulse' : ''}`}
+                style={{
+                  backgroundColor: plan === 'operator' ? 'rgba(249,115,22,0.1)' : credits <= 10 ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+                  border: `1px solid ${plan === 'operator' ? 'rgba(249,115,22,0.25)' : credits <= 10 ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`,
+                  color: plan === 'operator' ? '#f97316' : credits <= 10 ? '#ef4444' : '#10b981',
+                }}
+                title={plan === 'operator' ? '운영자 (무제한)' : '크레딧 충전'}
+              >
+                <span>{plan === 'operator' ? '∞' : `💰 ${credits.toLocaleString()}`}</span>
+                {plan === 'operator' && (
+                  <span className="text-[9px] opacity-70">운영자</span>
+                )}
+              </button>
+
+              {/* Sound toggle */}
+              <SoundToggle />
+
+              {/* Theme toggle */}
+              <button
+                onClick={onToggleTheme}
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110"
+                style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+                title={isDark ? '라이트 모드' : '다크 모드'}
+              >
+                {isDark ? (
+                  <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="4" fill="currentColor" />
+                    <path strokeLinecap="round" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07 7.07l-1.41-1.41M8.34 8.34L6.93 6.93m12.14 0l-1.41 1.41M8.34 15.66l-1.41 1.41" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
+                    <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Avatar button + dropdown */}
+              <div className="relative">
+                <button
+                  ref={avatarBtnRef}
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:ring-2 hover:ring-brand-500/40"
+                  title={userName}
+                >
+                  <AvatarFrame
+                    name={userName || ''}
+                    size={28}
+                    rarity={equipped?.frame?.rarity}
+                    frameName={equipped?.frame?.name}
+                  />
+                </button>
+
+                {/* Dropdown menu */}
+                {showDropdown && (
+                  <div
+                    ref={dropdownRef}
+                    className="absolute right-0 top-[calc(100%+6px)] w-52 rounded-xl shadow-2xl border overflow-hidden z-[100]"
+                    style={{
+                      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                      borderColor: 'var(--border-default)',
+                      boxShadow: isDark ? '0 20px 40px rgba(0,0,0,0.5)' : '0 20px 40px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    {/* User info header */}
+                    <div className="px-3 py-2.5 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                      <div className="flex items-center gap-2">
+                        <AvatarFrame name={userName || ''} size={24} rarity={equipped?.frame?.rarity} frameName={equipped?.frame?.name} />
+                        <div className="min-w-0">
+                          <div className="text-[12px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{userName}</div>
+                          {levelInfo && (
+                            <div className="text-[10px]" style={{ color: lColor }}>
+                              {lEmoji} Lv.{lv} {equipped?.title?.name || levelInfo.title || ''}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu items */}
+                    <div className="py-1">
+                      <DropdownItem icon="👤" label="프로필" onClick={() => { setShowDropdown(false); onShowProfile?.(); }} isDark={isDark} />
+                      <DropdownItem icon="🎒" label="인벤토리" onClick={() => { setShowDropdown(false); onShowInventory?.(); }} isDark={isDark} />
+                      <DropdownItem icon="🏆" label="업적" onClick={() => { setShowDropdown(false); onShowAchievements?.(); }} isDark={isDark} />
+                      <DropdownItem icon="🏅" label="리더보드" onClick={() => { setShowDropdown(false); onShowLeaderboard?.(); }} isDark={isDark} />
+                    </div>
+
+                    <div className="border-t" style={{ borderColor: 'var(--border-subtle)' }} />
+
+                    <div className="py-1">
+                      <DropdownItem icon="🚪" label="로그아웃" onClick={() => { setShowDropdown(false); onLogout?.(); }} isDark={isDark} danger />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Not authenticated: sound + theme + login button */}
+              <SoundToggle />
+              <button
+                onClick={onToggleTheme}
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110"
+                style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+                title={isDark ? '라이트 모드' : '다크 모드'}
+              >
+                {isDark ? (
+                  <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="4" fill="currentColor" />
+                    <path strokeLinecap="round" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07 7.07l-1.41-1.41M8.34 8.34L6.93 6.93m12.14 0l-1.41 1.41M8.34 15.66l-1.41 1.41" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
+                    <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={onShowAuthModal}
+                className="text-[12px] px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg transition-all font-bold"
+              >
+                로그인
+              </button>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Mobile menu dropdown */}
+      {showMobileMenu && (
+        <div className="sm:hidden border-t px-3 pb-2 pt-1" style={{ borderColor: 'var(--border-subtle)' }}>
+          {tabs.map(tab => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => { onTabChange?.(tab.key); setShowMobileMenu(false); }}
+                className={`w-full text-left px-3 py-2 text-[13px] font-semibold rounded-md transition-colors ${
+                  isActive ? 'text-brand-400' : ''
+                }`}
+                style={{
+                  backgroundColor: isActive ? 'var(--bg-elevated)' : undefined,
+                  color: !isActive ? 'var(--text-secondary)' : undefined,
+                }}
+              >
+                {tab.label}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="ml-1.5 text-[10px] px-1.5 py-px rounded-full font-bold" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </header>
   );
 };
+
+/* Dropdown menu item helper */
+const DropdownItem: React.FC<{
+  icon: string; label: string; onClick: () => void; isDark: boolean; danger?: boolean;
+}> = ({ icon, label, onClick, isDark, danger }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-medium transition-colors ${
+      danger ? 'hover:bg-red-500/10 text-red-400' : ''
+    }`}
+    style={!danger ? {
+      color: 'var(--text-secondary)',
+      ...(isDark ? {} : {}),
+    } : undefined}
+    onMouseEnter={e => { if (!danger) (e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'); }}
+    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+  >
+    <span className="text-[13px]">{icon}</span>
+    {label}
+  </button>
+);
 
 export default Header;
