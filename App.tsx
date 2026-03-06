@@ -1995,7 +1995,19 @@ const AppContent: React.FC<{
           equipped={game.equipped}
           gachaTickets={game.userState?.gachaTickets ?? 0}
           onEquipItem={game.equipItem}
-          onUseConsumable={game.useConsumable}
+          onUseConsumable={async (inventoryItemId: string) => {
+            const result = await game.useConsumable(inventoryItemId);
+            if (result?.success) {
+              if (result.effect?.type === 'credit_voucher') {
+                await fetchCredits();
+                setToastMessage(`+${result.effect.credits} 크레딧이 지급됐습니다!`);
+                setTimeout(() => setToastMessage(null), 3000);
+              } else if (result.effect?.type === 'xp_booster') {
+                setToastMessage(`XP 부스터 활성화! x${result.effect.multiplier} (${new Date(result.effect.until).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}까지)`);
+                setTimeout(() => setToastMessage(null), 4000);
+              }
+            }
+          }}
           onPullGacha={async () => {
             const result = await game.pullGacha();
             if (result?.item) {

@@ -258,16 +258,23 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
   const useConsumableAction = useCallback(async (inventoryItemId: string) => {
     const result = await apiUseConsumable(inventoryItemId);
     if (result?.success) {
-      // 옵티미스틱: 로컬 인벤토리 업데이트
       setInventory(prev => {
         if (!prev) return prev;
+        const isBooster = result.effect?.type === 'xp_booster';
         return {
           ...prev,
-          consumables: prev.consumables.map(item =>
-            item.inventoryId === inventoryItemId
-              ? { ...item, quantity: Math.max(0, item.quantity - 1), isActive: true, activeUntil: result.effect?.until }
-              : item
-          ),
+          consumables: prev.consumables
+            .map(item => {
+              if (item.inventoryId !== inventoryItemId) return item;
+              const newQty = Math.max(0, item.quantity - 1);
+              return {
+                ...item,
+                quantity: newQty,
+                isActive: isBooster ? true : item.isActive,
+                activeUntil: isBooster ? result.effect?.until : item.activeUntil,
+              };
+            })
+            .filter(item => item.quantity > 0 || item.isActive),
         };
       });
     }
