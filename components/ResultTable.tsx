@@ -610,6 +610,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [selectedResolution, setSelectedResolution] = useState<ResolutionTier>(getVideoResolution());
   const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleResolutionChange = (res: ResolutionTier) => {
     if (!canAccessResolution(userPlan, res)) return;
@@ -826,8 +827,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 
           {/* 저장 드롭다운 */}
-          <div className="relative">
+          <div>
             <button
+              ref={saveButtonRef}
               onClick={() => setShowSaveMenu(!showSaveMenu)}
               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-brand-600 text-white hover:bg-brand-500 shadow-md shadow-brand-900/20">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -836,9 +838,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </button>
             {showSaveMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowSaveMenu(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-60 rounded-xl border shadow-2xl py-1.5 overflow-hidden"
-                  style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+                <div className="fixed inset-0 z-[9998]" onClick={() => setShowSaveMenu(false)} />
+                <div className="fixed z-[9999] w-60 rounded-xl border shadow-2xl py-1.5"
+                  style={{
+                    backgroundColor: 'var(--bg-surface)',
+                    borderColor: 'var(--border-default)',
+                    top: saveButtonRef.current ? saveButtonRef.current.getBoundingClientRect().bottom + 6 : 0,
+                    right: saveButtonRef.current ? window.innerWidth - saveButtonRef.current.getBoundingClientRect().right : 0,
+                  }}>
                   <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
                     className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
                     style={{ color: 'var(--text-primary)' }}>

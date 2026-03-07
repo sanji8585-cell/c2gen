@@ -224,60 +224,84 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
   const handleLike = useCallback(async (postId: string) => {
     if (!isAuthenticated) { onShowAuthModal(); return; }
 
-    // Optimistic UI
-    setPosts(prev => prev.map(p => {
-      if (p.id !== postId) return p;
-      const newLiked = !p.liked;
-      return { ...p, liked: newLiked, likeCount: p.likeCount + (newLiked ? 1 : -1) };
-    }));
+    // Optimistic UI — 피드 + 상세 모달 모두 즉시 반영
+    const optimisticUpdate = (liked: boolean, delta: number) => {
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? { ...p, liked, likeCount: p.likeCount + delta } : p
+      ));
+      setDetailData(prev => {
+        if (!prev || prev.post.id !== postId) return prev;
+        return {
+          ...prev,
+          post: { ...prev.post, liked, likeCount: prev.post.likeCount + delta },
+          liked,
+        };
+      });
+    };
+
+    // 현재 상태 파악 (피드 or 상세에서)
+    const currentPost = posts.find(p => p.id === postId) || detailData?.post;
+    const wasLiked = currentPost?.liked ?? false;
+    const newLiked = !wasLiked;
+
+    optimisticUpdate(newLiked, newLiked ? 1 : -1);
 
     try {
       const result = await toggleLike(postId);
+      // 서버 결과로 보정 (count가 다를 수 있음)
       setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, liked: result.liked, likeCount: result.likeCount } : p
       ));
-      if (detailData?.post.id === postId) {
-        setDetailData(prev => prev ? {
+      setDetailData(prev => {
+        if (!prev || prev.post.id !== postId) return prev;
+        return {
           ...prev,
           post: { ...prev.post, liked: result.liked, likeCount: result.likeCount },
           liked: result.liked,
-        } : null);
-      }
+        };
+      });
     } catch {
-      setPosts(prev => prev.map(p => {
-        if (p.id !== postId) return p;
-        const reverted = !p.liked;
-        return { ...p, liked: reverted, likeCount: p.likeCount + (reverted ? 1 : -1) };
-      }));
+      // 롤백
+      optimisticUpdate(wasLiked, wasLiked ? 1 : -1);
     }
-  }, [isAuthenticated, onShowAuthModal, detailData]);
+  }, [isAuthenticated, onShowAuthModal, posts, detailData]);
 
   // 북마크 토글
   const handleBookmark = useCallback(async (postId: string) => {
     if (!isAuthenticated) { onShowAuthModal(); return; }
 
+    const currentPost = posts.find(p => p.id === postId) || detailData?.post;
+    const wasBookmarked = currentPost?.bookmarked ?? false;
+    const newBookmarked = !wasBookmarked;
+
+    // Optimistic — 피드 + 상세 모두
     setPosts(prev => prev.map(p =>
-      p.id === postId ? { ...p, bookmarked: !p.bookmarked } : p
+      p.id === postId ? { ...p, bookmarked: newBookmarked } : p
     ));
+    setDetailData(prev => {
+      if (!prev || prev.post.id !== postId) return prev;
+      return { ...prev, post: { ...prev.post, bookmarked: newBookmarked }, bookmarked: newBookmarked };
+    });
 
     try {
       const result = await toggleBookmark(postId);
       setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, bookmarked: result.bookmarked } : p
       ));
-      if (detailData?.post.id === postId) {
-        setDetailData(prev => prev ? {
-          ...prev,
-          post: { ...prev.post, bookmarked: result.bookmarked },
-          bookmarked: result.bookmarked,
-        } : null);
-      }
+      setDetailData(prev => {
+        if (!prev || prev.post.id !== postId) return prev;
+        return { ...prev, post: { ...prev.post, bookmarked: result.bookmarked }, bookmarked: result.bookmarked };
+      });
     } catch {
       setPosts(prev => prev.map(p =>
-        p.id === postId ? { ...p, bookmarked: !p.bookmarked } : p
+        p.id === postId ? { ...p, bookmarked: wasBookmarked } : p
       ));
+      setDetailData(prev => {
+        if (!prev || prev.post.id !== postId) return prev;
+        return { ...prev, post: { ...prev.post, bookmarked: wasBookmarked }, bookmarked: wasBookmarked };
+      });
     }
-  }, [isAuthenticated, onShowAuthModal, detailData]);
+  }, [isAuthenticated, onShowAuthModal, posts, detailData]);
 
   // 삭제
   const handleDelete = useCallback(async (postId: string) => {
@@ -795,43 +819,12 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
 
       {/* 작성자 프로필 팝업 */}
       {authorProfile && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} onClick={() => setAuthorProfile(null)}>
-          <div className="w-full max-w-xs rounded-2xl border p-5 text-center space-y-3"
-            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
-            onClick={e => e.stopPropagation()}>
-            <FramedAvatar name={authorProfile.name} url={authorProfile.avatarUrl} size={64} frame={authorProfile.equipped?.frame} />
-            <div>
-              <div className="flex items-center justify-center gap-2">
-                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{authorProfile.name}</p>
-                <LevelBadge level={authorProfile.level || 1} />
-                {authorProfile.equipped?.badges && authorProfile.equipped.badges.length > 0 && (
-                  <BadgeIcons badges={authorProfile.equipped.badges} />
-                )}
-              </div>
-              {authorProfile.equipped?.title && (
-                <div className="mt-1 flex justify-center">
-                  <TitleBadge title={authorProfile.equipped.title} />
-                </div>
-              )}
-            </div>
-            <div className="flex justify-center gap-6 py-2">
-              <div className="text-center">
-                <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{authorProfile.postCount}</p>
-                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('playground.authorPosts')}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold" style={{ color: '#ef4444' }}>{authorProfile.totalLikes}</p>
-                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('playground.authorLikes')}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => { setAuthorFilter(authorProfile.email); setAuthorFilterName(authorProfile.name); setAuthorProfile(null); }}
-              className="w-full py-2 rounded-xl text-sm font-medium transition-all"
-              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
-              {t('playground.viewAllPosts')}
-            </button>
-          </div>
-        </div>
+        <ProfilePopup
+          profile={authorProfile}
+          onViewPosts={() => { setAuthorFilter(authorProfile.email); setAuthorFilterName(authorProfile.name); setAuthorProfile(null); }}
+          onClose={() => setAuthorProfile(null)}
+          t={t}
+        />
       )}
     </div>
   );
@@ -858,6 +851,7 @@ const PostCard: React.FC<{
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [longPressPreview, setLongPressPreview] = useState(false);
+  const [likeBounce, setLikeBounce] = useState(false);
 
   const handleMouseEnter = () => {
     if (!post.videoUrl) return;
@@ -1024,7 +1018,9 @@ const PostCard: React.FC<{
         {/* 하단 액션 바 */}
         <div className="flex items-center gap-3">
           {/* 좋아요 */}
-          <button onClick={e => { e.stopPropagation(); onLike(); }} className="flex items-center gap-1 transition-all hover:scale-105">
+          <button onClick={e => { e.stopPropagation(); setLikeBounce(true); setTimeout(() => setLikeBounce(false), 300); onLike(); }}
+            className="flex items-center gap-1 transition-all hover:scale-105"
+            style={{ transform: likeBounce ? 'scale(1.3)' : undefined, transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill={post.liked ? '#ef4444' : 'none'} stroke={post.liked ? '#ef4444' : 'currentColor'} strokeWidth={2} style={{ color: 'var(--text-muted)' }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
             </svg>
@@ -1196,6 +1192,150 @@ const LevelBadge: React.FC<{ level: number; compact?: boolean }> = ({ level, com
     </span>
   );
 };
+
+// ── 프로필 팝업 ──
+
+function getProfileBoxStyle(rarity?: string): React.CSSProperties {
+  if (!rarity) return { borderColor: 'var(--border-default)' };
+  const color = RARITY_COLORS[rarity];
+  if (!color) return { borderColor: 'var(--border-default)' };
+
+  switch (rarity) {
+    case 'legendary':
+      return {
+        border: '2px solid transparent',
+        backgroundClip: 'padding-box',
+        animation: 'frame-legendary-glow 2s ease-in-out infinite',
+      };
+    case 'epic':
+      return {
+        border: `2px solid ${color}`,
+        animation: 'frame-epic-glow 3s ease-in-out infinite',
+      };
+    case 'rare':
+      return {
+        border: `2px solid ${color}`,
+        animation: 'frame-rare-pulse 2s ease-in-out infinite',
+      };
+    case 'uncommon':
+      return {
+        border: `2px solid ${color}`,
+        boxShadow: `0 0 8px ${color}44, 0 0 16px ${color}22`,
+      };
+    default:
+      return { border: `1.5px solid ${color}40` };
+  }
+}
+
+function getProfileGradient(rarity?: string): string {
+  switch (rarity) {
+    case 'legendary': return 'linear-gradient(135deg, #ef4444, #f59e0b, #ec4899, #8b5cf6)';
+    case 'epic': return 'linear-gradient(135deg, #f59e0b, #fbbf24)';
+    case 'rare': return 'linear-gradient(135deg, #8b5cf6, #a78bfa)';
+    case 'uncommon': return 'linear-gradient(135deg, #22c55e, #4ade80)';
+    default: return 'linear-gradient(135deg, var(--brand-500), var(--brand-400))';
+  }
+}
+
+const ProfilePopup: React.FC<{
+  profile: AuthorProfile;
+  onViewPosts: () => void;
+  onClose: () => void;
+  t: (key: string, opts?: any) => string;
+}> = ({ profile, onViewPosts, onClose, t }) => {
+  const frameRarity = profile.equipped?.frame?.rarity as string | undefined;
+  const boxStyle = getProfileBoxStyle(frameRarity);
+  const gradientBar = getProfileGradient(frameRarity);
+  const accentColor = frameRarity ? RARITY_COLORS[frameRarity] || 'var(--brand-500)' : 'var(--brand-500)';
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      {/* legendary: conic gradient 외곽 래퍼 */}
+      {frameRarity === 'legendary' ? (
+        <div className="rounded-2xl p-[2px] frame-animated" onClick={e => e.stopPropagation()}
+          style={{
+            background: 'conic-gradient(from var(--frame-angle, 0deg), #ef4444, #f59e0b, #ec4899, #8b5cf6, #ef4444)',
+            animation: 'frame-legendary-spin 3s linear infinite, frame-legendary-glow 2s ease-in-out infinite',
+            maxWidth: '320px', width: '100%',
+          }}>
+          <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--bg-surface)' }}>
+            <ProfilePopupInner profile={profile} gradientBar={gradientBar} accentColor={accentColor} onViewPosts={onViewPosts} t={t} />
+          </div>
+        </div>
+      ) : (
+        <div className={`w-full max-w-[320px] rounded-2xl overflow-hidden ${frameRarity === 'epic' || frameRarity === 'rare' ? 'frame-animated' : ''}`}
+          style={{ backgroundColor: 'var(--bg-surface)', ...boxStyle }}
+          onClick={e => e.stopPropagation()}>
+          <ProfilePopupInner profile={profile} gradientBar={gradientBar} accentColor={accentColor} onViewPosts={onViewPosts} t={t} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ProfilePopupInner: React.FC<{
+  profile: AuthorProfile;
+  gradientBar: string;
+  accentColor: string;
+  onViewPosts: () => void;
+  t: (key: string, opts?: any) => string;
+}> = ({ profile, gradientBar, accentColor, onViewPosts, t }) => (
+  <div>
+    {/* 상단 그라데이션 바 */}
+    <div style={{ background: gradientBar, height: 48 }} />
+
+    {/* 아바타 (바 위에 걸치게) */}
+    <div className="flex justify-center" style={{ marginTop: -36 }}>
+      <FramedAvatar name={profile.name} url={profile.avatarUrl} size={72} frame={profile.equipped?.frame} />
+    </div>
+
+    <div className="px-5 pb-5 pt-3 text-center space-y-3">
+      {/* 이름 + 레벨 */}
+      <div>
+        <div className="flex items-center justify-center gap-2">
+          <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{profile.name}</p>
+          <LevelBadge level={profile.level || 1} />
+        </div>
+
+        {/* 칭호 */}
+        {profile.equipped?.title && (
+          <div className="mt-1.5 flex justify-center">
+            <TitleBadge title={profile.equipped.title} />
+          </div>
+        )}
+
+        {/* 뱃지 */}
+        {profile.equipped?.badges && profile.equipped.badges.length > 0 && (
+          <div className="mt-2 flex justify-center">
+            <BadgeIcons badges={profile.equipped.badges} />
+          </div>
+        )}
+      </div>
+
+      {/* 구분선 */}
+      <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${accentColor}30, transparent)` }} />
+
+      {/* 통계 */}
+      <div className="flex justify-center gap-4">
+        <div className="flex-1 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+          <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{profile.postCount}</p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('playground.authorPosts')}</p>
+        </div>
+        <div className="flex-1 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+          <p className="text-xl font-bold" style={{ color: '#ef4444' }}>{profile.totalLikes}</p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('playground.authorLikes')}</p>
+        </div>
+      </div>
+
+      {/* 버튼 */}
+      <button onClick={onViewPosts}
+        className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
+        style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`, color: '#fff' }}>
+        {t('playground.viewAllPosts')}
+      </button>
+    </div>
+  </div>
+);
 
 // ── 공유 모달 ──
 
@@ -1564,6 +1704,8 @@ const DetailModal: React.FC<{
   t: (key: string, opts?: any) => string;
   lang: 'ko' | 'en' | 'ja';
 }> = ({ data, loading, isMine, isAuthenticated, userEmail, onLike, onBookmark, onDelete, onClose, onShowAuthModal, onReport, onAuthorClick, onTagClick, onCopyLink, onCommentCountChange, t, lang }) => {
+  const [detailLikeBounce, setDetailLikeBounce] = useState(false);
+
   const playerAssets = useMemo<GeneratedAsset[]>(() => {
     if (!data?.assets) return [];
     return data.assets
@@ -1697,9 +1839,13 @@ const DetailModal: React.FC<{
             {/* 액션 바 */}
             <div className="flex items-center gap-3 pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
               <button
-                onClick={() => isAuthenticated ? onLike() : onShowAuthModal()}
+                onClick={() => { if (!isAuthenticated) { onShowAuthModal(); return; } setDetailLikeBounce(true); setTimeout(() => setDetailLikeBounce(false), 300); onLike(); }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:scale-105"
-                style={{ backgroundColor: data.liked ? 'rgba(239,68,68,0.1)' : 'var(--bg-elevated)' }}>
+                style={{
+                  backgroundColor: data.liked ? 'rgba(239,68,68,0.1)' : 'var(--bg-elevated)',
+                  transform: detailLikeBounce ? 'scale(1.15)' : undefined,
+                  transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s',
+                }}>
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill={data.liked ? '#ef4444' : 'none'} stroke={data.liked ? '#ef4444' : 'currentColor'} strokeWidth={2} style={{ color: 'var(--text-muted)' }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
                 </svg>
