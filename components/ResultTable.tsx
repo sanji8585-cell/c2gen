@@ -1049,7 +1049,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
               onClick={() => {
                 if (!showSaveMenu && saveButtonRef.current) {
                   const rect = saveButtonRef.current.getBoundingClientRect();
-                  setSaveMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+                  const menuHeight = 220; // approx height of save menu
+                  const spaceBelow = window.innerHeight - rect.bottom;
+                  const top = spaceBelow < menuHeight ? rect.top - menuHeight - 6 : rect.bottom + 6;
+                  setSaveMenuPos({ top: Math.max(8, top), right: window.innerWidth - rect.right });
                 }
                 setShowSaveMenu(!showSaveMenu);
               }}
