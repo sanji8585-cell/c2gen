@@ -773,24 +773,12 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9991] rounded-t-2xl border-t max-h-[80vh] overflow-y-auto"
             style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
             <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0" style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-surface)' }}>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('result.subtitleSettings', '설정')}</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>설정</span>
               <button onClick={() => setShowMobileSettings(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-4 space-y-5">
-              {/* 장면효과 */}
-              <div>
-                <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--text-muted)' }}>{t('result.autoZoom')}</label>
-                <select onChange={(e) => { onAutoZoom?.(e.target.value || 'alternating'); setAutoZoomPattern(e.target.value); }} value={autoZoomPattern}
-                  className="w-full h-11 px-3 rounded-lg text-sm border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                  <option value="">{t('result.autoZoom')}</option>
-                  <option value="alternating">{t('result.autoZoomAlternating')}</option>
-                  <option value="dynamic">{t('result.autoZoomDynamic')}</option>
-                  <option value="sentiment">{t('result.autoZoomSentiment')}</option>
-                  <option value="static">{t('result.autoZoomStatic')}</option>
-                </select>
-              </div>
               {/* BGM */}
               <div>
                 <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--text-muted)' }}>BGM</label>
@@ -820,6 +808,18 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     const res = VIDEO_RESOLUTIONS[key]; const ok = canAccessResolution(userPlan, key);
                     return <option key={key} value={key} disabled={!ok}>{key.toUpperCase()} {!ok ? `(${res.planLabel})` : ''}</option>;
                   })}
+                </select>
+              </div>
+              {/* 컷 신 전체 반영 */}
+              <div>
+                <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--text-muted)' }}>컷 신 전체 반영</label>
+                <select onChange={(e) => { onAutoZoom?.(e.target.value || 'alternating'); setAutoZoomPattern(e.target.value); }} value={autoZoomPattern}
+                  className="w-full h-11 px-3 rounded-lg text-sm border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                  <option value="">{t('result.autoZoom')}</option>
+                  <option value="alternating">{t('result.autoZoomAlternating')}</option>
+                  <option value="dynamic">{t('result.autoZoomDynamic')}</option>
+                  <option value="sentiment">{t('result.autoZoomSentiment')}</option>
+                  <option value="static">{t('result.autoZoomStatic')}</option>
                 </select>
               </div>
               {/* 자막 설정 */}
