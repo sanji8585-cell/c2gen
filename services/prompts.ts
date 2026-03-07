@@ -299,7 +299,7 @@ Concept art quality with painterly brushstrokes.`,
 };
 
 // 썸네일 프롬프트
-export const getThumbnailPrompt = (topic: string, platform: string, style?: string) => {
+export const getThumbnailPrompt = (topic: string, platform: string, style?: string, contentSummary?: string) => {
   const aspectRatio = platform === 'tiktok' ? '9:16' : platform === 'instagram' ? '1:1' : '16:9';
 
   const platformGuide = platform === 'tiktok'
@@ -313,10 +313,15 @@ export const getThumbnailPrompt = (topic: string, platform: string, style?: stri
     : `Bold, attention-grabbing composition. High contrast, vibrant saturated colors.
 Dramatic lighting with strong highlights and shadows. Professional quality.`;
 
+  const contentContext = contentSummary
+    ? `\n## Content Context (from the actual video script)\nThe video discusses: ${contentSummary}\nUse this context to create a thumbnail that accurately represents the video content. Extract the key visual elements, subjects, and mood from this description.\n`
+    : '';
+
   return `
 Create a STUNNING, PROFESSIONAL social media THUMBNAIL image.
 
 Subject/Topic: "${topic}"
+${contentContext}
 Aspect Ratio: ${aspectRatio}
 
 ## Visual Style
@@ -325,6 +330,7 @@ ${stylePrompt}
 ## Composition Rules
 - ${platformGuide}
 - Main subject should dominate 40-60% of the frame
+- The thumbnail MUST visually represent the actual content described above, not a generic interpretation of the topic
 - Use dramatic camera angle (low angle for power, close-up for intimacy, wide for scale)
 - Create strong focal point with lighting/contrast
 - Background should complement but not distract

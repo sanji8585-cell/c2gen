@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { THUMBNAIL_PLATFORMS, LANGUAGE_CONFIG, type ThumbnailPlatform, type Language, CONFIG } from '../config';
 import { generateThumbnailImage } from '../services/geminiService';
 import { overlayTitleOnImage, TEXT_STYLE_PRESETS, getStyleSampleImageUrl } from '../services/thumbnailService';
-import { THUMBNAIL_IMAGE_STYLES } from '../services/prompts';
+import { THUMBNAIL_IMAGE_STYLES, getThumbnailPrompt } from '../services/prompts';
 
 interface Props {
   topic: string;
   sceneImages: string[];
+  contentSummary?: string;
   onClose: () => void;
 }
 
@@ -20,7 +21,7 @@ interface GeneratedItem {
   imageData: string; // base64
 }
 
-const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) => {
+const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, contentSummary, onClose }) => {
   const { t } = useTranslation();
   const [platform, setPlatform] = useState<ThumbnailPlatform>('youtube');
   const [title, setTitle] = useState(topic);
@@ -37,6 +38,11 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
   const [textPosition, setTextPosition] = useState<'top' | 'center' | 'bottom'>('bottom');
   const [fontSizeMultiplier, setFontSizeMultiplier] = useState(1.0);
 
+  // 프롬프트 편집
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [promptEdited, setPromptEdited] = useState(false);
+
   // 생성 히스토리
   const [generatedHistory, setGeneratedHistory] = useState<GeneratedItem[]>([]);
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
@@ -48,6 +54,13 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
 
   const dims = THUMBNAIL_PLATFORMS[platform];
   const aspectRatio = dims.width / dims.height;
+
+  // 프롬프트 자동 갱신 (사용자가 편집하지 않은 경우)
+  useEffect(() => {
+    if (!promptEdited) {
+      setCustomPrompt(getThumbnailPrompt(topic, platform, aiStyle, contentSummary));
+    }
+  }, [topic, platform, aiStyle, contentSummary, promptEdited]);
 
   // AI 스타일 변경 시: 해당 스타일 히스토리 있으면 복원, 없으면 샘플 프리뷰 표시
   useEffect(() => {
@@ -97,7 +110,10 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
     setError(null);
 
     try {
-      const imageData = await generateThumbnailImage(topic, platform, aiStyle);
+      const imageData = await generateThumbnailImage(
+        topic, platform, aiStyle, contentSummary,
+        promptEdited ? customPrompt : undefined
+      );
       if (!imageData) {
         setError(t('thumbnail.errorGenerateFailed'));
         return;
@@ -121,7 +137,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
     } finally {
       setLoading(false);
     }
-  }, [topic, platform, aiStyle, showTitle, title]);
+  }, [topic, platform, aiStyle, showTitle, title, contentSummary, promptEdited, customPrompt]);
 
   // 히스토리에서 선택
   const handleSelectHistory = useCallback((item: GeneratedItem) => {
@@ -235,6 +251,36 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                     </button>
                   ))}
                 </div>
+              </Section>
+            )}
+
+            {/* AI 프롬프트 보기/편집 */}
+            {imageSource === 'ai' && (
+              <Section label={t('thumbnail.promptLabel', 'AI 프롬프트')} right={
+                <button onClick={() => setShowPromptEditor(!showPromptEditor)}
+                  className="text-[10px] font-medium transition-colors hover:opacity-80"
+                  style={{ color: 'var(--brand-400)' }}>
+                  {showPromptEditor ? t('thumbnail.hidePrompt', '접기') : t('thumbnail.showPrompt', '보기/편집')}
+                </button>
+              }>
+                {showPromptEditor && (
+                  <div className="space-y-1.5">
+                    <textarea
+                      value={customPrompt}
+                      onChange={e => { setCustomPrompt(e.target.value); setPromptEdited(true); }}
+                      rows={8}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-[11px] leading-relaxed border resize-y font-mono focus:outline-none focus:border-[var(--brand-400)]"
+                      style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
+                    />
+                    {promptEdited && (
+                      <button onClick={() => { setPromptEdited(false); setCustomPrompt(getThumbnailPrompt(topic, platform, aiStyle, contentSummary)); }}
+                        className="text-[9px] font-medium transition-colors hover:opacity-80"
+                        style={{ color: 'var(--text-muted)' }}>
+                        {t('thumbnail.resetPrompt', '기본 프롬프트로 초기화')}
+                      </button>
+                    )}
+                  </div>
+                )}
               </Section>
             )}
 

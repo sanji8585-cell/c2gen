@@ -535,8 +535,8 @@ Return ONLY the motion prompt, no explanation.`;
 
       // ── 썸네일 이미지 생성 ──
       case 'generateThumbnail': {
-        const { topic, platform, style } = params;
-        const thumbnailPromptText = getThumbnailPrompt(topic, platform || 'youtube', style);
+        const { topic, platform, style, contentSummary, customPrompt } = params;
+        const thumbnailPromptText = customPrompt || getThumbnailPrompt(topic, platform || 'youtube', style, contentSummary);
         const aspectRatio = platform === 'tiktok' ? '9:16' : platform === 'instagram' ? '1:1' : '16:9';
 
         const response = await ai.models.generateContent({

@@ -261,7 +261,10 @@ export const analyzeMood = async (narrations: string[]): Promise<{ mood: string;
 };
 
 /** 썸네일 이미지 생성 */
-export const generateThumbnailImage = async (topic: string, platform: string, style?: string): Promise<string | null> => {
-  const result = await callGeminiProxy('generateThumbnail', { topic, platform, style });
+export const generateThumbnailImage = async (
+  topic: string, platform: string, style?: string,
+  contentSummary?: string, customPrompt?: string
+): Promise<string | null> => {
+  const result = await callGeminiProxy('generateThumbnail', { topic, platform, style, contentSummary, customPrompt });
   return result?.imageData || null;
 };

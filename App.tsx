@@ -1952,6 +1952,7 @@ const AppContent: React.FC<{
         <ThumbnailGenerator
           topic={currentTopic}
           sceneImages={generatedData.filter(d => d.imageData).map(d => d.imageData!)}
+          contentSummary={generatedData.slice(0, 3).map(d => d.narration).filter(Boolean).join(' ').slice(0, 400)}
           onClose={() => setShowThumbnailGenerator(false)}
         />
       )}
