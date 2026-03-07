@@ -139,11 +139,39 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       .catch(() => {});
   }, [isAuthenticated]);
 
-  // 피드 로드
+  // 피드 캐시 키
+  const feedCacheKey = `pg_feed_${sort}`;
+
+  // 피드 로드 (stale-while-revalidate)
   const loadFeed = useCallback(async (resetCursor = true) => {
     try {
-      if (resetCursor) setLoading(true);
-      else setLoadingMore(true);
+      if (resetCursor) {
+        // 캐시에서 즉시 복원 (필터 없는 기본 피드만)
+        if (!activeSearch && !activeTag && !authorFilter && feedFilter === 'all') {
+          try {
+            const cached = sessionStorage.getItem(feedCacheKey);
+            if (cached) {
+              const { posts: cachedPosts, nextCursor: cachedCursor, ts } = JSON.parse(cached);
+              // 5분 이내 캐시만 사용
+              if (Date.now() - ts < 300000 && cachedPosts.length > 0) {
+                setPosts(cachedPosts);
+                setNextCursor(cachedCursor);
+                setLoading(false);
+                // 백그라운드 갱신 (await 하지 않음)
+                getPlaygroundFeed({ sort }).then(result => {
+                  setPosts(result.posts);
+                  setNextCursor(result.nextCursor);
+                  sessionStorage.setItem(feedCacheKey, JSON.stringify({ posts: result.posts, nextCursor: result.nextCursor, ts: Date.now() }));
+                }).catch(() => {});
+                return;
+              }
+            }
+          } catch {}
+        }
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
       setError(null);
 
       const cursor = resetCursor ? null : nextCursor;
@@ -164,6 +192,12 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
 
       if (resetCursor) {
         setPosts(newPosts);
+        // 기본 피드 캐시 저장
+        if (!activeSearch && !activeTag && !authorFilter && feedFilter === 'all') {
+          try {
+            sessionStorage.setItem(feedCacheKey, JSON.stringify({ posts: newPosts, nextCursor: result.nextCursor, ts: Date.now() }));
+          } catch {}
+        }
       } else {
         setPosts(prev => [...prev, ...newPosts]);
       }
@@ -188,7 +222,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [sort, nextCursor, activeSearch, activeTag, authorFilter, feedFilter]);
+  }, [sort, nextCursor, activeSearch, activeTag, authorFilter, feedFilter, feedCacheKey]);
 
   // 정렬/필터 변경 시 리로드
   useEffect(() => {
@@ -536,18 +570,29 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       setAuthorFilterName('');
       return;
     }
-    setAuthorProfileLoading(true);
+
+    // 피드에서 이미 가진 데이터로 즉시 팝업 표시
+    const feedPost = posts.find(p => p.email === authorEmail);
+    const instantProfile: AuthorProfile = {
+      email: authorEmail,
+      name: feedPost?.authorName || authorName,
+      avatarUrl: feedPost?.authorAvatarUrl || null,
+      level: feedPost?.authorLevel || 1,
+      postCount: -1, // 로딩 중 표시용
+      totalLikes: -1,
+      equipped: feedPost?.equipped || { title: null, badges: [], frame: null },
+    };
+    setAuthorProfile(instantProfile);
+
+    // 백그라운드에서 정확한 통계 로드
     try {
       const profile = await getAuthorProfile(authorEmail);
       setAuthorProfile(profile);
     } catch {
-      // 프로필 로드 실패 시 필터만 적용
-      setAuthorFilter(authorEmail);
-      setAuthorFilterName(authorName);
-    } finally {
-      setAuthorProfileLoading(false);
+      // 통계 로드 실패 시 0으로 표시
+      setAuthorProfile(prev => prev ? { ...prev, postCount: 0, totalLikes: 0 } : null);
     }
-  }, [authorFilter]);
+  }, [authorFilter, posts]);
 
   // 태그 클릭
   const handleTagClick = (tag: string) => {
@@ -634,7 +679,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
           {(['latest', 'popular'] as const).map(s => (
-            <button key={s} onClick={() => setSort(s)}
+            <button key={s} onClick={() => { setSort(s); if (feedFilter !== 'all') setFeedFilter('all'); }}
               className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
               style={{
                 backgroundColor: sort === s && feedFilter === 'all' ? 'var(--brand-500)' : 'transparent',
@@ -1318,11 +1363,19 @@ const ProfilePopupInner: React.FC<{
       {/* 통계 */}
       <div className="flex justify-center gap-4">
         <div className="flex-1 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
-          <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{profile.postCount}</p>
+          {profile.postCount < 0 ? (
+            <div className="flex justify-center"><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} /></div>
+          ) : (
+            <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{profile.postCount}</p>
+          )}
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('playground.authorPosts')}</p>
         </div>
         <div className="flex-1 py-2.5 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
-          <p className="text-xl font-bold" style={{ color: '#ef4444' }}>{profile.totalLikes}</p>
+          {profile.totalLikes < 0 ? (
+            <div className="flex justify-center"><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} /></div>
+          ) : (
+            <p className="text-xl font-bold" style={{ color: '#ef4444' }}>{profile.totalLikes}</p>
+          )}
           <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('playground.authorLikes')}</p>
         </div>
       </div>

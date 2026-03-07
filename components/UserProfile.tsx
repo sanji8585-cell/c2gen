@@ -89,6 +89,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 놀이터 통계
+  const [playgroundStats, setPlaygroundStats] = useState<{ postCount: number; totalLikes: number } | null>(null);
+
   const token = localStorage.getItem('c2gen_session_token');
 
   const fetchProfile = useCallback(async () => {
@@ -140,6 +143,24 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
   }, [token]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
+
+  // 놀이터 통계 로드
+  useEffect(() => {
+    if (!profile?.email) return;
+    fetch('/api/playground', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'author-posts', token, authorEmail: profile.email }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.author) {
+          setPlaygroundStats({ postCount: d.author.postCount, totalLikes: d.author.totalLikes });
+        }
+      })
+      .catch(() => {});
+  }, [profile?.email, token]);
+
   useEffect(() => {
     if (activeTab === 'usage') fetchHistory();
     if (activeTab === 'payments') fetchPayments();
@@ -512,6 +533,18 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                           {usr.loginDays}{t('profile.daysUnit')}
                         </span>
                       </div>
+                      <div className="p-3 rounded-xl border" style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.15)' }}>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.playgroundPosts')}</p>
+                        <span className="text-sm font-bold" style={{ color: '#818cf8' }}>
+                          {playgroundStats?.postCount ?? 0}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl border" style={{ backgroundColor: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.15)' }}>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.playgroundLikes')}</p>
+                        <span className="text-sm font-bold" style={{ color: '#ef4444' }}>
+                          {playgroundStats?.totalLikes ?? 0}
+                        </span>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -564,10 +597,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                       { label: t('common.video'), value: usr.totalVideos, icon: '🎬' },
                       { label: t('common.login'), value: `${usr.loginDays}${t('profile.daysUnit')}`, icon: '📅' },
                       { label: t('profile.maxCombo'), value: usr.maxCombo, icon: '⚡' },
-                    ].map((s, i) => (
-                      <div key={i} className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
+                      { label: t('profile.playgroundPosts'), value: playgroundStats?.postCount ?? 0, icon: '🎪', highlight: true },
+                      { label: t('profile.playgroundLikes'), value: playgroundStats?.totalLikes ?? 0, icon: '❤️', highlight: true },
+                    ].map((s: any, i) => (
+                      <div key={i} className="p-2.5 rounded-lg border text-center" style={{
+                        backgroundColor: s.highlight ? 'rgba(99,102,241,0.08)' : 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)',
+                        borderColor: s.highlight ? 'rgba(99,102,241,0.2)' : 'var(--border-subtle)',
+                      }}>
                         <div className="text-sm mb-0.5">{s.icon}</div>
-                        <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</div>
+                        <div className="text-sm font-bold" style={{ color: s.highlight && s.icon === '❤️' ? '#ef4444' : 'var(--text-primary)' }}>{s.value}</div>
                         <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
                       </div>
                     ))}

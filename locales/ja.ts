@@ -504,6 +504,8 @@ const ja = {
     totalGenerations: '総生成数',
     daysUnit: '日',
     maxCombo: '最高コンボ',
+    playgroundPosts: 'プレイグラウンド投稿',
+    playgroundLikes: '受け取ったイイネ',
     noAchievements: 'まだ達成した実績がありません。',
     totalGacha: '総ガチャ回数',
     tickets: 'チケット',

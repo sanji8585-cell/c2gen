@@ -504,6 +504,8 @@ const ko = {
     totalGenerations: '총 생성',
     daysUnit: '일',
     maxCombo: '최고 콤보',
+    playgroundPosts: '놀이터 게시물',
+    playgroundLikes: '받은 좋아요',
     noAchievements: '아직 달성한 업적이 없습니다.',
     totalGacha: '총 뽑기',
     tickets: '티켓',

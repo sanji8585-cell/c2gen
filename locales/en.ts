@@ -504,6 +504,8 @@ const en = {
     totalGenerations: 'Total Generations',
     daysUnit: 'days',
     maxCombo: 'Max Combo',
+    playgroundPosts: 'Playground Posts',
+    playgroundLikes: 'Likes Received',
     noAchievements: 'No achievements yet.',
     totalGacha: 'Total Gacha',
     tickets: 'Tickets',

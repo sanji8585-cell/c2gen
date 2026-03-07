@@ -211,6 +211,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           author_level: levelMap[p.email] || 1,
         }));
 
+        // 비로그인 피드는 CDN 캐시 가능
+        if (!email) {
+          res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
+        }
         return res.json({ posts: enrichedPosts, nextCursor, likedPostIds, bookmarkedPostIds });
       }
 
