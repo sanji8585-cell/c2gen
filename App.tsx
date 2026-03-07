@@ -1246,6 +1246,8 @@ const AppContent: React.FC<{
         // 영상 비용 추가
         addCost('video', PRICING.VIDEO.perVideo, 1);
         setProgressMessage(`씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`);
+        // 영상 변환 후 자동 저장
+        try { await saveProject(currentTopic, assetsRef.current, undefined, costRef.current); refreshProjects(); } catch {}
         // 영상 퀘스트 진행
         const { isAuthenticated: authV, synced: syncV, recordAction: recordV } = gameRef.current;
         if (authV && syncV) recordV('generation_complete', 1, { videoCount: 1 }).catch(() => {});
@@ -1907,6 +1909,15 @@ const AppContent: React.FC<{
             canUndo={canUndo}
             canRedo={canRedo}
             onOpenThumbnail={() => setShowThumbnailGenerator(true)}
+            onSaveProject={async () => {
+              try {
+                await saveProject(currentTopic, assetsRef.current, undefined, costRef.current);
+                refreshProjects();
+                setToastMessage(t('progress.projectSaved', { name: currentTopic })); setTimeout(() => setToastMessage(null), 3000);
+              } catch (e: any) {
+                setToastMessage(t('progress.projectSaveFailed', { error: e.message })); setTimeout(() => setToastMessage(null), 3000);
+              }
+            }}
         />
       </main>
       )}

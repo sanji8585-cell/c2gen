@@ -43,6 +43,7 @@ interface ResultTableProps {
   canUndo?: boolean;
   canRedo?: boolean;
   onOpenThumbnail?: () => void;
+  onSaveProject?: () => void;
 }
 
 // 오디오 디코딩 함수
@@ -597,6 +598,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   canUndo,
   canRedo,
   onOpenThumbnail,
+  onSaveProject,
 }) => {
   const { t } = useTranslation();
   const dragIndexRef = useRef<number | null>(null);
@@ -757,6 +759,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
               className={`h-10 w-10 rounded-lg flex items-center justify-center border ${showPreview ? 'bg-emerald-500/25 border-emerald-500/50 text-emerald-300' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'}`}>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
             </button>
+            {onSaveProject && (
+              <button onClick={onSaveProject}
+                className="h-10 w-10 rounded-lg flex items-center justify-center border"
+                style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
+                title={t('result.saveProject', '프로젝트 저장')}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+              </button>
+            )}
             <button onClick={() => setShowMobileSettings(true)}
               className="h-10 w-10 rounded-lg flex items-center justify-center border"
               style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
@@ -1095,6 +1105,16 @@ const ResultTable: React.FC<ResultTableProps> = ({
           </div>
 
           <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
+
+          {/* 프로젝트 저장 */}
+          {onSaveProject && (
+            <button onClick={onSaveProject}
+              className="h-8 w-8 rounded-lg transition-all flex items-center justify-center hover:bg-[var(--bg-hover)]"
+              style={{ color: 'var(--text-secondary)' }}
+              title={t('result.saveProject', '프로젝트 저장')}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+            </button>
+          )}
 
           {/* 저장 드롭다운 */}
           <div>
