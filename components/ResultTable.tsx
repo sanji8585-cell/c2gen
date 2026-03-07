@@ -42,6 +42,7 @@ interface ResultTableProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  onOpenThumbnail?: () => void;
 }
 
 // 오디오 디코딩 함수
@@ -595,6 +596,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onRedo,
   canUndo,
   canRedo,
+  onOpenThumbnail,
 }) => {
   const { t } = useTranslation();
   const dragIndexRef = useRef<number | null>(null);
@@ -810,6 +812,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
             {t('result.subtitleSettings')}
           </button>
+
+          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
+
+          {/* 썸네일 생성 */}
+          {onOpenThumbnail && (
+            <button onClick={onOpenThumbnail}
+              title={t('result.thumbnailDesc', 'YouTube, Instagram 등 플랫폼별 썸네일 생성')}
+              className="h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]"
+              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
+              <svg className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+              {t('thumbnailButton', '썸네일')}
+            </button>
+          )}
 
           <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 

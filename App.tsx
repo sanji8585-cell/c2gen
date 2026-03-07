@@ -1696,24 +1696,7 @@ const AppContent: React.FC<{
           </div>
         )}
 
-        {/* 썸네일 생성 버튼 */}
-        {generatedData.length > 0 && step === GenerationStep.COMPLETED && (
-          <div className="max-w-7xl mx-auto px-4 mb-6 flex justify-center">
-            <button
-              onClick={() => setShowThumbnailGenerator(true)}
-              className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border"
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                borderColor: 'var(--border-default)',
-                color: 'var(--text-primary)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--brand-500)'; e.currentTarget.style.color = 'var(--brand-400)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-            >
-              {t('thumbnailButton')}
-            </button>
-          </div>
-        )}
+        {/* 썸네일 생성 버튼 — ResultTable 툴바로 이동됨 */}
 
         {/* 스크립트 검토 배너 */}
         {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (() => {
@@ -1923,6 +1906,7 @@ const AppContent: React.FC<{
             onRedo={handleRedo}
             canUndo={canUndo}
             canRedo={canRedo}
+            onOpenThumbnail={() => setShowThumbnailGenerator(true)}
         />
       </main>
       )}
