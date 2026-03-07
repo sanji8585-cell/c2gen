@@ -1042,7 +1042,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 
           {/* 저장 드롭다운 */}
-          <div className="relative">
+          <div>
             <button
               ref={saveButtonRef}
               onClick={() => setShowSaveMenu(!showSaveMenu)}
@@ -1052,14 +1052,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
               {t('common.save')}
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
-            {showSaveMenu && (
-              <>
-                <div className="fixed inset-0 z-[9998]" onClick={() => setShowSaveMenu(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-[9999] w-60 rounded-xl border shadow-2xl py-1.5"
-                  style={{
-                    backgroundColor: 'var(--bg-surface)',
-                    borderColor: 'var(--border-default)',
-                  }}>
+          </div>
+        </div>
+        {/* 저장 메뉴 — 툴바 바깥, fixed 포탈 */}
+        {showSaveMenu && (
+          <>
+            <div className="fixed inset-0 z-[9998]" onClick={() => setShowSaveMenu(false)} />
+            <div className="fixed z-[9999] w-60 rounded-xl border shadow-2xl py-1.5"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-default)',
+                top: saveButtonRef.current ? saveButtonRef.current.getBoundingClientRect().bottom + 6 : 0,
+                right: saveButtonRef.current ? window.innerWidth - saveButtonRef.current.getBoundingClientRect().right : 0,
+              }}>
                   <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
                     className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
                     style={{ color: 'var(--text-primary)' }}>
@@ -1092,11 +1097,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     }
                     {t('result.mp4WithSub')}
                   </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
 
         {/* 자막 설정 패널 (접힘식) */}
         {showSubtitleSettings && (
