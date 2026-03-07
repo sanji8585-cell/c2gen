@@ -674,6 +674,51 @@ const ResultTable: React.FC<ResultTableProps> = ({
   if (data.length === 0) return null;
 
   return (
+    <>
+    {/* ═══ 저장 메뉴 포탈 (최상위 레벨) ═══ */}
+    {showSaveMenu && (
+      <>
+        <div className="fixed inset-0 z-[9998]" onClick={() => setShowSaveMenu(false)} />
+        <div className="fixed z-[9999] w-60 rounded-xl border shadow-2xl py-1.5"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-default)',
+            top: saveButtonRef.current ? saveButtonRef.current.getBoundingClientRect().bottom + 6 : 0,
+            right: saveButtonRef.current ? window.innerWidth - saveButtonRef.current.getBoundingClientRect().right : 0,
+          }}>
+          <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
+            className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+            style={{ color: 'var(--text-primary)' }}>
+            <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            {t('result.excelImages')}
+          </button>
+          <button onClick={async () => { await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowSaveMenu(false); }}
+            className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+            style={{ color: 'var(--text-primary)' }}>
+            <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            SRT
+          </button>
+          <div className="my-1 border-t" style={{ borderColor: 'var(--border-default)' }} />
+          <button onClick={() => { onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution); setShowSaveMenu(false); }}
+            disabled={isExporting}
+            className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40"
+            style={{ color: 'var(--text-primary)' }}>
+            {isExporting
+              ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
+              : <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+            {t('result.mp4NoSub')}
+          </button>
+          <button onClick={() => { onExportVideo?.(true, currentSubtitleConfig, sceneGap, selectedResolution); setShowSaveMenu(false); }}
+            disabled={isExporting}
+            className="w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40 text-brand-400">
+            {isExporting
+              ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
+              : <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+            {t('result.mp4WithSub')}
+          </button>
+        </div>
+      </>
+    )}
     <div className="w-full max-w-[98%] mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* ═══ 모바일 미니 툴바 (md 미만) ═══ */}
       <div className="md:hidden mb-4 backdrop-blur-md rounded-2xl border px-3 py-2" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)', borderColor: 'var(--border-default)' }}>
@@ -1054,53 +1099,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </button>
           </div>
         </div>
-        {/* 저장 메뉴 — 툴바 바깥, fixed 포탈 */}
-        {showSaveMenu && (
-          <>
-            <div className="fixed inset-0 z-[9998]" onClick={() => setShowSaveMenu(false)} />
-            <div className="fixed z-[9999] w-60 rounded-xl border shadow-2xl py-1.5"
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                borderColor: 'var(--border-default)',
-                top: saveButtonRef.current ? saveButtonRef.current.getBoundingClientRect().bottom + 6 : 0,
-                right: saveButtonRef.current ? window.innerWidth - saveButtonRef.current.getBoundingClientRect().right : 0,
-              }}>
-                  <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
-                    style={{ color: 'var(--text-primary)' }}>
-                    <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    {t('result.excelImages')}
-                  </button>
-                  <button onClick={async () => { await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowSaveMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
-                    style={{ color: 'var(--text-primary)' }}>
-                    <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    SRT
-                  </button>
-                  <div className="my-1 border-t" style={{ borderColor: 'var(--border-default)' }} />
-                  <button onClick={() => { onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution); setShowSaveMenu(false); }}
-                    disabled={isExporting}
-                    className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40"
-                    style={{ color: 'var(--text-primary)' }}>
-                    {isExporting
-                      ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
-                      : <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    }
-                    {t('result.mp4NoSub')}
-                  </button>
-                  <button onClick={() => { onExportVideo?.(true, currentSubtitleConfig, sceneGap, selectedResolution); setShowSaveMenu(false); }}
-                    disabled={isExporting}
-                    className="w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40 text-brand-400">
-                    {isExporting
-                      ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
-                      : <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    }
-                    {t('result.mp4WithSub')}
-                  </button>
-            </div>
-          </>
-        )}
-
         {/* 자막 설정 패널 (접힘식) */}
         {showSubtitleSettings && (
           <div className="px-5 pb-4 pt-1 border-t" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 40%, transparent)' }}>
@@ -1415,6 +1413,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 
