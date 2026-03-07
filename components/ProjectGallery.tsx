@@ -89,7 +89,6 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
       if (selectedProject?.id === id) {
         setSelectedProject(null);
       }
-      onRefresh();
     } else {
       setConfirmDelete(id);
       setTimeout(() => setConfirmDelete(null), 3000);

@@ -703,12 +703,22 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
           <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 
-          {/* 미리보기 */}
+          {/* 썸네일 생성 — 미리보기 왼쪽 */}
+          {onOpenThumbnail && (
+            <button onClick={onOpenThumbnail}
+              title={t('result.thumbnailDesc', 'YouTube, Instagram 등 플랫폼별 썸네일 생성')}
+              className="h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]"
+              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
+              <svg className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+              {t('thumbnailButton', '썸네일')}
+            </button>
+          )}
+
+          {/* 미리보기 — 항상 눈에 띄는 emerald 색상 */}
           <button onClick={() => setShowPreview(!showPreview)}
-            className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-              showPreview ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300' : 'hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]'
+            className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+              showPreview ? 'bg-emerald-500/25 border-emerald-500/50 text-emerald-300' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
             }`}
-            style={showPreview ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
             title={t('result.previewDesc')}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
             {t('result.preview')}
@@ -720,7 +730,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div className="flex items-center gap-1">
             <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             <select
-              onChange={(e) => { if (e.target.value) { onAutoZoom?.(e.target.value); setAutoZoomPattern(e.target.value); } }}
+              onChange={(e) => { onAutoZoom?.(e.target.value || 'alternating'); setAutoZoomPattern(e.target.value); }}
               value={autoZoomPattern}
               title={t('result.autoZoomDesc', '전체 씬에 줌/팬 효과 일괄 적용')}
               className="h-8 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border"
@@ -812,19 +822,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
             {t('result.subtitleSettings')}
           </button>
-
-          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
-
-          {/* 썸네일 생성 */}
-          {onOpenThumbnail && (
-            <button onClick={onOpenThumbnail}
-              title={t('result.thumbnailDesc', 'YouTube, Instagram 등 플랫폼별 썸네일 생성')}
-              className="h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]"
-              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
-              <svg className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-              {t('thumbnailButton', '썸네일')}
-            </button>
-          )}
 
           <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 

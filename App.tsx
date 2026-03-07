@@ -1491,10 +1491,10 @@ const AppContent: React.FC<{
     }
   };
 
-  // 프로젝트 삭제 핸들러
-  const handleDeleteProject = async (id: string) => {
-    await deleteProject(id);
-    await refreshProjects();
+  // 프로젝트 삭제 핸들러 (Optimistic UI)
+  const handleDeleteProject = (id: string) => {
+    setSavedProjects(prev => prev.filter(p => p.id !== id));
+    deleteProject(id).then(() => refreshProjects()).catch(() => refreshProjects());
   };
 
   // 프로젝트 불러오기 핸들러 (클라우드에서 전체 데이터 로드)
