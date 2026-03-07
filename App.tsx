@@ -917,7 +917,7 @@ const AppContent: React.FC<{
       // BGM 자동 선택 (비차단, 병렬)
       const runAutoBgm = async () => {
         try {
-          const autoBgmEnabled = localStorage.getItem('tubegen_auto_bgm') !== 'false';
+          const autoBgmEnabled = localStorage.getItem('tubegen_auto_bgm') === 'true';
           if (!autoBgmEnabled || bgmData) return; // 비활성화 또는 이미 BGM 있으면 스킵
 
           const narrations = initialAssets.map(a => a.narration);
