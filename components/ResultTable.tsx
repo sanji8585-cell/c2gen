@@ -1272,9 +1272,22 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   ))}
                 </div>
                 {row.audioData ? (
-                  <button onClick={() => onRegenerateAudio?.(index)} className="h-8 w-8 rounded-full flex items-center justify-center border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <AudioPlayer base64={row.audioData} />
+                    <button onClick={() => onRegenerateAudio?.(index)}
+                      className="h-8 w-8 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
+                      title={t('result.voiceRegenerate')}>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
+                    <button onClick={() => onUpdateAsset?.(index, { audioMuted: !row.audioMuted })}
+                      className={`h-8 w-8 rounded-lg flex items-center justify-center ${row.audioMuted ? 'bg-red-600/30 text-red-400' : ''}`}
+                      style={row.audioMuted ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
+                      {row.audioMuted
+                        ? <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>
+                        : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-9.536a5 5 0 000 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>}
+                    </button>
+                  </div>
                 ) : (
                   <div className="w-8 h-8 flex items-center justify-center opacity-30">
                     <div className="w-3 h-3 border-2 animate-spin rounded-full" style={{ borderColor: 'var(--border-subtle)', borderTopColor: 'var(--text-muted)' }} />
