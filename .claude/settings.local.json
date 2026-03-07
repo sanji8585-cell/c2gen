@@ -13,7 +13,9 @@
       "Bash(python3 -c \":*)",
       "Bash(npx vite build)",
       "Bash(npx vercel --prod)",
-      "Bash(npm install i18next react-i18next)"
+      "Bash(npm install i18next react-i18next)",
+      "Bash(\"c:/Users/최천둥/Desktop/c2gen/tmp_used_keys.txt\")",
+      "Bash(node \"c:/Users/최천둥/Desktop/c2gen/tmp_compare.cjs\")"
     ]
   }
 }

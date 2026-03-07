@@ -10,6 +10,8 @@ interface PlaygroundStats {
   flaggedPosts: number;
   uniqueAuthors: number;
   totalLikes: number;
+  totalComments: number;
+  totalReports: number;
 }
 
 interface PlaygroundPost {
@@ -52,7 +54,7 @@ const AdminPlayground: React.FC<Props> = ({ adminToken, onToast }) => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'flagged'>('all');
+  const [filter, setFilter] = useState<'all' | 'flagged' | 'reported'>('all');
   const [sort, setSort] = useState<'latest' | 'popular'>('latest');
   const [loading, setLoading] = useState(true);
 
@@ -110,11 +112,13 @@ const AdminPlayground: React.FC<Props> = ({ adminToken, onToast }) => {
     <div className="space-y-6">
       {/* 통계 카드 */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="전체 게시물" value={stats.totalPosts} />
           <StatCard label="작성자 수" value={stats.uniqueAuthors} />
           <StatCard label="총 좋아요" value={stats.totalLikes} color="#ef4444" />
-          <StatCard label="신고 게시물" value={stats.flaggedPosts} color="#f59e0b" />
+          <StatCard label="총 댓글" value={stats.totalComments} color="#6366f1" />
+          <StatCard label="신고 접수" value={stats.totalReports} color="#f59e0b" />
+          <StatCard label="신고 게시물" value={stats.flaggedPosts} color="#f97316" />
         </div>
       )}
 
@@ -134,6 +138,7 @@ const AdminPlayground: React.FC<Props> = ({ adminToken, onToast }) => {
         >
           <option value="all">전체</option>
           <option value="flagged">신고됨</option>
+          <option value="reported">신고 접수</option>
         </select>
         <select value={sort} onChange={e => { setSort(e.target.value as any); setPage(0); }}
           className="px-3 py-2 rounded-lg text-sm border"

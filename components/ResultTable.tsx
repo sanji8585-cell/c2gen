@@ -2,7 +2,6 @@
 import React, { useRef, useState, useEffect, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GeneratedAsset, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
-import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
 import { exportAssetsToZip } from '../services/exportService';
 import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier, canAccessResolution, getVideoResolution, setVideoResolution, BGM_LIBRARY, BGM_MOODS } from '../config';
@@ -610,6 +609,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [sceneGap, setSceneGap] = useState(0.3); // 씬 전환 간격 (초)
   const [showPreview, setShowPreview] = useState(false);
   const [selectedResolution, setSelectedResolution] = useState<ResolutionTier>(getVideoResolution());
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
 
   const handleResolutionChange = (res: ResolutionTier) => {
     if (!canAccessResolution(userPlan, res)) return;
@@ -660,92 +660,66 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
   return (
     <div className="w-full max-w-[98%] mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 헤더 툴바 — 3-row grouped layout */}
+      {/* 헤더 툴바 — single row */}
       <div className="mb-6 backdrop-blur-md rounded-2xl border overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)', borderColor: 'var(--border-default)' }}>
 
-        {/* Row 1: 편집 도구 + 미리보기 */}
-        <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 40%, transparent)' }}>
-          <div className="flex items-center gap-2">
-            {/* Undo/Redo */}
-            <button onClick={onUndo} disabled={!canUndo}
-              className={`p-2 rounded-lg transition-all ${canUndo ? 'hover:bg-[var(--bg-hover)]' : 'opacity-30 cursor-not-allowed'}`}
-              style={{ color: 'var(--text-secondary)' }}
-              title={t('result.undoShortcut')}>
-              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
-            </button>
-            <button onClick={onRedo} disabled={!canRedo}
-              className={`p-2 rounded-lg transition-all ${canRedo ? 'hover:bg-[var(--bg-hover)]' : 'opacity-30 cursor-not-allowed'}`}
-              style={{ color: 'var(--text-secondary)' }}
-              title={t('result.redoShortcut')}>
-              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" /></svg>
-            </button>
+        {/* 메인 툴바 (한 줄) */}
+        <div className="flex items-center gap-1.5 px-4 py-2.5 flex-wrap">
+          {/* Undo/Redo */}
+          <button onClick={onUndo} disabled={!canUndo}
+            className={`p-1.5 rounded-lg transition-all ${canUndo ? 'hover:bg-[var(--bg-hover)]' : 'opacity-30 cursor-not-allowed'}`}
+            style={{ color: 'var(--text-secondary)' }}
+            title={t('result.undoShortcut')}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
+          </button>
+          <button onClick={onRedo} disabled={!canRedo}
+            className={`p-1.5 rounded-lg transition-all ${canRedo ? 'hover:bg-[var(--bg-hover)]' : 'opacity-30 cursor-not-allowed'}`}
+            style={{ color: 'var(--text-secondary)' }}
+            title={t('result.redoShortcut')}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 10H11a5 5 0 00-5 5v2m15-7l-4-4m4 4l-4 4" /></svg>
+          </button>
 
-            <div className="w-px h-6 mx-1" style={{ backgroundColor: 'var(--border-default)' }} />
-
-            {/* 자동 줌 패턴 */}
-            <select
-              onChange={(e) => { if (e.target.value) { onAutoZoom?.(e.target.value); e.target.value = ''; } }}
-              defaultValue=""
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border"
-              style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
-              title="전체 씬에 줌 효과 일괄 적용"
-            >
-              <option value="" disabled style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoom')}</option>
-              <option value="alternating" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomAlternating')}</option>
-              <option value="dynamic" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomDynamic')}</option>
-              <option value="sentiment" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomSentiment')}</option>
-              <option value="static" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomStatic')}</option>
-            </select>
-
-            {/* 실패 씬 재생성 */}
-            {failedScenesCount > 0 && (
-              <button
-                onClick={onRegenerateFailedScenes}
-                className="px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 text-xs font-semibold hover:bg-red-500/25 transition-all flex items-center gap-1.5"
-                title="실패한 씬 전체 재생성"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                {t('result.failedCount', { count: failedScenesCount })}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* 미리보기 */}
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                showPreview ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-[var(--bg-hover)]'
-              }`}
-              style={showPreview ? undefined : { color: 'var(--text-secondary)' }}
-              title={t('result.previewDesc')}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-              {t('result.preview')}
+          {/* 실패 씬 재생성 */}
+          {failedScenesCount > 0 && (
+            <button onClick={onRegenerateFailedScenes}
+              className="px-2 py-1 rounded-lg bg-red-500/15 text-red-400 text-xs font-semibold hover:bg-red-500/25 transition-all flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              {failedScenesCount}
             </button>
-          </div>
-        </div>
+          )}
 
-        {/* Row 2: 내보내기 파일 + BGM */}
-        <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 40%, transparent)' }}>
-          {/* 왼쪽: 파일 내보내기 */}
-          <div className="flex items-center gap-2">
-            <button onClick={() => downloadProjectZip(data)} className="px-3 py-1.5 rounded-lg border text-xs font-semibold hover:bg-[var(--bg-hover)] transition-all flex items-center gap-1.5" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              {t('result.saveAll')}
-            </button>
-            <button onClick={() => exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`)} className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              {t('result.excelImages')}
-            </button>
-            <button onClick={async () => await downloadSrt(data, `subtitles_${Date.now()}.srt`)} className="px-3 py-1.5 rounded-lg border text-xs font-semibold hover:bg-[var(--bg-hover)] transition-all flex items-center gap-1.5" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              SRT
-            </button>
-          </div>
+          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 
-          {/* 오른쪽: BGM */}
-          <div className="flex items-center gap-2">
+          {/* 미리보기 */}
+          <button onClick={() => setShowPreview(!showPreview)}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              showPreview ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-[var(--bg-hover)]'
+            }`}
+            style={showPreview ? undefined : { color: 'var(--text-secondary)' }}
+            title={t('result.previewDesc')}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            {t('result.preview')}
+          </button>
+
+          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
+
+          {/* 자동 줌 */}
+          <select
+            onChange={(e) => { if (e.target.value) { onAutoZoom?.(e.target.value); e.target.value = ''; } }}
+            defaultValue=""
+            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border"
+            style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
+            <option value="" disabled style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoom')}</option>
+            <option value="alternating" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomAlternating')}</option>
+            <option value="dynamic" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomDynamic')}</option>
+            <option value="sentiment" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomSentiment')}</option>
+            <option value="static" style={{ backgroundColor: '#1a1a2e' }}>{t('result.autoZoomStatic')}</option>
+          </select>
+
+          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
+
+          {/* BGM */}
+          <div className="flex items-center gap-1">
             <svg className="w-4 h-4 flex-shrink-0 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
@@ -766,9 +740,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   };
                   reader.readAsDataURL(blob);
                 } catch {}
-              }}
-              title="BGM 라이브러리에서 선택"
-            >
+              }}>
               <option value="" style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>{bgmData ? t('result.bgmSelected') : 'BGM'}</option>
               {BGM_LIBRARY.map(track => (
                 <option key={track.id} value={track.id} style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>
@@ -776,8 +748,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 </option>
               ))}
             </select>
-            <label className="p-1.5 rounded-lg hover:bg-purple-500/15 transition-colors cursor-pointer text-purple-400" title="BGM 파일 직접 업로드 (MP3, WAV)">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            <label className="p-1 rounded-lg hover:bg-purple-500/15 transition-colors cursor-pointer text-purple-400" title="BGM 업로드">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
               <input type="file" accept="audio/*" className="hidden" onChange={handleBgmUpload} />
             </label>
             {bgmData && (
@@ -785,117 +757,124 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <input type="range" min={0} max={100} step={5}
                   value={Math.round(bgmVolume * 100)}
                   onChange={(e) => onBgmVolumeChange?.(Number(e.target.value) / 100)}
-                  className="w-20 accent-purple-500"
-                  title={`BGM 볼륨: ${Math.round(bgmVolume * 100)}%`} />
-                <span className="text-[11px] text-purple-400 w-8 text-right font-medium">{Math.round(bgmVolume * 100)}%</span>
-                <div className="w-px h-5 mx-1" style={{ backgroundColor: 'var(--border-default)' }} />
-                <label className="flex items-center gap-1.5 cursor-pointer" title="나레이션 구간에서 BGM 볼륨 자동 감소">
+                  className="w-16 accent-purple-500"
+                  title={`BGM ${Math.round(bgmVolume * 100)}%`} />
+                <span className="text-[10px] text-purple-400 font-medium">{Math.round(bgmVolume * 100)}%</span>
+                <label className="flex items-center gap-1 cursor-pointer" title={t('result.bgmDucking')}>
                   <input type="checkbox" checked={bgmDuckingEnabled ?? false}
                     onChange={(e) => onBgmDuckingToggle?.(e.target.checked)}
-                    className="accent-purple-500 w-3.5 h-3.5" />
-                  <span className="text-[11px] text-purple-400 whitespace-nowrap font-medium">{t('result.bgmDucking')}</span>
+                    className="accent-purple-500 w-3 h-3" />
+                  <span className="text-[10px] text-purple-400 whitespace-nowrap">{t('result.bgmDucking')}</span>
                 </label>
                 {bgmDuckingEnabled && (
                   <>
                     <input type="range" min={10} max={50} step={5}
                       value={Math.round((bgmDuckingAmount ?? 0.3) * 100)}
                       onChange={(e) => onBgmDuckingAmountChange?.(Number(e.target.value) / 100)}
-                      className="w-16 accent-purple-500"
-                      title={`덕킹 볼륨: ${Math.round((bgmDuckingAmount ?? 0.3) * 100)}%`} />
-                    <span className="text-[11px] text-purple-400 w-8 font-medium">{Math.round((bgmDuckingAmount ?? 0.3) * 100)}%</span>
+                      className="w-12 accent-purple-500" />
+                    <span className="text-[10px] text-purple-400">{Math.round((bgmDuckingAmount ?? 0.3) * 100)}%</span>
                   </>
                 )}
-                <button onClick={() => onBgmChange?.(null)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/15 transition-colors" title="BGM 제거">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <button onClick={() => onBgmChange?.(null)} className="p-1 rounded-lg text-red-400 hover:bg-red-500/15 transition-colors" title="BGM 제거">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </>
             )}
           </div>
-        </div>
 
-        {/* Row 3: 영상 출력 (Primary CTA) */}
-        <div className="flex items-center justify-between px-5 py-3">
-          <div className="flex items-center gap-3">
-            {/* 해상도 */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{t('result.resolution')}</span>
-              <select
-                value={selectedResolution}
-                onChange={(e) => {
-                  const val = e.target.value as ResolutionTier;
-                  if (canAccessResolution(userPlan, val)) handleResolutionChange(val);
-                }}
-                className="px-2 py-1 rounded-lg text-xs font-bold border cursor-pointer"
-                style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-              >
-                {(Object.keys(VIDEO_RESOLUTIONS) as ResolutionTier[]).map((key) => {
-                  const res = VIDEO_RESOLUTIONS[key];
-                  const accessible = canAccessResolution(userPlan, key);
-                  return (
-                    <option key={key} value={key} disabled={!accessible} style={{ backgroundColor: '#1a1a2e', color: accessible ? '#e2e8f0' : '#475569' }}>
-                      {key.toUpperCase()} {!accessible ? `(${res.planLabel})` : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-            {selectedResolution === '1080p' && (
-              <span className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>
-                {t('result.resolution1080pWarning')}
-              </span>
+          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
+
+          {/* 자막 설정 */}
+          <button onClick={() => setShowSubtitleSettings(!showSubtitleSettings)}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              showSubtitleSettings ? 'bg-brand-500/20 text-brand-300' : 'hover:bg-[var(--bg-hover)]'
+            }`}
+            style={showSubtitleSettings ? undefined : { color: 'var(--text-secondary)' }}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+            {t('result.subtitleSettings')}
+          </button>
+
+          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
+
+          {/* 해상도 */}
+          <select
+            value={selectedResolution}
+            onChange={(e) => {
+              const val = e.target.value as ResolutionTier;
+              if (canAccessResolution(userPlan, val)) handleResolutionChange(val);
+            }}
+            className="px-2 py-1.5 rounded-lg text-xs font-bold border cursor-pointer"
+            style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+            {(Object.keys(VIDEO_RESOLUTIONS) as ResolutionTier[]).map((key) => {
+              const res = VIDEO_RESOLUTIONS[key];
+              const accessible = canAccessResolution(userPlan, key);
+              return (
+                <option key={key} value={key} disabled={!accessible} style={{ backgroundColor: '#1a1a2e', color: accessible ? '#e2e8f0' : '#475569' }}>
+                  {key.toUpperCase()} {!accessible ? `(${res.planLabel})` : ''}
+                </option>
+              );
+            })}
+          </select>
+          {selectedResolution === '4k' && (
+            <span title={t('result.resolution4kWarning')}>
+              <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </span>
+          )}
+
+          {/* 스페이서 */}
+          <div className="flex-1" />
+
+          {/* 저장 드롭다운 */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSaveMenu(!showSaveMenu)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-brand-600 text-white hover:bg-brand-500 shadow-md shadow-brand-900/20">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              {t('result.saveAll')}
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {showSaveMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowSaveMenu(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-60 rounded-xl border shadow-2xl py-1.5 overflow-hidden"
+                  style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+                  <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+                    style={{ color: 'var(--text-primary)' }}>
+                    <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    {t('result.excelImages')}
+                  </button>
+                  <button onClick={async () => { await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowSaveMenu(false); }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+                    style={{ color: 'var(--text-primary)' }}>
+                    <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    SRT
+                  </button>
+                  <div className="my-1 border-t" style={{ borderColor: 'var(--border-default)' }} />
+                  <button onClick={() => { onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution); setShowSaveMenu(false); }}
+                    disabled={isExporting}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40"
+                    style={{ color: 'var(--text-primary)' }}>
+                    {isExporting
+                      ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
+                      : <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    }
+                    {t('result.mp4NoSub')}
+                  </button>
+                  <button onClick={() => { onExportVideo?.(true, currentSubtitleConfig, sceneGap, selectedResolution); setShowSaveMenu(false); }}
+                    disabled={isExporting}
+                    className="w-full px-4 py-2.5 text-left text-xs font-bold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40 text-brand-400">
+                    {isExporting
+                      ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
+                      : <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    }
+                    {t('result.mp4WithSub')}
+                  </button>
+                </div>
+              </>
             )}
-            {selectedResolution === '4k' && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400">
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                <span className="text-[11px] font-semibold">{t('result.resolution4kWarning')}</span>
-              </div>
-            )}
-
-            <div className="w-px h-6 mx-1" style={{ backgroundColor: 'var(--border-default)' }} />
-
-            {/* 자막 설정 토글 */}
-            <button
-              onClick={() => setShowSubtitleSettings(!showSubtitleSettings)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                showSubtitleSettings ? 'bg-brand-500/20 text-brand-300' : 'hover:bg-[var(--bg-hover)]'
-              }`}
-              style={showSubtitleSettings ? undefined : { color: 'var(--text-secondary)' }}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
-              {t('result.subtitleSettings')}
-            </button>
-          </div>
-
-          {/* 오른쪽: MP4 내보내기 */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution)}
-              disabled={isExporting}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                isExporting ? 'opacity-40 cursor-not-allowed' : 'border hover:brightness-110'
-              }`}
-              style={isExporting ? { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' } : { backgroundColor: 'var(--bg-hover)', color: 'var(--text-primary)', borderColor: 'var(--border-subtle)' }}
-            >
-              {isExporting
-                ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
-                : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-              }
-              {t('result.mp4NoSub')}
-            </button>
-            <button
-              onClick={() => onExportVideo?.(true, currentSubtitleConfig, sceneGap, selectedResolution)}
-              disabled={isExporting}
-              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                isExporting ? 'opacity-40 cursor-not-allowed' : 'bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-900/30'
-              }`}
-              style={isExporting ? { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' } : undefined}
-            >
-              {isExporting
-                ? <div className="w-4 h-4 border-2 border-t-transparent animate-spin rounded-full" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
-                : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-              }
-              {t('result.mp4WithSub')}
-            </button>
           </div>
         </div>
 
@@ -903,72 +882,43 @@ const ResultTable: React.FC<ResultTableProps> = ({
         {showSubtitleSettings && (
           <div className="px-5 pb-4 pt-1 border-t" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 40%, transparent)' }}>
             <div className="flex flex-wrap items-center gap-5 py-3">
-              {/* 위치 */}
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{t('result.subtitlePosition')}</span>
                 <div className="flex gap-1">
                   {(['top', 'center', 'bottom'] as const).map(pos => (
-                    <button
-                      key={pos}
-                      onClick={() => setSubtitlePos(pos)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                        subtitlePos === pos ? 'bg-brand-600 text-white' : 'hover:bg-[var(--bg-hover)] border'
-                      }`}
-                      style={subtitlePos === pos ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', borderColor: 'var(--border-subtle)' }}
-                    >
+                    <button key={pos} onClick={() => setSubtitlePos(pos)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${subtitlePos === pos ? 'bg-brand-600 text-white' : 'hover:bg-[var(--bg-hover)] border'}`}
+                      style={subtitlePos === pos ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', borderColor: 'var(--border-subtle)' }}>
                       {pos === 'top' ? t('result.subtitleTop') : pos === 'center' ? t('result.subtitleCenter') : t('result.subtitleBottom')}
                     </button>
                   ))}
                 </div>
               </div>
-              {/* 폰트 크기 */}
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{t('result.subtitleSize')}</span>
                 <input type="range" min={20} max={72} step={2} value={subtitleFontSize} onChange={(e) => setSubtitleFontSize(Number(e.target.value))} className="w-24 accent-brand-500" />
                 <span className="text-[11px] w-6 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>{subtitleFontSize}</span>
               </div>
-              {/* 배경 투명도 */}
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{t('result.subtitleBg')}</span>
                 <input type="range" min={0} max={100} step={5} value={subtitleBgOpacity} onChange={(e) => setSubtitleBgOpacity(Number(e.target.value))} className="w-24 accent-brand-500" />
                 <span className="text-[11px] w-9 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>{subtitleBgOpacity}%</span>
               </div>
-              {/* 텍스트 색상 */}
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{t('result.subtitleColor')}</span>
                 <div className="flex gap-1.5">
-                  {[
-                    { color: '#FFFFFF', labelKey: 'result.white' },
-                    { color: '#FFFF00', labelKey: 'result.yellow' },
-                    { color: '#00FFFF', labelKey: 'result.cyan' },
-                    { color: '#FFB347', labelKey: 'result.orange' },
-                  ].map(({ color, labelKey }) => (
-                    <button
-                      key={color}
-                      onClick={() => setSubtitleTextColor(color)}
-                      title={t(labelKey)}
-                      className={`w-5 h-5 rounded-full border-2 transition-all hover:scale-110 ${
-                        subtitleTextColor === color ? 'border-brand-400 scale-110' : 'border-[var(--text-muted)]'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
+                  {[{ color: '#FFFFFF', labelKey: 'result.white' }, { color: '#FFFF00', labelKey: 'result.yellow' }, { color: '#00FFFF', labelKey: 'result.cyan' }, { color: '#FFB347', labelKey: 'result.orange' }].map(({ color, labelKey }) => (
+                    <button key={color} onClick={() => setSubtitleTextColor(color)} title={t(labelKey)}
+                      className={`w-5 h-5 rounded-full border-2 transition-all hover:scale-110 ${subtitleTextColor === color ? 'border-brand-400 scale-110' : 'border-[var(--text-muted)]'}`}
+                      style={{ backgroundColor: color }} />
                   ))}
                 </div>
               </div>
-              {/* 미리보기 */}
-              <div
-                className="px-3 py-1 rounded text-xs font-bold"
-                style={{
-                  backgroundColor: `rgba(0, 0, 0, ${subtitleBgOpacity / 100})`,
-                  color: subtitleTextColor,
-                  fontSize: `${Math.max(11, Math.round(subtitleFontSize / 3))}px`,
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}
-              >
+              <div className="px-3 py-1 rounded text-xs font-bold"
+                style={{ backgroundColor: `rgba(0, 0, 0, ${subtitleBgOpacity / 100})`, color: subtitleTextColor, fontSize: `${Math.max(11, Math.round(subtitleFontSize / 3))}px`, border: '1px solid rgba(255,255,255,0.1)' }}>
                 {t('result.subtitlePreview')}
               </div>
             </div>
-            {/* 씬 전환 간격 + 기본 전환 효과 */}
             <div className="flex flex-wrap items-center gap-4 pt-3 border-t" style={{ borderColor: 'color-mix(in srgb, var(--border-default) 30%, transparent)' }}>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{t('result.sceneGap')}</span>
@@ -977,12 +927,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{t('result.defaultTransition')}</span>
-                <select
-                  onChange={(e) => onSetDefaultTransition?.(e.target.value)}
-                  defaultValue="none"
+                <select onChange={(e) => onSetDefaultTransition?.(e.target.value)} defaultValue="none"
                   className="px-2 py-1 rounded-lg border text-xs font-semibold cursor-pointer"
-                  style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
-                >
+                  style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
                   <option value="none" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>{t('result.noTransition')}</option>
                   <option value="crossfade" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>{t('result.crossfade')}</option>
                   <option value="fadeBlack" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>{t('result.fadeBlack')}</option>
@@ -990,9 +937,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   <option value="wipeRight" style={{ backgroundColor: '#1a1a2e', color: '#94a3b8' }}>{t('result.wipeRight')}</option>
                 </select>
               </div>
-              {sceneGap === 0 && (
-                <span className="text-[11px] text-amber-500 font-medium">{t('result.sceneGapWarning')}</span>
-              )}
+              {sceneGap === 0 && <span className="text-[11px] text-amber-500 font-medium">{t('result.sceneGapWarning')}</span>}
             </div>
           </div>
         )}
