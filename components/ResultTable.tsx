@@ -610,8 +610,17 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [selectedResolution, setSelectedResolution] = useState<ResolutionTier>(getVideoResolution());
   const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const [saveMenuPos, setSaveMenuPos] = useState({ top: 0, right: 0 });
   const [autoZoomPattern, setAutoZoomPattern] = useState('');
   const saveButtonRef = useRef<HTMLButtonElement>(null);
+
+  // 스크롤 시 저장 메뉴 닫기
+  useEffect(() => {
+    if (!showSaveMenu) return;
+    const close = () => setShowSaveMenu(false);
+    window.addEventListener('scroll', close, true);
+    return () => window.removeEventListener('scroll', close, true);
+  }, [showSaveMenu]);
 
   const handleResolutionChange = (res: ResolutionTier) => {
     if (!canAccessResolution(userPlan, res)) return;
@@ -841,7 +850,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div>
             <button
               ref={saveButtonRef}
-              onClick={() => setShowSaveMenu(!showSaveMenu)}
+              onClick={() => {
+                if (!showSaveMenu && saveButtonRef.current) {
+                  const rect = saveButtonRef.current.getBoundingClientRect();
+                  setSaveMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+                }
+                setShowSaveMenu(!showSaveMenu);
+              }}
               title={t('result.saveDesc', '엑셀, SRT, MP4 내보내기')}
               className="h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-brand-600 text-white hover:bg-brand-500 shadow-md shadow-brand-900/20">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -855,8 +870,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   style={{
                     backgroundColor: 'var(--bg-surface)',
                     borderColor: 'var(--border-default)',
-                    top: saveButtonRef.current ? saveButtonRef.current.getBoundingClientRect().bottom + 6 : 0,
-                    right: saveButtonRef.current ? window.innerWidth - saveButtonRef.current.getBoundingClientRect().right : 0,
+                    top: saveMenuPos.top,
+                    right: saveMenuPos.right,
                   }}>
                   <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
                     className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
