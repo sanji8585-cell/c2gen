@@ -691,6 +691,18 @@ const ResultTable: React.FC<ResultTableProps> = ({
             <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
             {t('result.saveAll', '전체 저장 (엑셀+이미지+SRT)')}
           </button>
+          <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
+            className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+            style={{ color: 'var(--text-primary)' }}>
+            <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            {t('result.excelImages')}
+          </button>
+          <button onClick={async () => { await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowSaveMenu(false); }}
+            className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+            style={{ color: 'var(--text-primary)' }}>
+            <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            SRT
+          </button>
           <div className="my-1 border-t" style={{ borderColor: 'var(--border-default)' }} />
           <button onClick={() => { onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution); setShowSaveMenu(false); }}
             disabled={isExporting}
@@ -866,6 +878,16 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 className="w-full px-5 py-4 text-left text-sm font-bold flex items-center gap-3 active:bg-[var(--bg-hover)] text-brand-400">
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                 {t('result.saveAll', '전체 저장 (엑셀+이미지+SRT)')}
+              </button>
+              <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowMobileSaveMenu(false); }}
+                className="w-full px-5 py-3.5 text-left text-sm font-semibold flex items-center gap-3 active:bg-[var(--bg-hover)]" style={{ color: 'var(--text-primary)' }}>
+                <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                {t('result.excelImages')}
+              </button>
+              <button onClick={async () => { await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowMobileSaveMenu(false); }}
+                className="w-full px-5 py-3.5 text-left text-sm font-semibold flex items-center gap-3 active:bg-[var(--bg-hover)]" style={{ color: 'var(--text-primary)' }}>
+                <svg className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                SRT
               </button>
               <div className="my-1 border-t mx-4" style={{ borderColor: 'var(--border-default)' }} />
               <button onClick={() => { onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution); setShowMobileSaveMenu(false); }}
