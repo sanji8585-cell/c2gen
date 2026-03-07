@@ -663,8 +663,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
       {/* 헤더 툴바 — single row */}
       <div className="mb-6 backdrop-blur-md rounded-2xl border overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)', borderColor: 'var(--border-default)' }}>
 
-        {/* 메인 툴바 (한 줄) */}
-        <div className="flex items-center gap-1.5 px-4 py-2.5 flex-wrap">
+        {/* 메인 툴바 (한 줄, 우측 정렬) */}
+        <div className="flex items-center justify-end gap-1.5 px-4 py-2.5 flex-wrap">
           {/* Undo/Redo */}
           <button onClick={onUndo} disabled={!canUndo}
             className={`p-1.5 rounded-lg transition-all ${canUndo ? 'hover:bg-[var(--bg-hover)]' : 'opacity-30 cursor-not-allowed'}`}
@@ -692,10 +692,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
           {/* 미리보기 */}
           <button onClick={() => setShowPreview(!showPreview)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              showPreview ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-[var(--bg-hover)]'
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
+              showPreview ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300' : 'hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]'
             }`}
-            style={showPreview ? undefined : { color: 'var(--text-secondary)' }}
+            style={showPreview ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
             title={t('result.previewDesc')}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
             {t('result.preview')}
@@ -786,10 +786,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
           {/* 자막 설정 */}
           <button onClick={() => setShowSubtitleSettings(!showSubtitleSettings)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              showSubtitleSettings ? 'bg-brand-500/20 text-brand-300' : 'hover:bg-[var(--bg-hover)]'
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
+              showSubtitleSettings ? 'bg-brand-500/20 border-brand-500/40 text-brand-300' : 'hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]'
             }`}
-            style={showSubtitleSettings ? undefined : { color: 'var(--text-secondary)' }}>
+            style={showSubtitleSettings ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
             {t('result.subtitleSettings')}
           </button>
@@ -823,8 +823,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </span>
           )}
 
-          {/* 스페이서 */}
-          <div className="flex-1" />
+          <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 
           {/* 저장 드롭다운 */}
           <div className="relative">
@@ -832,13 +831,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
               onClick={() => setShowSaveMenu(!showSaveMenu)}
               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-brand-600 text-white hover:bg-brand-500 shadow-md shadow-brand-900/20">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              {t('result.saveAll')}
+              {t('common.save')}
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {showSaveMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowSaveMenu(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-60 rounded-xl border shadow-2xl py-1.5 overflow-hidden"
+                <div className="absolute right-0 bottom-full mb-1.5 z-50 w-60 rounded-xl border shadow-2xl py-1.5 overflow-hidden"
                   style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
                   <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
                     className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"

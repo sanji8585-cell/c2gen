@@ -307,7 +307,10 @@ const AppContent: React.FC<{
   const [animatingIndices, setAnimatingIndices] = useState<Set<number>>(new Set());
 
   // 갤러리 뷰 관련
-  const [viewMode, setViewMode] = useState<ViewMode>('main');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.has('post') ? 'playground' : 'main';
+  });
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [currentTopic, setCurrentTopic] = useState<string>('');
 
