@@ -281,6 +281,10 @@ const en = {
     noHistory: 'No usage history.',
     balance: 'Balance',
     free: 'Free',
+    credits: 'credits',
+    unlimitedCredits: 'Unlimited Credits',
+    purchase: 'Purchase',
+    perMonth: '/mo',
   },
 
   // ── Playground ──

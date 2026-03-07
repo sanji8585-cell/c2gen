@@ -281,6 +281,10 @@ const ko = {
     noHistory: '사용 내역이 없습니다.',
     balance: '잔액',
     free: '무료',
+    credits: '크레딧',
+    unlimitedCredits: '무제한 크레딧',
+    purchase: '결제하기',
+    perMonth: '/월',
   },
 
   // ── 플레이그라운드 ──

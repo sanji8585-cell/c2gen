@@ -281,6 +281,10 @@ const ja = {
     noHistory: '利用履歴がありません。',
     balance: '残高',
     free: '無料',
+    credits: 'クレジット',
+    unlimitedCredits: '無制限クレジット',
+    purchase: '決済する',
+    perMonth: '/月',
   },
 
   // ── プレイグラウンド ──
