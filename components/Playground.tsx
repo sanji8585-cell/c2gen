@@ -355,6 +355,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
         bookmarked: false,
         videoUrl: null,
         tags: shareData.post.tags || [],
+        authorLevel: shareData.post.author_level || 1,
       };
 
       // 프로젝트 에셋 로드
@@ -802,6 +803,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
             <div>
               <div className="flex items-center justify-center gap-2">
                 <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{authorProfile.name}</p>
+                <LevelBadge level={authorProfile.level || 1} />
                 {authorProfile.equipped?.badges && authorProfile.equipped.badges.length > 0 && (
                   <BadgeIcons badges={authorProfile.equipped.badges} />
                 )}
@@ -984,6 +986,7 @@ const PostCard: React.FC<{
                 onClick={e => { e.stopPropagation(); onAuthorClick(); }}>
                 {post.authorName}
               </p>
+              <LevelBadge level={post.authorLevel || 1} compact />
               {post.equipped?.badges && post.equipped.badges.length > 0 && (
                 <BadgeIcons badges={post.equipped.badges} compact />
               )}
@@ -1043,8 +1046,8 @@ const PostCard: React.FC<{
           {/* 북마크 */}
           <button onClick={e => { e.stopPropagation(); onBookmark(); }} className="transition-all hover:scale-110">
             <svg className="w-4 h-4" viewBox="0 0 24 24"
-              fill={post.bookmarked ? 'var(--brand-500)' : 'none'}
-              stroke={post.bookmarked ? 'var(--brand-500)' : 'currentColor'}
+              fill={post.bookmarked ? '#fbbf24' : 'none'}
+              stroke={post.bookmarked ? '#fbbf24' : 'currentColor'}
               strokeWidth={2} style={{ color: 'var(--text-muted)' }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
             </svg>
@@ -1151,6 +1154,45 @@ const BadgeIcons: React.FC<{ badges: PlaygroundEquippedItem[]; compact?: boolean
           {badge.emoji}
         </span>
       ))}
+    </span>
+  );
+};
+
+// ── 레벨 뱃지 ──
+
+const LEVEL_COLORS = [
+  '#94a3b8', // 1-4
+  '#4ade80', // 5-9
+  '#22d3ee', // 10-14
+  '#818cf8', // 15-19
+  '#f59e0b', // 20-24
+  '#ef4444', // 25+
+];
+
+function getLevelColor(level: number): string {
+  if (level >= 25) return LEVEL_COLORS[5];
+  if (level >= 20) return LEVEL_COLORS[4];
+  if (level >= 15) return LEVEL_COLORS[3];
+  if (level >= 10) return LEVEL_COLORS[2];
+  if (level >= 5) return LEVEL_COLORS[1];
+  return LEVEL_COLORS[0];
+}
+
+const LevelBadge: React.FC<{ level: number; compact?: boolean }> = ({ level, compact = false }) => {
+  const color = getLevelColor(level);
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded font-bold leading-none ${
+        compact ? 'px-1 py-0.5 text-[9px] min-w-[20px]' : 'px-1.5 py-0.5 text-[10px] min-w-[24px]'
+      }`}
+      style={{
+        backgroundColor: `${color}20`,
+        color,
+        border: `1px solid ${color}40`,
+      }}
+      title={`Lv.${level}`}
+    >
+      {level}
     </span>
   );
 };
@@ -1398,6 +1440,7 @@ const CommentSection: React.FC<{
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{comment.author_name}</span>
+          <LevelBadge level={comment.author_level || 1} compact />
           {comment.equipped?.badges && comment.equipped.badges.length > 0 && (
             <BadgeIcons badges={comment.equipped.badges} compact />
           )}
@@ -1599,6 +1642,7 @@ const DetailModal: React.FC<{
                     onClick={() => onAuthorClick(data.post.email, data.post.authorName)}>
                     {data.post.authorName}
                   </p>
+                  <LevelBadge level={data.post.authorLevel || 1} />
                   {detailEquipped?.badges && detailEquipped.badges.length > 0 && (
                     <BadgeIcons badges={detailEquipped.badges} />
                   )}
@@ -1667,14 +1711,14 @@ const DetailModal: React.FC<{
               <button
                 onClick={() => isAuthenticated ? onBookmark() : onShowAuthModal()}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:scale-105"
-                style={{ backgroundColor: data.bookmarked ? 'rgba(99,102,241,0.1)' : 'var(--bg-elevated)' }}>
+                style={{ backgroundColor: data.bookmarked ? 'rgba(251,191,36,0.1)' : 'var(--bg-elevated)' }}>
                 <svg className="w-5 h-5" viewBox="0 0 24 24"
-                  fill={data.bookmarked ? 'var(--brand-500)' : 'none'}
-                  stroke={data.bookmarked ? 'var(--brand-500)' : 'currentColor'}
+                  fill={data.bookmarked ? '#fbbf24' : 'none'}
+                  stroke={data.bookmarked ? '#fbbf24' : 'currentColor'}
                   strokeWidth={2} style={{ color: 'var(--text-muted)' }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
                 </svg>
-                <span className="text-sm font-medium" style={{ color: data.bookmarked ? 'var(--brand-500)' : 'var(--text-secondary)' }}>
+                <span className="text-sm font-medium" style={{ color: data.bookmarked ? '#fbbf24' : 'var(--text-secondary)' }}>
                   {t('playground.bookmark')}
                 </span>
               </button>

@@ -83,6 +83,23 @@ async function resolveEquippedItems(
   return result;
 }
 
+// ── 작성자 레벨 조회 헬퍼 ──
+async function resolveLevels(
+  supabase: ReturnType<typeof getSupabase>,
+  emails: string[]
+): Promise<Record<string, number>> {
+  if (emails.length === 0) return {};
+  const { data } = await supabase
+    .from('c2gen_users')
+    .select('email, level')
+    .in('email', emails);
+  const result: Record<string, number> = {};
+  for (const u of (data || [])) {
+    result[u.email] = u.level || 1;
+  }
+  return result;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -182,12 +199,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           bookmarkedPostIds = (bookmarksRes.data || []).map((b: any) => b.post_id);
         }
 
-        // 작성자 장착 아이템 배치 조회
+        // 작성자 장착 아이템 + 레벨 배치 조회
         const uniqueEmails = [...new Set(resultPosts.map((p: any) => p.email))] as string[];
-        const equippedMap = await resolveEquippedItems(supabase, uniqueEmails);
+        const [equippedMap, levelMap] = await Promise.all([
+          resolveEquippedItems(supabase, uniqueEmails),
+          resolveLevels(supabase, uniqueEmails),
+        ]);
         const enrichedPosts = resultPosts.map((p: any) => ({
           ...p,
           equipped: equippedMap[p.email] || { title: null, badges: [], frame: null },
+          author_level: levelMap[p.email] || 1,
         }));
 
         return res.json({ posts: enrichedPosts, nextCursor, likedPostIds, bookmarkedPostIds });
@@ -459,17 +480,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         resultComments.forEach((c: any) => allCommentEmails.push(c.email));
         Object.values(replies).forEach(arr => arr.forEach(r => allCommentEmails.push(r.email)));
         const uniqueCommentEmails = [...new Set(allCommentEmails)];
-        const commentEquipped = await resolveEquippedItems(supabase, uniqueCommentEmails);
+        const [commentEquipped, commentLevels] = await Promise.all([
+          resolveEquippedItems(supabase, uniqueCommentEmails),
+          resolveLevels(supabase, uniqueCommentEmails),
+        ]);
 
         const enrichComments = resultComments.map((c: any) => ({
           ...c,
           equipped: commentEquipped[c.email] || { title: null, badges: [], frame: null },
+          author_level: commentLevels[c.email] || 1,
         }));
         const enrichReplies: Record<string, any[]> = {};
         for (const [pid, arr] of Object.entries(replies)) {
           enrichReplies[pid] = arr.map((r: any) => ({
             ...r,
             equipped: commentEquipped[r.email] || { title: null, badges: [], frame: null },
+            author_level: commentLevels[r.email] || 1,
           }));
         }
 
@@ -613,7 +639,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 유저 정보
         const { data: user } = await supabase
           .from('c2gen_users')
-          .select('name, avatar_url')
+          .select('name, avatar_url, level')
           .eq('email', ae)
           .single();
 
@@ -635,6 +661,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             email: ae,
             name: user?.name || 'Unknown',
             avatarUrl: user?.avatar_url || null,
+            level: user?.level || 1,
             postCount,
             totalLikes,
             equipped: eqMap[ae] || { title: null, badges: [], frame: null },
@@ -693,11 +720,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           bookmarked = !!bmRes.data;
         }
 
-        // 작성자 장착 아이템 조회
-        const eqMap = await resolveEquippedItems(supabase, [post.email]);
+        // 작성자 장착 아이템 + 레벨 조회
+        const [eqMap, lvlMap] = await Promise.all([
+          resolveEquippedItems(supabase, [post.email]),
+          resolveLevels(supabase, [post.email]),
+        ]);
         const equipped = eqMap[post.email] || { title: null, badges: [], frame: null };
+        const authorLevel = lvlMap[post.email] || 1;
 
-        return res.json({ post, assets, liked, bookmarked, sceneGap, equipped });
+        return res.json({ post: { ...post, author_level: authorLevel }, assets, liked, bookmarked, sceneGap, equipped });
       }
 
       // ══════════════════════════════════════

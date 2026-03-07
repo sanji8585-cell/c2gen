@@ -661,7 +661,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   return (
     <div className="w-full max-w-[98%] mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* 헤더 툴바 — single row */}
-      <div className="mb-6 backdrop-blur-md rounded-2xl border overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)', borderColor: 'var(--border-default)' }}>
+      <div className="mb-6 backdrop-blur-md rounded-2xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)', borderColor: 'var(--border-default)' }}>
 
         {/* 메인 툴바 (한 줄, 우측 정렬) */}
         <div className="flex items-center justify-end gap-1.5 px-4 py-2.5 flex-wrap">

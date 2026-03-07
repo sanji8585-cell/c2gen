@@ -30,6 +30,7 @@ export interface PlaygroundPost {
   equipped?: PlaygroundEquippedItems;
   videoUrl?: string | null;
   tags?: string[];
+  authorLevel?: number;
 }
 
 export interface PlaygroundFeedResponse {
@@ -73,6 +74,7 @@ export interface PlaygroundComment {
   created_at: string;
   liked?: boolean;
   equipped?: PlaygroundEquippedItems;
+  author_level?: number;
 }
 
 export interface CommentsResponse {
@@ -86,6 +88,7 @@ export interface AuthorProfile {
   email: string;
   name: string;
   avatarUrl: string | null;
+  level: number;
   postCount: number;
   totalLikes: number;
   equipped: PlaygroundEquippedItems;
@@ -127,6 +130,7 @@ function mapPost(raw: any, liked?: boolean, bookmarked?: boolean): PlaygroundPos
     equipped: raw.equipped || undefined,
     videoUrl: raw.video_url || null,
     tags: raw.tags || [],
+    authorLevel: raw.author_level || 1,
   };
 }
 
