@@ -837,7 +837,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
             {showSaveMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowSaveMenu(false)} />
-                <div className="absolute right-0 bottom-full mb-1.5 z-50 w-60 rounded-xl border shadow-2xl py-1.5 overflow-hidden"
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-60 rounded-xl border shadow-2xl py-1.5 overflow-hidden"
                   style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
                   <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
                     className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
