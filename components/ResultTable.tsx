@@ -612,7 +612,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [selectedResolution, setSelectedResolution] = useState<ResolutionTier>(getVideoResolution());
   const [showSaveMenu, setShowSaveMenu] = useState(false);
-  const [saveMenuPos, setSaveMenuPos] = useState({ top: 0, right: 0 });
   const [autoZoomPattern, setAutoZoomPattern] = useState('');
   const [showMobileSettings, setShowMobileSettings] = useState(false);
   const [showMobileSaveMenu, setShowMobileSaveMenu] = useState(false);
@@ -1043,19 +1042,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div className="w-px h-5" style={{ backgroundColor: 'var(--border-default)' }} />
 
           {/* 저장 드롭다운 */}
-          <div>
+          <div className="relative">
             <button
               ref={saveButtonRef}
-              onClick={() => {
-                if (!showSaveMenu && saveButtonRef.current) {
-                  const rect = saveButtonRef.current.getBoundingClientRect();
-                  const menuHeight = 220; // approx height of save menu
-                  const spaceBelow = window.innerHeight - rect.bottom;
-                  const top = spaceBelow < menuHeight ? rect.top - menuHeight - 6 : rect.bottom + 6;
-                  setSaveMenuPos({ top: Math.max(8, top), right: window.innerWidth - rect.right });
-                }
-                setShowSaveMenu(!showSaveMenu);
-              }}
+              onClick={() => setShowSaveMenu(!showSaveMenu)}
               title={t('result.saveDesc', '엑셀, SRT, MP4 내보내기')}
               className="h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-brand-600 text-white hover:bg-brand-500 shadow-md shadow-brand-900/20">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -1065,12 +1055,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
             {showSaveMenu && (
               <>
                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowSaveMenu(false)} />
-                <div className="fixed z-[9999] w-60 rounded-xl border shadow-2xl py-1.5"
+                <div className="absolute right-0 top-full mt-1.5 z-[9999] w-60 rounded-xl border shadow-2xl py-1.5"
                   style={{
                     backgroundColor: 'var(--bg-surface)',
                     borderColor: 'var(--border-default)',
-                    top: saveMenuPos.top,
-                    right: saveMenuPos.right,
                   }}>
                   <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
                     className="w-full px-4 py-2.5 text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors"
