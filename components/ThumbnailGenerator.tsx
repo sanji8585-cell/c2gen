@@ -153,20 +153,24 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
   const showSamplePreview = !baseImage && !loading && imageSource === 'ai';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }} onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}>
       <div
         className="w-full max-h-[92vh] overflow-hidden rounded-2xl border flex flex-col"
         style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', maxWidth: '960px' }}
-        onClick={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()} /* 유지: 내부 클릭 전파 방지 */
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between p-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
           <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{t('thumbnail.title')}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
+          <button onClick={() => { if (window.confirm(t('thumbnail.closeConfirm', '창을 닫으면 작업 내용이 사라집니다. 닫으시겠습니까?'))) onClose(); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
+        <div className="px-4 py-1.5 text-[11px] font-medium flex items-center gap-1.5 border-b" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}>
+          <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          {t('thumbnail.closeWarning', '창을 닫으면 작업 내용이 사라집니다. 완료 후 다운로드하세요.')}
+        </div>
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
           {/* 좌측: 컨트롤 패널 */}
           <div className="lg:w-[340px] flex-shrink-0 overflow-y-auto p-4 space-y-3 border-r" style={{ borderColor: 'var(--border-subtle)', scrollbarWidth: 'thin' }}>
