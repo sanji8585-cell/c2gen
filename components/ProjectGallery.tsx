@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SavedProject } from '../types';
 import { formatKRW } from '../config';
 import { getProjectById } from '../services/projectService';
@@ -21,6 +22,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   onLoad,
   onImport,
 }) => {
+  const { t } = useTranslation();
   const [selectedProject, setSelectedProject] = useState<SavedProject | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -100,7 +102,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
       <div className="max-w-7xl mx-auto px-4 py-8 text-center">
         <div className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl border" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
           <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent animate-spin rounded-full"></div>
-          <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>프로젝트 불러오는 중...</span>
+          <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{t('common.loading')}</span>
         </div>
       </div>
     );
@@ -122,7 +124,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            목록으로
+            {t('common.close')}
           </button>
 
           <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{selectedProject.name}</h2>
@@ -134,7 +136,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            불러오기
+            {t('gallery.loadProject')}
           </button>
         </div>
 
@@ -204,7 +206,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                     />
                   ) : (
                     <div className="w-full h-48 md:h-full flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>이미지 없음</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{t('gallery.noProjects')}</span>
                     </div>
                   )}
                 </div>
@@ -262,10 +264,10 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          돌아가기
+          {t('common.close')}
         </button>
 
-        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>저장된 프로젝트</h2>
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{t('gallery.title')}</h2>
 
         <div className="flex items-center gap-3">
           <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{projects.length}개 프로젝트</span>
@@ -274,7 +276,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            JSON 가져오기
+            {t('gallery.importProject')}
             <input type="file" accept=".json,application/json" className="hidden" onChange={handleImportFile} />
           </label>
         </div>
@@ -297,9 +299,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             ))}
           </div>
           <div className="text-6xl mb-4">🎨</div>
-          <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>첫 작품을 만들어보세요!</h3>
+          <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>{t('gallery.noProjects')}</h3>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            AI와 함께 놀라운 영상 콘텐츠를 창작해보세요
           </p>
         </div>
       ) : (
@@ -330,7 +331,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
                 {/* 오버레이 */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
-                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>자세히 보기</span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('gallery.loadProject')}</span>
                 </div>
               </div>
 
@@ -391,7 +392,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                     }}
                     className="flex-1 px-3 py-2 bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 text-xs font-bold rounded transition-colors"
                   >
-                    불러오기
+                    {t('gallery.loadProject')}
                   </button>
 
                   {/* JSON 내보내기 */}
@@ -402,7 +403,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                     }}
                     className="p-2 rounded transition-colors hover:bg-blue-900/50 hover:text-blue-400"
                     style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
-                    title="JSON으로 내보내기 (다른 기기 이전용)"
+                    title={t('gallery.exportJson')}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -420,7 +421,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                         : 'hover:bg-red-500/20 hover:text-red-400'
                     }`}
                     style={confirmDelete === project.id ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
-                    title={confirmDelete === project.id ? '다시 클릭하여 삭제' : '삭제'}
+                    title={confirmDelete === project.id ? t('result.confirmDelete') : t('gallery.deleteProject')}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path

@@ -27,6 +27,7 @@ import InventoryModal from './components/InventoryModal';
 import LeaderboardWidget from './components/LeaderboardWidget';
 // AvatarFrame moved into Header component
 import CompletionScreen from './components/CompletionScreen';
+import { useTranslation } from 'react-i18next';
 
 import { SavedProject } from './types';
 import { CONFIG, PRICING, formatKRW, ResolutionTier, Language, BGM_LIBRARY, LANGUAGE_CONFIG, BgmMood } from './config';
@@ -271,6 +272,7 @@ const AppContent: React.FC<{
   isAuthenticated: boolean; showAuthModal: boolean; onShowAuthModal: () => void; onCloseAuthModal: () => void;
   onAuthSuccess: (name: string) => void; onAdminSuccess: (token: string) => void;
 }> = ({ userName, onLogout, isDark, onToggleTheme, onNameChange, isAuthenticated, showAuthModal, onShowAuthModal, onCloseAuthModal, onAuthSuccess, onAdminSuccess }) => {
+  const { t } = useTranslation();
   const [announcements, setAnnouncements] = useState<{id:string;title:string;content:string;type:string}[]>([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('c2gen_dismissed_announcements') || '[]')); } catch { return new Set(); }
@@ -627,7 +629,7 @@ const AppContent: React.FC<{
   const handleAbort = () => {
     isAbortedRef.current = true;
     isProcessingRef.current = false;
-    setProgressMessage("🛑 작업 중단됨.");
+    setProgressMessage(`🛑 ${t('progress.aborted')}`);
     setStep(GenerationStep.COMPLETED);
   };
 
@@ -646,7 +648,7 @@ const AppContent: React.FC<{
 
     // 크레딧 잔액 확인 (최소 10크레딧 필요, 운영자 제외)
     if (userPlan !== 'operator' && userCredits < 10) {
-      setProgressMessage('크레딧이 부족합니다. 충전 후 다시 시도해주세요.');
+      setProgressMessage(t('progress.creditsInsufficient'));
       setShowCreditShop(true);
       return;
     }
@@ -656,7 +658,7 @@ const AppContent: React.FC<{
     generationStartRef.current = Date.now();
 
     setStep(GenerationStep.SCRIPTING);
-    setProgressMessage('V9.2 Ultra 엔진 부팅 중...');
+    setProgressMessage(t('progress.booting'));
 
     try {
       const hasKey = await checkApiKeyStatus();
@@ -684,9 +686,9 @@ const AppContent: React.FC<{
         // 수동 대본: 대본 첫 줄/첫 부분을 프로젝트명으로 사용
         const firstLine = sourceText.split('\n').find(l => l.trim().length > 0)?.trim() || '수동 대본';
         targetTopic = firstLine.slice(0, 50);
-        setProgressMessage('대본 분석 및 시각화 설계 중...');
+        setProgressMessage(t('progress.analyzingScript'));
       } else if (sourceText) {
-        setProgressMessage('외부 콘텐츠 분석 중...');
+        setProgressMessage(t('progress.analyzingContent'));
         targetTopic = "Custom Analysis Topic";
       } else {
         const trendMsgs = [
@@ -713,7 +715,7 @@ const AppContent: React.FC<{
         usedTopicsRef.current.push(targetTopic);
       }
 
-      setProgressMessage(`스토리보드 및 메타포 생성 중... (${LANGUAGE_CONFIG[language].name})`);
+      setProgressMessage(`${t('progress.storyboard')} (${LANGUAGE_CONFIG[language].name})`);
 
       // 긴 대본(3000자 초과) 감지 시 청크 분할 처리
       const inputLength = sourceText?.length || 0;
@@ -723,7 +725,7 @@ const AppContent: React.FC<{
       if (inputLength > CHUNK_THRESHOLD) {
         // 긴 대본: 청크 분할 처리 (10,000자 이상 대응)
         console.log(`[App] 긴 대본 감지: ${inputLength.toLocaleString()}자 → 청크 분할 처리`);
-        setProgressMessage(`긴 대본(${inputLength.toLocaleString()}자) 청크 분할 처리 중...`);
+        setProgressMessage(String(t('progress.longScript', { count: inputLength.toLocaleString() } as any)));
         scriptScenes = await generateScriptChunked(
           targetTopic,
           hasRefImages,
@@ -747,7 +749,7 @@ const AppContent: React.FC<{
       // 스크립트 검토 단계에서 멈춤 — 사용자가 확인/편집 후 "생성 시작" 클릭
       pendingGenContextRef.current = { targetTopic, refImgs, language, hasRefImages, sourceText };
       setStep(GenerationStep.SCRIPT_REVIEW);
-      setProgressMessage(`스크립트 ${initialAssets.length}개 씬 생성 완료 — 확인 후 생성을 시작하세요.`);
+      setProgressMessage(t('progress.scriptDone', { count: initialAssets.length }));
 
     } catch (error: any) {
       if (!isAbortedRef.current) {
@@ -844,7 +846,7 @@ const AppContent: React.FC<{
               if (isAbortedRef.current) break;
               const batch = indices.slice(start, start + TTS_CONCURRENCY);
               const batchEnd = Math.min(start + TTS_CONCURRENCY, indices.length);
-              setProgressMessage(`음성 생성 중... (${start + 1}~${batchEnd}/${indices.length})`);
+              setProgressMessage(t('progress.generatingAudio', { range: `${start + 1}~${batchEnd}`, total: indices.length }));
               await Promise.all(batch.map(i => generateSingleAudio(i)));
           }
       };
@@ -904,7 +906,7 @@ const AppContent: React.FC<{
           for (let start = 0; start < indices.length; start += CONCURRENCY) {
               if (isAbortedRef.current) break;
               const batch = indices.slice(start, start + CONCURRENCY);
-              setProgressMessage(`이미지 생성 중... (${start + 1}~${Math.min(start + CONCURRENCY, indices.length)}/${indices.length})`);
+              setProgressMessage(t('progress.generatingImages', { range: `${start + 1}~${Math.min(start + CONCURRENCY, indices.length)}`, total: indices.length }));
               await Promise.all(batch.map(i => generateSingleImage(i)));
           }
       };
@@ -947,7 +949,7 @@ const AppContent: React.FC<{
         }
       };
 
-      setProgressMessage(`시각 에셋 및 오디오 합성 중...`);
+      setProgressMessage(t('progress.generatingAssets'));
       // 이미지, 오디오, BGM 병렬 생성
       await Promise.all([runAudio(), runImages(), runAutoBgm()]);
 
@@ -1092,17 +1094,17 @@ const AppContent: React.FC<{
       // 비용 요약 메시지 (원화)
       const cost = costRef.current;
       const costMsg = `이미지 ${cost.imageCount}장 ${formatKRW(cost.images)} + TTS ${cost.ttsCharacters}자 ${formatKRW(cost.tts)} = 총 ${formatKRW(cost.total)}`;
-      setProgressMessage(`생성 완료! ${costMsg}`);
+      setProgressMessage(`${t('progress.generationComplete')} ${costMsg}`);
 
       // 자동 저장 (비용 정보 포함)
       try {
         console.log(`[App] 프로젝트 저장 시도: topic="${targetTopic}", assets=${assetsRef.current.length}개`);
         const savedProject = await saveProject(targetTopic, assetsRef.current, undefined, costRef.current);
         refreshProjects();
-        setProgressMessage(`"${savedProject.name}" 저장됨 | ${costMsg}`);
+        setProgressMessage(`${t('progress.projectSaved', { name: savedProject.name })} | ${costMsg}`);
       } catch (e: any) {
         console.error('프로젝트 자동 저장 실패:', e);
-        setProgressMessage(`생성 완료! (저장 실패: ${e.message}) | ${costMsg}`);
+        setProgressMessage(`${t('progress.projectSaveFailed', { error: e.message })} | ${costMsg}`);
       }
 
     } catch (error: any) {
@@ -1148,7 +1150,7 @@ const AppContent: React.FC<{
       assetsRef.current = newAssets;
       setGeneratedData(newAssets);
       setStep(GenerationStep.SCRIPT_REVIEW);
-      setProgressMessage(`스크립트 ${newAssets.length}개 씬 재생성 완료 — 확인 후 생성을 시작하세요.`);
+      setProgressMessage(t('progress.scriptRegenDone', { count: newAssets.length }));
     } catch (error: any) {
       setStep(GenerationStep.ERROR);
       setProgressMessage(`스크립트 재생성 오류: ${error.message}`);
@@ -1284,10 +1286,10 @@ const AppContent: React.FC<{
 
       if (result) {
         saveAs(result.videoBlob, `c2gen_${suffix}_${resSuffix}_${timestamp}.mp4`);
-        setProgressMessage(`✨ MP4 렌더링 완료! (${enableSubtitles ? '자막 O' : '자막 X'}, ${resSuffix.toUpperCase()})`);
+        setProgressMessage(`✨ ${t('progress.renderComplete')} (${enableSubtitles ? '자막 O' : '자막 X'}, ${resSuffix.toUpperCase()})`);
       }
     } catch (error: any) {
-      setProgressMessage(`렌더링 실패: ${error.message}`);
+      setProgressMessage(`${t('progress.renderFailed')}: ${error.message}`);
     } finally {
       setIsVideoGenerating(false);
     }
@@ -1578,8 +1580,8 @@ const AppContent: React.FC<{
 
       {needsKey && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 flex items-center justify-center gap-4 animate-in fade-in slide-in-from-top-4">
-          <span className="text-amber-400 text-xs font-bold">Gemini 3 Pro 엔진을 위해 API 키 설정이 필요합니다.</span>
-          <button onClick={handleOpenKeySelector} className="px-3 py-1 bg-amber-500 text-[10px] font-black rounded-lg hover:bg-amber-400 transition-colors uppercase" style={{ color: 'var(--bg-base)' }}>API 키 설정</button>
+          <span className="text-amber-400 text-xs font-bold">{t('progress.needApiKey')}</span>
+          <button onClick={handleOpenKeySelector} className="px-3 py-1 bg-amber-500 text-[10px] font-black rounded-lg hover:bg-amber-400 transition-colors uppercase" style={{ color: 'var(--bg-base)' }}>{t('progress.apiKeySetup')}</button>
         </div>
       )}
 
@@ -1604,13 +1606,13 @@ const AppContent: React.FC<{
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>로그인이 필요합니다</h3>
-              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>프로젝트 저장 및 불러오기는 로그인 후 이용 가능합니다.</p>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{t('auth.loginRequired')}</h3>
+              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>{t('auth.loginRequiredDesc')}</p>
               <button
                 onClick={onShowAuthModal}
                 className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all"
               >
-                로그인 / 회원가입
+                {t('auth.loginOrRegister')}
               </button>
             </div>
           </div>
@@ -1644,7 +1646,7 @@ const AppContent: React.FC<{
               <div className="flex items-start gap-3">
                 <span className="text-xl">💡</span>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>오늘의 팁</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>{t('tipOfDay')}</p>
                   <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{tipOfDay.text}</p>
                 </div>
               </div>
@@ -1705,31 +1707,27 @@ const AppContent: React.FC<{
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--brand-500)'; e.currentTarget.style.color = 'var(--brand-400)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
             >
-              썸네일 생성 (YouTube / TikTok / Instagram)
+              {t('thumbnailButton')}
             </button>
           </div>
         )}
 
         {/* 스크립트 검토 배너 */}
-        {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (
-          <div className="max-w-7xl mx-auto px-4 mb-6">
-            <div className="rounded-2xl border-2 p-6 text-center" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--brand-500)' }}>
-              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-                스크립트 검토
-              </h3>
-              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
-                아래 {generatedData.length}개 씬의 나레이션(대사) / 이미지 프롬프트를 확인 후 생성시작을 눌러주세요.
-              </p>
-              {/* 예상 비용 카드 */}
+        {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (() => {
+          const sc = generatedData.length;
+          const imgModel = getSelectedImageModel();
+          const imgPer = imgModel === 'gpt-image-1' ? 21 : 16;
+          const totalChars = generatedData.reduce((s, d) => s + (d.narration?.length || 0), 0);
+          const scriptCost = 5;
+          const imgTotal = sc * imgPer;
+          const ttsTotal = Math.max(15, Math.ceil(totalChars / 1000) * 15);
+          const est = scriptCost + imgTotal + ttsTotal;
+          const isInsufficientCredits = userPlan !== 'operator' && userCredits < est;
+
+          return (
+          <div className="max-w-7xl mx-auto px-4 mb-6 text-center">
+              {/* 견적서 카드 */}
               {(() => {
-                const sc = generatedData.length;
-                const imgModel = getSelectedImageModel();
-                const imgPer = imgModel === 'gpt-image-1' ? 21 : 16;
-                const totalChars = generatedData.reduce((s, d) => s + (d.narration?.length || 0), 0);
-                const scriptCost = 5;
-                const imgTotal = sc * imgPer;
-                const ttsTotal = Math.max(15, Math.ceil(totalChars / 1000) * 15);
-                const est = scriptCost + imgTotal + ttsTotal;
                 // 음식 비유 시스템
                 const krwEst = est * 10;
                 const foodTiers: { max: number; label: string; quotes: string[] }[] = [
@@ -1785,39 +1783,44 @@ const AppContent: React.FC<{
                 const tier = foodTiers.find(t => est <= t.max) || foodTiers[foodTiers.length - 1];
                 const quote = tier.quotes[Math.floor(Math.random() * tier.quotes.length)];
                 return (
-                  <div className="mx-auto max-w-md mb-5 rounded-2xl overflow-hidden border" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(139,92,246,0.06) 100%)' }}>
+                  <div className="mx-auto max-w-lg mb-5 rounded-2xl overflow-hidden border" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(139,92,246,0.06) 100%)' }}>
                     <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(245,158,11,0.15)' }}>
-                      <span className="text-base">💰</span>
-                      <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#f59e0b' }}>예상 비용</span>
+                      <span className="text-base">📋</span>
+                      <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#f59e0b' }}>{t('scriptReview.estimatedCost')}</span>
                       <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full font-bold" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
                         {tier.label}
                       </span>
+                    </div>
+                    <div className="px-5 py-2.5 text-center" style={{ borderBottom: '1px solid rgba(245,158,11,0.1)' }}>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {t('scriptReview.description', { count: sc })}
+                      </p>
                     </div>
                     <div className="px-5 py-3 space-y-2">
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(139,92,246,0.15)' }}>📝</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>스크립트 생성</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{t('scriptReview.scriptGeneration')}</span>
                         </div>
                         <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{scriptCost}</span>
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(96,165,250,0.15)' }}>🖼️</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>이미지 {sc}장 <span className="text-[10px] opacity-60">({imgModel === 'gpt-image-1' ? 'GPT' : 'Gemini'} @{imgPer})</span></span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{t('scriptReview.imagesCount', { count: sc })} <span className="text-[10px] opacity-60">({imgModel === 'gpt-image-1' ? 'GPT' : 'Gemini'} @{imgPer})</span></span>
                         </div>
                         <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{imgTotal}</span>
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(34,197,94,0.15)' }}>🔊</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>TTS <span className="text-[10px] opacity-60">({totalChars}자)</span></span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{t('scriptReview.ttsChars')} <span className="text-[10px] opacity-60">({totalChars}{t('completion.unit.chars')})</span></span>
                         </div>
                         <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{ttsTotal}</span>
                       </div>
                       <div className="border-t pt-2 mt-1 flex items-center justify-between" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
-                        <span className="text-sm font-black" style={{ color: '#f59e0b' }}>예상 합계</span>
-                        <span className="text-lg font-black tabular-nums" style={{ color: '#f59e0b' }}>{est} <span className="text-xs font-bold">크레딧</span></span>
+                        <span className="text-sm font-black" style={{ color: '#f59e0b' }}>{t('scriptReview.estimatedTotal')}</span>
+                        <span className="text-lg font-black tabular-nums" style={{ color: '#f59e0b' }}>{est} <span className="text-xs font-bold">{t('common.credits')}</span></span>
                       </div>
                     </div>
                     <div className="px-5 py-2.5 text-center" style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderTop: '1px solid rgba(245,158,11,0.1)' }}>
@@ -1828,6 +1831,24 @@ const AppContent: React.FC<{
                   </div>
                 );
               })()}
+              {/* 크레딧 부족 경고 */}
+              {isInsufficientCredits && (
+                <div className="mx-auto max-w-md mb-4 px-4 py-3 rounded-xl bg-red-900/30 border border-red-500/50 text-center">
+                  <p className="text-sm font-bold text-red-400 mb-1">
+                    {t('scriptReview.insufficientCredits')}
+                  </p>
+                  <p className="text-xs text-red-300/80">
+                    {t('scriptReview.insufficientDesc', { est, balance: userCredits.toLocaleString() })}
+                    <span className="ml-1 opacity-70">({t('scriptReview.insufficientShort', { amount: est - userCredits })})</span>
+                  </p>
+                  <button
+                    onClick={() => setShowCreditShop(true)}
+                    className="mt-2 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors"
+                  >
+                    {t('scriptReview.chargeCredits')}
+                  </button>
+                </div>
+              )}
               <div className="flex justify-center gap-3">
                 <button
                   onClick={handleRegenerateScript}
@@ -1835,13 +1856,16 @@ const AppContent: React.FC<{
                   className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border hover:opacity-80"
                   style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
                 >
-                  스크립트 다시 생성
+                  {t('scriptReview.regenerateScript')}
                 </button>
                 <button
-                  onClick={handleApproveScript}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-black py-3 px-12 rounded-xl transition-all text-base shadow-lg shadow-cyan-500/40 hover:shadow-cyan-400/60 hover:scale-105 animate-pulse"
+                  onClick={isInsufficientCredits ? () => setShowCreditShop(true) : handleApproveScript}
+                  className={isInsufficientCredits
+                    ? "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-black py-3 px-12 rounded-xl transition-all text-base shadow-lg shadow-red-500/40"
+                    : "bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-black py-3 px-12 rounded-xl transition-all text-base shadow-lg shadow-cyan-500/40 hover:shadow-cyan-400/60 hover:scale-105 animate-pulse"
+                  }
                 >
-                  🚀 생성 시작
+                  {isInsufficientCredits ? `💳 ${t('scriptReview.chargeButton')}` : `🚀 ${t('scriptReview.startGeneration')}`}
                 </button>
                 <button
                   onClick={() => {
@@ -1854,12 +1878,12 @@ const AppContent: React.FC<{
                   className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-all hover:opacity-80"
                   style={{ borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}
                 >
-                  취소
+                  {t('common.cancel')}
                 </button>
               </div>
-            </div>
           </div>
-        )}
+          );
+        })()}
 
         <ResultTable
             data={generatedData}
@@ -2067,6 +2091,7 @@ const AppContent: React.FC<{
         <CompletionScreen
           {...completionData}
           onClose={() => setCompletionData(null)}
+          onOpenThumbnail={() => { setCompletionData(null); setShowThumbnailGenerator(true); }}
         />
       )}
 

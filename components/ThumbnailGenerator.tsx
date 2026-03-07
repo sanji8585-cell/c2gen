@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { THUMBNAIL_PLATFORMS, LANGUAGE_CONFIG, type ThumbnailPlatform, type Language, CONFIG } from '../config';
 import { generateThumbnailImage } from '../services/geminiService';
 import { overlayTitleOnImage, TEXT_STYLE_PRESETS, getStyleSampleImageUrl } from '../services/thumbnailService';
@@ -20,6 +21,7 @@ interface GeneratedItem {
 }
 
 const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) => {
+  const { t } = useTranslation();
   const [platform, setPlatform] = useState<ThumbnailPlatform>('youtube');
   const [title, setTitle] = useState(topic);
   const [subtitle, setSubtitle] = useState('');
@@ -97,7 +99,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
     try {
       const imageData = await generateThumbnailImage(topic, platform, aiStyle);
       if (!imageData) {
-        setError('이미지 생성에 실패했습니다.');
+        setError(t('thumbnail.errorGenerateFailed'));
         return;
       }
 
@@ -115,7 +117,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
       setBaseImage(imageData);
       if (!showTitle || !title.trim()) setFinalImage(imageData);
     } catch (e: any) {
-      setError(e.message || '썸네일 생성 실패');
+      setError(e.message || t('thumbnail.errorGenerateFailed'));
     } finally {
       setLoading(false);
     }
@@ -159,7 +161,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between p-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>썸네일 생성</h2>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{t('thumbnail.title')}</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
@@ -170,7 +172,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
           <div className="lg:w-[340px] flex-shrink-0 overflow-y-auto p-4 space-y-3 border-r" style={{ borderColor: 'var(--border-subtle)', scrollbarWidth: 'thin' }}>
 
             {/* 플랫폼 선택 */}
-            <Section label="플랫폼">
+            <Section label={t('thumbnail.platform')}>
               <div className="flex gap-1.5">
                 {(Object.keys(THUMBNAIL_PLATFORMS) as ThumbnailPlatform[]).map(p => (
                   <button key={p} onClick={() => setPlatform(p)}
@@ -188,7 +190,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
             </Section>
 
             {/* 이미지 소스 */}
-            <Section label="이미지 소스">
+            <Section label={t('thumbnail.imageSource')}>
               <div className="flex gap-1.5">
                 <button onClick={() => setImageSource('ai')}
                   className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-all ${imageSource === 'ai' ? 'ring-2' : ''}`}
@@ -197,7 +199,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                     color: imageSource === 'ai' ? '#fff' : 'var(--text-secondary)',
                   }}
                 >
-                  AI 생성 <span className="text-[9px] opacity-60">(16크레딧)</span>
+                  {t('thumbnail.aiGenerate')} <span className="text-[9px] opacity-60">({t('thumbnail.credits16')})</span>
                 </button>
                 <button onClick={() => setImageSource('scene')}
                   disabled={sceneImages.length === 0}
@@ -207,14 +209,14 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                     color: imageSource === 'scene' ? '#fff' : 'var(--text-secondary)',
                   }}
                 >
-                  씬 이미지 <span className="text-[9px] opacity-60">{sceneImages.length > 0 ? '(무료)' : '(없음)'}</span>
+                  {t('thumbnail.sceneImage')} <span className="text-[9px] opacity-60">{sceneImages.length > 0 ? `(${t('thumbnail.free')})` : `(${t('thumbnail.none')})`}</span>
                 </button>
               </div>
             </Section>
 
             {/* AI 스타일 (AI 모드) */}
             {imageSource === 'ai' && (
-              <Section label="AI 이미지 스타일">
+              <Section label={t('thumbnail.aiImageStyle')}>
                 <div className="grid grid-cols-3 gap-1">
                   {Object.entries(THUMBNAIL_IMAGE_STYLES).map(([id, s]) => (
                     <button key={id} onClick={() => setAiStyle(id)}
@@ -234,14 +236,14 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
 
             {/* 씬 이미지 선택 (씬 모드) */}
             {imageSource === 'scene' && sceneImages.length > 0 && (
-              <Section label="씬 이미지 선택">
+              <Section label={t('thumbnail.sceneImageSelect')}>
                 <div className="flex gap-1.5 overflow-x-auto pb-1.5" style={{ scrollbarWidth: 'thin' }}>
                   {sceneImages.map((img, i) => (
                     <button key={i} onClick={() => handleSelectScene(img)}
                       className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${baseImage === img && !activeHistoryId ? 'ring-2 scale-105' : 'opacity-70 hover:opacity-100'}`}
                       style={{ borderColor: baseImage === img && !activeHistoryId ? 'var(--brand-400)' : 'transparent' }}
                     >
-                      <img src={`data:image/png;base64,${img}`} alt={`씬 ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={`data:image/png;base64,${img}`} alt={`Scene ${i + 1}`} className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -253,16 +255,16 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
             <hr style={{ borderColor: 'var(--border-subtle)' }} />
 
             {/* 텍스트 오버레이 */}
-            <Section label="텍스트 오버레이" right={
+            <Section label={t('thumbnail.textOverlay')} right={
               <label className="flex items-center gap-1 text-[10px] cursor-pointer" style={{ color: 'var(--text-muted)' }}>
                 <input type="checkbox" checked={showTitle} onChange={() => setShowTitle(!showTitle)} className="rounded w-3.5 h-3.5" />
-                활성화
+                {t('thumbnail.enable')}
               </label>
             }>
               {showTitle && (
                 <div className="space-y-2.5">
                   <div>
-                    <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>스타일</label>
+                    <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('thumbnail.style')}</label>
                     <div className="grid grid-cols-4 gap-1">
                       {TEXT_STYLE_PRESETS.map(s => (
                         <button key={s.id} onClick={() => setTextStyleId(s.id)}
@@ -278,24 +280,24 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>제목</label>
+                    <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('thumbnail.titleLabel')}</label>
                     <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-                      placeholder="썸네일 제목..."
+                      placeholder={t('thumbnail.titlePlaceholder')}
                       className="w-full px-2.5 py-1.5 rounded-lg text-sm border focus:outline-none"
                       style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>부제목 (선택)</label>
+                    <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('thumbnail.subtitle')}</label>
                     <input type="text" value={subtitle} onChange={e => setSubtitle(e.target.value)}
-                      placeholder="부제목..."
+                      placeholder={t('thumbnail.subtitlePlaceholder')}
                       className="w-full px-2.5 py-1.5 rounded-lg text-sm border focus:outline-none"
                       style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
                     />
                   </div>
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>위치</label>
+                      <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('thumbnail.position')}</label>
                       <div className="flex gap-1">
                         {(['top', 'center', 'bottom'] as const).map(pos => (
                           <button key={pos} onClick={() => setTextPosition(pos)}
@@ -305,20 +307,20 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                               color: textPosition === pos ? '#fff' : 'var(--text-secondary)',
                             }}
                           >
-                            {pos === 'top' ? '상단' : pos === 'center' ? '중앙' : '하단'}
+                            {pos === 'top' ? t('thumbnail.posTop') : pos === 'center' ? t('thumbnail.posCenter') : t('thumbnail.posBottom')}
                           </button>
                         ))}
                       </div>
                     </div>
                     <div className="flex-1">
-                      <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>크기</label>
+                      <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('thumbnail.size')}</label>
                       <input type="range" min={0.7} max={1.5} step={0.05} value={fontSizeMultiplier}
                         onChange={e => setFontSizeMultiplier(Number(e.target.value))}
                         className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
                         style={{ accentColor: 'var(--brand-500)' }}
                       />
                       <div className="flex justify-between text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        <span>작게</span><span>크게</span>
+                        <span>{t('thumbnail.small')}</span><span>{t('thumbnail.large')}</span>
                       </div>
                     </div>
                   </div>
@@ -349,22 +351,22 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                           boxShadow: '0 4px 16px rgba(99, 102, 241, 0.3)',
                         }}
                       >
-                        {loading ? '생성 중...' : '✨ 다시 생성 (16크레딧)'}
+                        {loading ? t('thumbnail.generating') : `✨ ${t('thumbnail.regenerate')}`}
                       </button>
                     )}
                     <button onClick={handleDownload}
                       className="flex-1 py-3 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
                       style={{ backgroundColor: '#059669', color: '#fff', boxShadow: '0 4px 16px rgba(5, 150, 105, 0.3)' }}
                     >
-                      다운로드 ({dims.width}x{dims.height})
+                      {t('thumbnail.download')} ({dims.width}x{dims.height})
                     </button>
                   </div>
                 </div>
               ) : loading ? (
                 <div className="text-center">
                   <div className="w-12 h-12 border-3 rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--brand-500)', borderTopColor: 'transparent' }} />
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>AI 이미지 생성 중...</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>스타일: {selectedAiStyle?.nameKo}</p>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('thumbnail.generatingAiImage')}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>{t('thumbnail.style')}: {selectedAiStyle?.nameKo}</p>
                 </div>
               ) : showSamplePreview ? (
                 /* AI 생성 샘플 프리뷰 (사전 생성된 실제 AI 이미지) */
@@ -375,13 +377,13 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                   >
                     <img
                       src={getStyleSampleImageUrl(aiStyle)}
-                      alt={`${selectedAiStyle?.nameKo} 스타일 샘플`}
+                      alt={`${selectedAiStyle?.nameKo} style sample`}
                       className="w-full h-full object-cover"
                     />
                     {/* 스타일 이름 배지 */}
                     <div className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold text-white"
                       style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-                      {selectedAiStyle?.nameKo} 스타일 샘플
+                      {selectedAiStyle?.nameKo} {t('thumbnail.styleSample')}
                     </div>
                   </div>
 
@@ -397,10 +399,10 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                       border: '2px solid rgba(255,255,255,0.15)',
                     }}
                   >
-                    ✨ 이 스타일로 이미지 생성 (16 크레딧)
+                    ✨ {t('thumbnail.generateThisStyle')}
                   </button>
                   <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>
-                    위 이미지는 "{selectedAiStyle?.nameKo}" 스타일 예시입니다. 실제 생성 시 주제에 맞는 이미지가 만들어집니다.
+                    {t('thumbnail.sampleDescription', { style: selectedAiStyle?.nameKo })}
                   </p>
                 </div>
               ) : (
@@ -408,13 +410,13 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
                   <svg className="w-16 h-16 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
                   </svg>
-                  <p className="text-sm mb-4">왼쪽에서 씬 이미지를 선택하세요</p>
+                  <p className="text-sm mb-4">{t('thumbnail.selectSceneImage')}</p>
                   {imageSource === 'scene' && sceneImages.length === 0 && (
                     <button onClick={() => { setImageSource('ai'); }}
                       className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
                       style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}
                     >
-                      AI 생성 모드로 전환
+                      {t('thumbnail.switchToAi')}
                     </button>
                   )}
                 </div>
@@ -426,11 +428,11 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, onClose }) =>
               <div className="flex-shrink-0 border-t p-3" style={{ borderColor: 'var(--border-subtle)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <label className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                    생성된 이미지 ({generatedHistory.length})
+                    {t('thumbnail.generatedImages', { count: generatedHistory.length })}
                   </label>
                   {generatedHistory.length > 1 && (
                     <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
-                      클릭하여 비교/선택
+                      {t('thumbnail.clickToCompare')}
                     </span>
                   )}
                 </div>

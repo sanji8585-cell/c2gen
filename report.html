@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>TubeGen AI V9.2 - 플랫폼 종합 분석 보고서</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    color: #1a1a2e;
+    line-height: 1.8;
+    background: #fff;
+    padding: 60px 80px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  @media print {
+    body { padding: 40px 50px; }
+    .no-print { display: none; }
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    table { page-break-inside: avoid; }
+  }
+
+  .print-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 28px;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+    z-index: 100;
+  }
+  .print-btn:hover { background: #2563eb; }
+
+  .cover {
+    text-align: center;
+    padding: 80px 0 60px;
+    border-bottom: 3px solid #1a1a2e;
+    margin-bottom: 50px;
+  }
+  .cover h1 {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+  .cover .subtitle {
+    font-size: 18px;
+    color: #6366f1;
+    font-weight: 700;
+    margin-bottom: 24px;
+  }
+  .cover .meta {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 2;
+  }
+
+  h2 {
+    font-size: 22px;
+    font-weight: 900;
+    color: #1e293b;
+    margin: 50px 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #334155;
+    margin: 30px 0 12px;
+  }
+  h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #475569;
+    margin: 20px 0 8px;
+  }
+
+  p { margin-bottom: 12px; font-size: 14px; color: #374151; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 13px;
+  }
+  th {
+    background: #f1f5f9;
+    font-weight: 700;
+    text-align: left;
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
+    color: #1e293b;
+  }
+  td {
+    padding: 9px 14px;
+    border: 1px solid #e2e8f0;
+    color: #374151;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .tag-done { background: #dcfce7; color: #166534; }
+  .tag-low { background: #fef3c7; color: #92400e; }
+  .tag-mid { background: #fed7aa; color: #9a3412; }
+  .tag-high { background: #fecaca; color: #991b1b; }
+
+  ul, ol { margin: 8px 0 16px 24px; font-size: 14px; color: #374151; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 700; color: #1e293b; }
+  code {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'Consolas', monospace;
+  }
+
+  .section-note {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    color: #1e40af;
+  }
+
+  .footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">PDF 저장 (Ctrl+P)</button>
+
+<!-- 표지 -->
+<div class="cover">
+  <h1>TubeGen AI V9.2</h1>
+  <div class="subtitle">플랫폼 종합 분석 보고서</div>
+  <div class="meta">
+    작성일: 2026년 3월 7일<br>
+    분석 범위: 전체 코드베이스 직접 검증 기반<br>
+    대상: App.tsx, 21개 컴포넌트, 16개 서비스, 10개 API<br>
+    버전: V9.2 (imagemaker 브랜치, commit 6713eac)
+  </div>
+</div>
+
+<!-- 1. 현재 구현 완료 기능 -->
+<h2>1. 현재 구현 완료 기능 (코드 검증)</h2>
+<p>아래는 코드에서 직접 확인한 구현 완료 기능 목록입니다. 개선 제안에서 이들과 중복되지 않도록 합니다.</p>
+
+<table>
+  <tr><th style="width:40%">기능</th><th>코드 위치</th></tr>
+  <tr><td>씬 드래그 순서 변경</td><td>ResultTable.tsx:638-646, App.tsx:1332</td></tr>
+  <tr><td>씬 삭제 / 복제 / 추가</td><td>App.tsx:1345-1377</td></tr>
+  <tr><td>미리보기 플레이어 (MP4 렌더링 없이)</td><td>PreviewPlayer.tsx, ResultTable.tsx:984</td></tr>
+  <tr><td>Undo/Redo + Ctrl+Z/Y 단축키</td><td>App.tsx:591-625</td></tr>
+  <tr><td>스크립트 리뷰 비용 예측 (음식 비유 포함)</td><td>App.tsx:1724-1830</td></tr>
+  <tr><td>씬별 이미지 / 음성 재생성</td><td>App.tsx:1161, App.tsx:1304</td></tr>
+  <tr><td>실패 씬 일괄 재생성</td><td>App.tsx:1462</td></tr>
+  <tr><td>줌/팬 효과 (5종 + 자동 패턴 4종)</td><td>ResultTable.tsx:462-509</td></tr>
+  <tr><td>전환 효과 (crossfade, fadeBlack, wipe)</td><td>ResultTable.tsx:486-509</td></tr>
+  <tr><td>자막 설정 (위치/크기/색상/투명도)</td><td>ResultTable.tsx:869-980</td></tr>
+  <tr><td>BGM (라이브러리 + 업로드 + 덕킹)</td><td>ResultTable.tsx:708-776</td></tr>
+  <tr><td>해상도 티어 (720p/1080p/4K 플랜 제한)</td><td>ResultTable.tsx:821-857</td></tr>
+  <tr><td>썸네일 생성 (YouTube/TikTok/Instagram)</td><td>ThumbnailGenerator.tsx</td></tr>
+  <tr><td>게이미피케이션 (레벨/퀘스트/가챠/업적/인벤토리/리더보드)</td><td>App.tsx:2039-2125</td></tr>
+  <tr><td>플레이그라운드 (공유/좋아요/상세보기)</td><td>Playground.tsx</td></tr>
+  <tr><td>크레딧 시스템 (팩/플랜/내역) + 토스/Stripe</td><td>CreditShop.tsx</td></tr>
+  <tr><td>레퍼럴 시스템 (다단계)</td><td>ReferralPanel.tsx</td></tr>
+  <tr><td>RPG 완료 화면 (등급/XP/콤보)</td><td>CompletionScreen.tsx</td></tr>
+  <tr><td>다국어 (한국어/English/日本語)</td><td>config.ts:392-396</td></tr>
+  <tr><td>이미지 직접 업로드 + 커스텀 재생시간 + 음성 뮤트</td><td>ResultTable.tsx:184-199</td></tr>
+  <tr><td>내보내기 (MP4 자막O/X, SRT, 엑셀+이미지, ZIP)</td><td>ResultTable.tsx:695-865</td></tr>
+  <tr><td>프로젝트 갤러리 (클라우드 저장/불러오기)</td><td>ProjectGallery.tsx</td></tr>
+  <tr><td>프리셋 관리 (모델/화풍/음성 설정 저장)</td><td>InputSection.tsx:374-430</td></tr>
+  <tr><td>코나미 코드 이스터에그</td><td>App.tsx:484-539</td></tr>
+  <tr><td>라이트/다크 테마</td><td>useTheme.ts</td></tr>
+  <tr><td>글로벌 에러 바운더리 + 클라이언트 에러 리포팅</td><td>App.tsx:53-157</td></tr>
+  <tr><td>스크립트 무료 재생성</td><td>App.tsx:1120-1158</td></tr>
+  <tr><td>긴 대본 청크 분할 (3000자+)</td><td>App.tsx:718-738</td></tr>
+  <tr><td>Auto BGM (AI 분위기 분석 + Web Audio 폴백)</td><td>App.tsx:912-948</td></tr>
+</table>
+
+<!-- 2. UX 개선 제안 -->
+<h2>2. 실제로 없는 기능 - UX 개선 제안</h2>
+
+<h3>A. 플레이그라운드 소셜 기능 부족</h3>
+<p><strong>현재 상태:</strong> 좋아요만 있음 (Playground.tsx:127-158). 댓글, 팔로우, 북마크, 태그 없음.</p>
+
+<table>
+  <tr><th>없는 기능</th><th>영향</th></tr>
+  <tr><td>댓글 시스템</td><td>커뮤니티 상호작용 없음 → 좋아요만으로는 재방문 동기 부족</td></tr>
+  <tr><td>팔로우/팔로워</td><td>좋은 크리에이터를 찾아도 계속 볼 방법 없음</td></tr>
+  <tr><td>북마크/컬렉션</td><td>마음에 드는 작품 저장 불가</td></tr>
+  <tr><td>태그/해시태그</td><td>검색이 제목/작성자명으로만 가능. 주제별 탐색 불가</td></tr>
+  <tr><td>조회수</td><td>얼마나 인기 있는지 좋아요 외에 판단 기준 없음</td></tr>
+</table>
+
+<h3>B. 프리셋 확장 (구현 완료)</h3>
+<div class="section-note">
+  <strong>해결됨:</strong> 기존에 이미지 모델, TTS 음성, TTS 모델 3가지만 저장되던 프리셋을 화풍(Gemini/GPT), TTS 속도/안정성, 언어, 영상 방향, 한글 억제까지 포함하도록 확장. 서버(Supabase) 저장으로 전환하여 어디서든 동기화 가능.
+</div>
+
+<h3>C. 구독 기능 미완성</h3>
+<p><strong>현재 상태:</strong> CreditShop.tsx:311에서 구독 버튼 클릭 시 "구독 기능은 준비 중입니다" 메시지만 표시. 플랜 탭이 그대로 노출됨.</p>
+<ul>
+  <li>구독 준비 전이면 플랜 탭에 "Coming Soon" 뱃지를 붙이거나, 팩 구매 유도 문구로 대체</li>
+  <li>연간 플랜 추가 (월간 대비 15-20% 할인) - SaaS 기본 패턴</li>
+</ul>
+
+<h3>D. 크레딧 부족 시 생성 중단 위험</h3>
+<p><strong>현재 상태:</strong> App.tsx:648에서 최소 10크레딧만 확인하고 시작. 10씬 기준 예상 비용은 200+ 크레딧이지만, 중간에 부족해도 일부만 생성되고 끝남.</p>
+<p>스크립트 리뷰 단계에서 비용 예측 카드(App.tsx:1724)는 잘 되어 있으나, <strong>예상 비용 > 잔액일 때 "생성 시작" 버튼을 비활성화하거나 경고하는 로직이 없음.</strong></p>
+<p><strong>제안:</strong> handleApproveScript 시점에서 예상 비용 vs 잔액 비교 → 부족하면 버튼 색상 변경 + "크레딧 부족 (예상 320 / 잔액 50)" 표시 + 충전 유도</p>
+
+<!-- 3. 수익 모델 개선 -->
+<h2>3. 수익 모델 개선</h2>
+
+<table>
+  <tr><th>현재 상태</th><th>제안</th></tr>
+  <tr><td>크레딧 팩 3종 (1K/3K/10K)</td><td><strong>첫 결제 할인</strong> 추가. 예: "첫 충전 50% 보너스" → 전환율 극대화</td></tr>
+  <tr><td>구독 Coming Soon</td><td>구독 출시 시 <strong>연간 플랜</strong> 필수. 9,900원/월 → 99,000원/년 (17% 할인)</td></tr>
+  <tr><td>해상도별 같은 비용</td><td>1080p/4K 렌더링 시 <strong>추가 크레딧</strong> 고려. 현재는 720p나 4K나 동일 비용</td></tr>
+  <tr><td>환율 1,450원 하드코딩 (config.ts:173)</td><td>분기별 환율 조정 또는 10% 버퍼 적용</td></tr>
+</table>
+
+<!-- 4. 게이미피케이션 고도화 -->
+<h2>4. 게이미피케이션 고도화</h2>
+
+<h3>A. 가챠 연출 부재</h3>
+<p><strong>현재:</strong> InventoryModal의 가챠 탭에서 버튼 클릭 → pullGacha() → 결과가 GameOverlay로 바로 표시. 뽑기 과정의 연출 애니메이션이 없음.</p>
+<ul>
+  <li>카드 뒤집기 or 슬롯머신 회전 애니메이션 (1-2초)</li>
+  <li>레전더리 등급 시 화면 흔들림 + 금빛 이펙트</li>
+  <li>10연차 뽑기 옵션 (레어 이상 1개 보장)</li>
+</ul>
+
+<h3>B. 시즌 이벤트 시스템</h3>
+<p><strong>현재:</strong> EventBanner.tsx와 관리자 EventManager.tsx 인프라는 있으나 실제 시즌 콘텐츠(한정 아이템, 시즌 미션)는 관리자가 수동 생성 필요.</p>
+<ul>
+  <li>시즌 전용 가챠 풀 (한정 프레임/칭호)</li>
+  <li>시즌 미션 보드 (예: "이번 달 10개 영상 만들기")</li>
+  <li>시즌 종료 시 한정 뱃지 자동 지급</li>
+</ul>
+
+<h3>C. 창작 챌린지</h3>
+<p><strong>현재:</strong> 없음. 플레이그라운드에 작품은 올라오지만 주제별/챌린지별 모아볼 수 없음.</p>
+<ul>
+  <li>주간/월간 챌린지 주제 (관리자 설정)</li>
+  <li>참여 작품에 챌린지 태그 자동 부착</li>
+  <li>투표 → 상위 3명 크레딧 보상</li>
+</ul>
+
+<!-- 5. 보안 강화 -->
+<h2>5. 보안 강화</h2>
+
+<table>
+  <tr><th>항목</th><th>현재</th><th>제안</th></tr>
+  <tr><td>비밀번호 정책</td><td>최소 길이 제한 미확인</td><td>8자 이상 + 영문+숫자 조합</td></tr>
+  <tr><td>2FA</td><td>없음</td><td>크레딧이 실돈이므로 OTP 추가</td></tr>
+  <tr><td>로그인 시도 제한</td><td>서버 측 rate limiting 여부 불명</td><td>5회 실패 시 5분 잠금</td></tr>
+  <tr><td>세션 관리</td><td>토큰 기반 (7일 TTL)</td><td>활성 디바이스 목록 + 원격 로그아웃</td></tr>
+  <tr><td>비밀번호 찾기</td><td>코드에서 미발견</td><td>이메일 기반 비밀번호 재설정 플로우</td></tr>
+</table>
+
+<!-- 6. 기술적 주의점 -->
+<h2>6. 기술적 주의점</h2>
+
+<h3>A. 메모리 - base64 이미지 in state</h3>
+<p><strong>현재:</strong> assetsRef.current에 씬별 base64 이미지 원본 저장. 30씬 x ~1-2MB = 30-60MB가 브라우저 메모리에 상주.</p>
+<p>Undo 스냅샷(useUndoRedo.ts)이 얕은 복제라 base64 문자열은 참조 공유하므로 undo 자체는 메모리 부담 적음 (잘 설계됨). 하지만 씬 수가 많을수록(40-50개) 느려질 수 있음.</p>
+<p><strong>제안:</strong> 장기적으로 IndexedDB에 이미지 캐싱, state에는 참조 ID만 보관</p>
+
+<h3>B. 4K 렌더링</h3>
+<p><strong>현재:</strong> config.ts:355-362에서 3840x2160, 35Mbps 비트레이트. Canvas 기반 브라우저 렌더링이므로 모바일이나 저사양 PC에서 메모리 초과 위험.</p>
+<p><strong>제안:</strong> 4K 선택 시 경고 문구 강화 ("PC에서만 권장" 정도를 더 명확하게)</p>
+
+<!-- 7. 우선순위 요약 -->
+<h2>7. 우선순위 요약</h2>
+
+<table>
+  <tr><th>순위</th><th>항목</th><th>근거</th><th>난이도</th></tr>
+  <tr>
+    <td><strong>1</strong></td>
+    <td>크레딧 부족 시 생성 시작 차단/경고</td>
+    <td>실제 사용자 피해 방지. 코드 변경 소량</td>
+    <td><span class="tag tag-done">낮음</span></td>
+  </tr>
+  <tr>
+    <td><strong>2</strong></td>
+    <td>구독 탭 정리 (Coming Soon 처리)</td>
+    <td>미완성 기능 노출은 신뢰도 하락</td>
+    <td><span class="tag tag-done">낮음</span></td>
+  </tr>
+  <tr>
+    <td><strong>3</strong></td>
+    <td>플레이그라운드 댓글 시스템</td>
+    <td>커뮤니티 활성화 → 리텐션 핵심</td>
+    <td><span class="tag tag-mid">중간</span></td>
+  </tr>
+  <tr>
+    <td><strong>4</strong></td>
+    <td>비밀번호 찾기 플로우</td>
+    <td>기본 인증 기능. 없으면 이탈</td>
+    <td><span class="tag tag-mid">중간</span></td>
+  </tr>
+  <tr>
+    <td><strong>5</strong></td>
+    <td>가챠 뽑기 애니메이션</td>
+    <td>게이미피케이션 몰입감 향상</td>
+    <td><span class="tag tag-mid">중간</span></td>
+  </tr>
+  <tr>
+    <td><strong>6</strong></td>
+    <td>첫 결제 할인 프로모션</td>
+    <td>무료 → 유료 전환율 극대화</td>
+    <td><span class="tag tag-done">낮음</span></td>
+  </tr>
+  <tr>
+    <td><strong>7</strong></td>
+    <td>태그/해시태그 시스템 (플레이그라운드)</td>
+    <td>콘텐츠 발견성 개선</td>
+    <td><span class="tag tag-mid">중간</span></td>
+  </tr>
+  <tr>
+    <td><strong>8</strong></td>
+    <td>창작 챌린지 시스템</td>
+    <td>재방문율 + 신규 콘텐츠 생산</td>
+    <td><span class="tag tag-high">높음</span></td>
+  </tr>
+  <tr>
+    <td><strong>9</strong></td>
+    <td>연간 구독 플랜</td>
+    <td>매출 안정화 (LTV 증가)</td>
+    <td><span class="tag tag-done">낮음</span></td>
+  </tr>
+</table>
+
+<div class="section-note">
+  모든 항목은 실제 코드에서 직접 확인한 사실 기반입니다. 추측이나 에이전트 보고서에 의존하지 않았습니다.
+</div>
+
+<div class="footer">
+  TubeGen AI V9.2 Platform Analysis Report | 2026.03.07 | Confidential
+</div>
+
+</body>
+</html>

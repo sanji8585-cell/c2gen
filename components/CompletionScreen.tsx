@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface CompletionScreenProps {
   cost: {
@@ -17,6 +18,7 @@ interface CompletionScreenProps {
   questProgress?: { completed: number; total: number };
   gachaTickets?: number;
   onClose: () => void;
+  onOpenThumbnail?: () => void;
 }
 
 export default function CompletionScreen({
@@ -27,6 +29,7 @@ export default function CompletionScreen({
   elapsedSeconds,
   questProgress,
   gachaTickets,
+  onOpenThumbnail,
   onClose,
 }: CompletionScreenProps) {
   const imgCredits = cost.imageCount * 16;
@@ -37,24 +40,25 @@ export default function CompletionScreen({
 
   const creditsPerScene = sceneCount > 0 ? totalCredits / sceneCount : 999;
   const grade = creditsPerScene <= 15 ? 'SS' : creditsPerScene <= 22 ? 'S' : creditsPerScene <= 30 ? 'AA' : 'A';
+  const { t } = useTranslation();
   const gradeColors: Record<string, { color: string; glow: string; label: string }> = {
-    SS: { color: '#fbbf24', glow: '#fbbf2466', label: '전설의 효율!' },
-    S: { color: '#f59e0b', glow: '#f59e0b44', label: '최고의 선택!' },
-    AA: { color: '#22c55e', glow: '#22c55e44', label: '훌륭해요!' },
-    A: { color: '#60a5fa', glow: '#60a5fa44', label: '잘했어요!' },
+    SS: { color: '#fbbf24', glow: '#fbbf2466', label: t('completion.gradeSS') },
+    S: { color: '#f59e0b', glow: '#f59e0b44', label: t('completion.gradeS') },
+    AA: { color: '#22c55e', glow: '#22c55e44', label: t('completion.gradeAA') },
+    A: { color: '#60a5fa', glow: '#60a5fa44', label: t('completion.gradeA') },
   };
   const gi = gradeColors[grade];
   const gradeColor = gi.color;
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
-  const timeStr = minutes > 0 ? `${minutes}분 ${seconds}초` : `${seconds}초`;
+  const timeStr = minutes > 0 ? `${minutes}${t('completion.minutes')} ${seconds}${t('completion.seconds')}` : `${seconds}${t('completion.seconds')}`;
 
   const rows = [
-    { icon: '🎬', label: '씬', count: `${sceneCount}개`, credits: 0 },
-    { icon: '🖼️', label: '이미지', count: `${cost.imageCount}장`, credits: imgCredits },
-    { icon: '🎙️', label: 'TTS', count: `${cost.ttsCharacters}자`, credits: ttsCredits },
-    { icon: '🎥', label: '영상', count: `${cost.videoCount}개`, credits: videoCredits },
+    { icon: '🎬', label: t('completion.scene'), count: `${sceneCount}${t('completion.unit.scenes')}`, credits: 0 },
+    { icon: '🖼️', label: t('completion.image'), count: `${cost.imageCount}${t('completion.unit.images')}`, credits: imgCredits },
+    { icon: '🎙️', label: t('completion.tts'), count: `${cost.ttsCharacters}${t('completion.unit.chars')}`, credits: ttsCredits },
+    { icon: '🎥', label: t('completion.video'), count: `${cost.videoCount}${t('completion.unit.videos')}`, credits: videoCredits },
   ];
 
   return (
@@ -120,7 +124,7 @@ export default function CompletionScreen({
             color: 'var(--text-muted)',
             marginBottom: 10,
           }}>
-            생성 결과
+            {t('completion.generationResult')}
           </div>
 
           {rows.map((row, i) => (
@@ -143,7 +147,7 @@ export default function CompletionScreen({
                 <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 500 }}>{row.count}</span>
                 {row.credits > 0 && (
                   <span style={{ color: '#ef4444', fontSize: 13, fontWeight: 600, minWidth: 70, textAlign: 'right' }}>
-                    -{row.credits} 크레딧
+                    -{row.credits} {t('common.credits')}
                   </span>
                 )}
               </div>
@@ -166,10 +170,10 @@ export default function CompletionScreen({
             animation: 'result-total-pop 0.6s ease-out 1s both',
           }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
-              총 크레딧
+              {t('completion.totalCredits')}
             </span>
             <span style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>
-              -{totalCredits} 크레딧
+              -{totalCredits} {t('common.credits')}
             </span>
           </div>
         </div>
@@ -189,7 +193,7 @@ export default function CompletionScreen({
             color: 'var(--text-muted)',
             marginBottom: 8,
           }}>
-            획득 보상
+            {t('completion.rewards')}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -202,18 +206,18 @@ export default function CompletionScreen({
             {(gachaTickets ?? 0) > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#a78bfa', fontWeight: 600 }}>
                 <span>🎫</span>
-                <span>+{gachaTickets} 뽑기 티켓</span>
+                <span>+{gachaTickets} {t('completion.gachaTicket')}</span>
               </div>
             )}
             {questProgress && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#60a5fa', fontWeight: 600 }}>
                 <span>📋</span>
-                <span>{questProgress.completed}/{questProgress.total} 퀘스트 진행</span>
+                <span>{questProgress.completed}/{questProgress.total} {t('completion.questProgress')}</span>
               </div>
             )}
             {xpGained === 0 && !gachaTickets && !questProgress && (
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                로그인하면 보상을 받을 수 있어요!
+                {t('completion.loginForRewards')}
               </div>
             )}
           </div>
@@ -228,11 +232,11 @@ export default function CompletionScreen({
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              소요 시간: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{timeStr}</span>
+              {t('completion.elapsed')}: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{timeStr}</span>
             </div>
             {combo >= 2 && (
               <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 600 }}>
-                🔥 {combo}연속 생성!
+                🔥 {t('completion.combo', { count: combo })}
               </div>
             )}
           </div>
@@ -266,6 +270,36 @@ export default function CompletionScreen({
           </div>
         </div>
 
+        {/* 썸네일 제작 버튼 */}
+        {onOpenThumbnail && (
+          <button
+            onClick={() => { onClose(); onOpenThumbnail(); }}
+            style={{
+              width: '100%',
+              padding: '11px 0',
+              borderRadius: 12,
+              border: '1px solid rgba(168,85,247,0.4)',
+              background: 'rgba(168,85,247,0.1)',
+              color: '#c084fc',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'transform 0.15s, background 0.15s',
+              marginBottom: 8,
+            }}
+            onMouseEnter={(e) => {
+              (e.target as HTMLElement).style.background = 'rgba(168,85,247,0.2)';
+              (e.target as HTMLElement).style.transform = 'scale(1.02)';
+            }}
+            onMouseLeave={(e) => {
+              (e.target as HTMLElement).style.background = 'rgba(168,85,247,0.1)';
+              (e.target as HTMLElement).style.transform = 'scale(1)';
+            }}
+          >
+            🎨 {t('thumbnailButton')}
+          </button>
+        )}
+
         {/* 확인 버튼 */}
         <button
           onClick={onClose}
@@ -291,7 +325,7 @@ export default function CompletionScreen({
             (e.target as HTMLElement).style.boxShadow = '0 4px 14px rgba(14,165,233,0.3)';
           }}
         >
-          확인
+          {t('common.confirm')}
         </button>
       </div>
     </div>

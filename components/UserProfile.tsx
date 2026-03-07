@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CREDIT_CONFIG } from '../config';
 import type { CreditTransaction } from '../types';
 import type { LevelInfo, EquippedItems, GameSyncResponse } from '../types/gamification';
@@ -62,6 +63,7 @@ const USAGE_TYPE_ICONS: Record<string, string> = {
 };
 
 const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, currentPlan, userName, onNameChange, gameState }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>('info');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,12 +161,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
         localStorage.setItem('c2gen_user_name', newName.trim());
         onNameChange(newName.trim());
         setEditingName(false);
-        setMessage({ type: 'success', text: '닉네임이 변경되었습니다.' });
+        setMessage({ type: 'success', text: t('profile.nameChanged') });
       } else {
-        setMessage({ type: 'error', text: d.error || '변경에 실패했습니다.' });
+        setMessage({ type: 'error', text: d.error || t('profile.changeFailed') });
       }
     } catch {
-      setMessage({ type: 'error', text: '서버 연결에 실패했습니다.' });
+      setMessage({ type: 'error', text: t('auth.serverError') });
     }
     setSaving(false);
   };
@@ -200,7 +202,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
     const file = e.target.files?.[0];
     if (!file || !token) return;
     if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: '이미지 파일만 업로드할 수 있습니다.' });
+      setMessage({ type: 'error', text: t('profile.imageOnlyError') });
       return;
     }
 
@@ -217,12 +219,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
       const d = await r.json();
       if (r.ok && d.url) {
         setProfile(p => p ? { ...p, avatarUrl: d.url } : p);
-        setMessage({ type: 'success', text: '프로필 이미지가 변경되었습니다.' });
+        setMessage({ type: 'success', text: t('profile.avatarChanged') });
       } else {
-        setMessage({ type: 'error', text: d.error || '업로드에 실패했습니다.' });
+        setMessage({ type: 'error', text: d.error || t('profile.uploadFailed') });
       }
     } catch {
-      setMessage({ type: 'error', text: '업로드 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: t('profile.uploadError') });
     }
     setUploadingAvatar(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -231,15 +233,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
   const handleChangePassword = async () => {
     if (!token) return;
     if (!currentPassword || !newPassword) {
-      setMessage({ type: 'error', text: '비밀번호를 입력해주세요.' });
+      setMessage({ type: 'error', text: t('profile.enterPassword') });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: '새 비밀번호가 일치하지 않습니다.' });
+      setMessage({ type: 'error', text: t('auth.passwordMismatch') });
       return;
     }
     if (newPassword.length < 4) {
-      setMessage({ type: 'error', text: '새 비밀번호는 4자 이상이어야 합니다.' });
+      setMessage({ type: 'error', text: t('auth.passwordTooShort') });
       return;
     }
 
@@ -253,15 +255,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
       });
       const d = await r.json();
       if (r.ok && d.success) {
-        setMessage({ type: 'success', text: '비밀번호가 변경되었습니다.' });
+        setMessage({ type: 'success', text: t('profile.passwordChanged') });
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setMessage({ type: 'error', text: d.error || '변경에 실패했습니다.' });
+        setMessage({ type: 'error', text: d.error || t('profile.changeFailed') });
       }
     } catch {
-      setMessage({ type: 'error', text: '서버 연결에 실패했습니다.' });
+      setMessage({ type: 'error', text: t('auth.serverError') });
     }
     setChangingPassword(false);
   };
@@ -309,7 +311,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-default)' }}>
-          <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>내 프로필</h2>
+          <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>{t('profile.title')}</h2>
           <button
             onClick={onClose}
             className="text-xl transition-colors"
@@ -322,21 +324,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
         {/* 탭 */}
         <div className="flex border-b px-4" style={{ borderColor: 'var(--border-default)' }}>
           {([
-            { id: 'info' as Tab, label: '내 정보' },
-            { id: 'game' as Tab, label: '🎮 게임' },
-            { id: 'usage' as Tab, label: '사용 내역' },
-            { id: 'payments' as Tab, label: '결제 내역' },
-            { id: 'security' as Tab, label: '보안' },
-            { id: 'referral' as Tab, label: '추천' },
-          ]).map(t => (
+            { id: 'info' as Tab, label: t('profile.info') },
+            { id: 'game' as Tab, label: `🎮 ${t('profile.gameTab')}` },
+            { id: 'usage' as Tab, label: t('profile.usage') },
+            { id: 'payments' as Tab, label: t('profile.payments') },
+            { id: 'security' as Tab, label: t('profile.security') },
+            { id: 'referral' as Tab, label: t('profile.referral') },
+          ]).map(tab => (
             <button
-              key={t.id}
-              className={tabClass(t.id)}
-              onClick={() => { setActiveTab(t.id); setMessage(null); }}
-              style={activeTab !== t.id ? { color: 'var(--text-secondary)' } : undefined}
+              key={tab.id}
+              className={tabClass(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setMessage(null); }}
+              style={activeTab !== tab.id ? { color: 'var(--text-secondary)' } : undefined}
             >
-              {t.label}
-              {activeTab === t.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />}
+              {tab.label}
+              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />}
             </button>
           ))}
         </div>
@@ -355,7 +357,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
           {/* === 내 정보 탭 === */}
           {activeTab === 'info' && (
             loading ? (
-              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>로딩 중...</div>
+              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</div>
             ) : profile ? (
               <div className="space-y-5">
                 {/* 프로필 이미지 + 이름 */}
@@ -405,14 +407,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                           disabled={saving || !newName.trim()}
                           className="px-3 py-1.5 bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 rounded-lg text-xs font-bold border border-brand-500/30 transition-all disabled:opacity-50"
                         >
-                          {saving ? '...' : '저장'}
+                          {saving ? '...' : t('common.save')}
                         </button>
                         <button
                           onClick={() => { setEditingName(false); setNewName(profile.name); }}
                           className="px-2 py-1.5 text-xs transition-colors"
                           style={{ color: 'var(--text-muted)' }}
                         >
-                          취소
+                          {t('common.cancel')}
                         </button>
                       </div>
                     ) : (
@@ -485,65 +487,65 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                 {/* 정보 카드 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>등급</p>
+                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.plan')}</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full border font-bold ${planInfo.bg} ${planInfo.color}`}>
                       {planInfo.name}
                     </span>
                   </div>
                   <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>크레딧</p>
+                    <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('common.credits')}</p>
                     <span className={`text-sm font-bold ${currentPlan === 'operator' ? 'text-orange-400' : 'text-emerald-400'}`}>
-                      {currentPlan === 'operator' ? '무제한' : currentCredits.toLocaleString()}
+                      {currentPlan === 'operator' ? t('profile.unlimited') : currentCredits.toLocaleString()}
                     </span>
                   </div>
                   {gs?.synced && usr ? (
                     <>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>연속 출석</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.streak')}</p>
                         <span className="text-sm font-bold" style={{ color: usr.streakCount >= 7 ? '#f59e0b' : 'var(--text-secondary)' }}>
-                          {usr.streakCount}일
+                          {usr.streakCount}{t('profile.daysUnit')}
                         </span>
                       </div>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>총 로그인</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.totalLogin')}</p>
                         <span className="text-sm font-bold" style={{ color: 'var(--text-secondary)' }}>
-                          {usr.loginDays}일
+                          {usr.loginDays}{t('profile.daysUnit')}
                         </span>
                       </div>
                     </>
                   ) : (
                     <>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>가입일</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.joinDate')}</p>
                         <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                           {new Date(profile.createdAt).toLocaleDateString('ko-KR')}
                         </span>
                       </div>
                       <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>로그인 방식</p>
+                        <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.loginMethod')}</p>
                         <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                          {profile.oauthProvider === 'google' ? 'Google' : profile.oauthProvider === 'kakao' ? 'Kakao' : '이메일'}
+                          {profile.oauthProvider === 'google' ? 'Google' : profile.oauthProvider === 'kakao' ? 'Kakao' : t('profile.email')}
                         </span>
                       </div>
                     </>
                   )}
                 </div>
 
-                {/* 크레딧 단가 안내 */}
+                {/* {t('common.credits')} 단가 안내 */}
                 <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 30%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                  <p className="text-[10px] mb-2 font-bold" style={{ color: 'var(--text-muted)' }}>크레딧 사용 단가</p>
+                  <p className="text-[10px] mb-2 font-bold" style={{ color: 'var(--text-muted)' }}>{t('profile.creditCosts')}</p>
                   <div className="grid grid-cols-2 gap-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
                     {Object.entries(CREDIT_CONFIG.COSTS).map(([key, cost]) => (
                       <div key={key} className="flex justify-between">
-                        <span>{key === 'gemini-2.5-flash-image' ? 'Gemini 이미지' : key === 'gpt-image-1' ? 'GPT 이미지' : key === 'tts_per_1000_chars' ? 'TTS (1000자)' : key === 'video' ? '영상 변환' : key === 'script' ? '스크립트' : key}</span>
-                        <span className="font-bold">{cost} 크레딧</span>
+                        <span>{key === 'gemini-2.5-flash-image' ? t('creditShop.imageGemini') : key === 'gpt-image-1' ? t('creditShop.imageGpt') : key === 'tts_per_1000_chars' ? t('creditShop.ttsPerK') : key === 'video' ? t('creditShop.videoConvert') : key === 'script' ? t('creditShop.scriptGen') : key}</span>
+                        <span className="font-bold">{cost} {t('common.credits')}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>프로필을 불러올 수 없습니다.</div>
+              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('profile.loadFailed')}</div>
             )
           )}
 
@@ -553,15 +555,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
               <div className="space-y-4">
                 {/* 통계 그리드 */}
                 <div>
-                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>활동 통계</p>
+                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{t('profile.activityStats')}</p>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { label: '총 생성', value: usr.totalGenerations, icon: '📝' },
-                      { label: '이미지', value: usr.totalImages, icon: '🖼️' },
-                      { label: '오디오', value: usr.totalAudio, icon: '🔊' },
-                      { label: '영상', value: usr.totalVideos, icon: '🎬' },
-                      { label: '로그인', value: `${usr.loginDays}일`, icon: '📅' },
-                      { label: '최고 콤보', value: usr.maxCombo, icon: '⚡' },
+                      { label: t('profile.totalGenerations'), value: usr.totalGenerations, icon: '📝' },
+                      { label: t('common.images'), value: usr.totalImages, icon: '🖼️' },
+                      { label: t('common.audio'), value: usr.totalAudio, icon: '🔊' },
+                      { label: t('common.video'), value: usr.totalVideos, icon: '🎬' },
+                      { label: t('common.login'), value: `${usr.loginDays}${t('profile.daysUnit')}`, icon: '📅' },
+                      { label: t('profile.maxCombo'), value: usr.maxCombo, icon: '⚡' },
                     ].map((s, i) => (
                       <div key={i} className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                         <div className="text-sm mb-0.5">{s.icon}</div>
@@ -575,11 +577,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                 {/* 업적 요약 */}
                 {achievements && (
                   <div>
-                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>업적</p>
+                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{t('header.achievements')}</p>
                     <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {Object.values(achievements.progress).filter(a => a.unlocked).length} / {achievements.definitions.length} 달성
+                          {Object.values(achievements.progress).filter(a => a.unlocked).length} / {achievements.definitions.length} {t('game.achievementsUnlocked')}
                         </span>
                         <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                           {Math.round((Object.values(achievements.progress).filter(a => a.unlocked).length / Math.max(1, achievements.definitions.length)) * 100)}%
@@ -604,7 +606,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                             </div>
                           ))}
                         {Object.values(achievements.progress).filter(a => a.unlocked).length === 0 && (
-                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>아직 달성한 업적이 없습니다.</p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('profile.noAchievements')}</p>
                         )}
                       </div>
                     </div>
@@ -613,19 +615,19 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
 
                 {/* 뿑기 요약 */}
                 <div>
-                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>뿑기 (Gacha)</p>
+                  <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{t('game.gacha')}</p>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{usr.totalGachaPulls}</div>
-                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>총 뿑기</div>
+                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('profile.totalGacha')}</div>
                     </div>
                     <div className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="text-sm font-bold" style={{ color: usr.gachaTickets > 0 ? '#22c55e' : 'var(--text-primary)' }}>{usr.gachaTickets}</div>
-                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>티켓</div>
+                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('profile.tickets')}</div>
                     </div>
                     <div className="p-2.5 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                       <div className="text-sm font-bold" style={{ color: '#f59e0b' }}>{usr.gachaPityLegendary}</div>
-                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>천장 카운터</div>
+                      <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t('profile.pityCounter')}</div>
                     </div>
                   </div>
                 </div>
@@ -633,13 +635,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                 {/* 인벤토리 요약 */}
                 {inventory && (
                   <div>
-                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>인벤토리</p>
+                    <p className="text-xs font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{t('header.inventory')}</p>
                     <div className="grid grid-cols-4 gap-2">
                       {[
-                        { label: '칭호', count: inventory.titles.length },
-                        { label: '배지', count: inventory.badges.length },
-                        { label: '프레임', count: inventory.frames.length },
-                        { label: '소모품', count: inventory.consumables.length },
+                        { label: t('game.title'), count: inventory.titles.length },
+                        { label: t('game.badge'), count: inventory.badges.length },
+                        { label: t('game.frame'), count: inventory.frames.length },
+                        { label: t('game.consumable'), count: inventory.consumables.length },
                       ].map((inv, i) => (
                         <div key={i} className="p-2 rounded-lg border text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)' }}>
                           <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{inv.count}</div>
@@ -652,7 +654,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
 
                 {/* 연속 출석 마일스톤 */}
                 <div className="p-3 rounded-xl border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 30%, transparent)', borderColor: 'var(--border-subtle)' }}>
-                  <p className="text-[10px] font-bold mb-1.5" style={{ color: 'var(--text-muted)' }}>연속 출석 마일스톤</p>
+                  <p className="text-[10px] font-bold mb-1.5" style={{ color: 'var(--text-muted)' }}>{t('profile.streakMilestone')}</p>
                   <div className="flex items-center gap-1">
                     {[3, 7, 14, 30].map(d => (
                       <div
@@ -664,7 +666,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                           border: `1px solid ${usr.streakCount >= d ? 'rgba(234, 179, 8, 0.3)' : 'var(--border-subtle)'}`,
                         }}
                       >
-                        {d}일
+                        {d}{t('profile.daysUnit')}
                       </div>
                     ))}
                   </div>
@@ -673,8 +675,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
             ) : (
               <div className="text-center py-12">
                 <div className="text-3xl mb-3">{'🎮'}</div>
-                <p className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>게이미피케이션</p>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>로그인 후 게임 데이터가 동기화되면 확인할 수 있습니다.</p>
+                <p className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('profile.gamification')}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('profile.gamificationDesc')}</p>
               </div>
             )
           )}
@@ -685,12 +687,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
               {/* 필터 버튼 */}
               <div className="flex flex-wrap gap-1 mb-3">
                 {[
-                  { id: 'all', label: '전체' },
-                  { id: 'image', label: '🖼️ 이미지' },
+                  { id: 'all', label: t('profile.filterAll') },
+                  { id: 'image', label: `🖼️ ${t('common.images')}` },
                   { id: 'tts', label: '🔊 TTS' },
-                  { id: 'video', label: '🎬 영상' },
-                  { id: 'bonus', label: '🎁 보상' },
-                  { id: 'purchase', label: '💳 충전' },
+                  { id: 'video', label: `🎬 ${t('common.video')}` },
+                  { id: 'bonus', label: `🎁 ${t('profile.filterBonus')}` },
+                  { id: 'purchase', label: `💳 ${t('profile.filterPurchase')}` },
                 ].map(f => (
                   <button
                     key={f.id}
@@ -708,9 +710,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
               </div>
 
               {historyLoading ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>로딩 중...</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</div>
               ) : filteredHistory.length === 0 ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>사용 내역이 없습니다.</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('profile.noUsageHistory')}</div>
               ) : (
                 <div className="space-y-1">
                   {filteredHistory.map(tx => (
@@ -728,7 +730,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                         <div className={`text-sm font-bold ${txTypeColor(tx.type, tx.amount)}`}>
                           {tx.amount > 0 ? '+' : ''}{tx.amount}
                         </div>
-                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tx.balance_after.toLocaleString()} 잔액</div>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tx.balance_after.toLocaleString()} {t('profile.balance')}</div>
                       </div>
                     </div>
                   ))}
@@ -741,9 +743,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
           {activeTab === 'payments' && (
             <div>
               {paymentsLoading ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>로딩 중...</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</div>
               ) : payments.length === 0 ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>결제 내역이 없습니다.</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('profile.noPaymentHistory')}</div>
               ) : (
                 <div className="space-y-1">
                   {payments.map(p => (
@@ -751,14 +753,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                            {p.credits.toLocaleString()} 크레딧
+                            {p.credits.toLocaleString()} {t('common.credits')}
                           </span>
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${
                             p.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
                             p.status === 'failed' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
                             'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                           }`}>
-                            {p.status === 'completed' ? '완료' : p.status === 'failed' ? '실패' : '대기'}
+                            {p.status === 'completed' ? t('profile.statusCompleted') : p.status === 'failed' ? t('profile.statusFailed') : t('profile.statusPending')}
                           </span>
                         </div>
                         <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
@@ -767,7 +769,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                          {p.amount.toLocaleString()}원
+                          {p.amount.toLocaleString()}{t('creditShop.won')}
                         </div>
                       </div>
                     </div>
@@ -788,17 +790,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     </svg>
                   </div>
                   <p className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                    {profile.oauthProvider === 'google' ? 'Google' : 'Kakao'} 계정으로 로그인 중
+                    {t('profile.oauthLoginActive', { provider: profile.oauthProvider === 'google' ? 'Google' : 'Kakao' })}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    소셜 로그인 계정은 비밀번호를 별도로 관리하지 않습니다.
+                    {t('profile.oauthNoPassword')}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>비밀번호 변경</h3>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('profile.changePassword')}</h3>
                   <div>
-                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>현재 비밀번호</label>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('profile.currentPassword')}</label>
                     <input
                       type="password"
                       value={currentPassword}
@@ -808,7 +810,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>새 비밀번호</label>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('profile.newPassword')}</label>
                     <input
                       type="password"
                       value={newPassword}
@@ -818,7 +820,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>새 비밀번호 확인</label>
+                    <label className="text-[10px] font-bold mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('profile.confirmNewPassword')}</label>
                     <input
                       type="password"
                       value={confirmPassword}
@@ -832,7 +834,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                     disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
                     className="w-full py-2.5 rounded-lg bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 text-sm font-bold border border-brand-500/30 transition-all disabled:opacity-50"
                   >
-                    {changingPassword ? '변경 중...' : '비밀번호 변경'}
+                    {changingPassword ? t('profile.changing') : t('profile.changePassword')}
                   </button>
                 </div>
               )}

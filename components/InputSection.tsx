@@ -35,6 +35,30 @@ GEMINI_STYLE_CATEGORIES.forEach(category => {
   });
 });
 
+// 자동 대본 placeholder 예시 배열
+const PLACEHOLDER_EXAMPLES = [
+  "비트코인 반감기 이후 시세 전망",
+  "2026년 부동산 시장 분석",
+  "테슬라 vs BYD 전기차 전쟁",
+  "금리 인하가 주식시장에 미치는 영향",
+  "AI 반도체 시장의 미래",
+  "엔비디아 실적과 주가 전망",
+  "한국 출생률 위기와 경제 영향",
+  "워렌 버핏의 최신 투자 전략",
+  "유튜브 수익화 완벽 가이드",
+  "MZ세대 소비 트렌드 2026",
+  "일본 여행 꿀팁 총정리",
+  "삼성전자 반도체 사업 전망",
+  "인스타그램 릴스로 돈 버는 법",
+  "애플 비전프로 리뷰",
+  "전세사기 예방 가이드",
+  "초보 주식투자 시작하기",
+  "넷플릭스 추천 다큐 TOP 10",
+  "2026 수능 영어 공부법",
+  "건강한 다이어트 식단 추천",
+  "프리랜서 세금 절약 팁",
+];
+
 // GPT 스타일 맵
 const GPT_STYLE_MAP = new Map<string, { id: string; name: string; category: string; prompt: string }>();
 GPT_STYLE_CATEGORIES.forEach(category => {
@@ -52,6 +76,21 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
   const [topic, setTopic] = useState('');
   const [manualScript, setManualScript] = useState('');
+
+  // 랜덤 placeholder 페이드 전환
+  const [placeholderIndex, setPlaceholderIndex] = useState(() => Math.floor(Math.random() * PLACEHOLDER_EXAMPLES.length));
+  const [placeholderFade, setPlaceholderFade] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderFade(false);
+      setTimeout(() => {
+        setPlaceholderIndex(prev => (prev + 1) % PLACEHOLDER_EXAMPLES.length);
+        setPlaceholderFade(true);
+      }, 400);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // 참조 이미지 상태 분리 (캐릭터/스타일)
   const [characterRefImages, setCharacterRefImages] = useState<string[]>([]);
@@ -101,6 +140,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
   // ElevenLabs 설정 상태
   const [showElevenLabsSettings, setShowElevenLabsSettings] = useState(false);
   const [showVoiceIdInput, setShowVoiceIdInput] = useState(false);
+  const [showDetailedSettings, setShowDetailedSettings] = useState(false);
   const [elVoiceId, setElVoiceId] = useState('');
   const [elModelId, setElModelId] = useState<ElevenLabsModelId>('eleven_multilingual_v2');
   const [elSpeed, setElSpeed] = useState<number>(() => {
@@ -119,8 +159,11 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
   const [genderFilter, setGenderFilter] = useState<VoiceGender | null>(null);
   const [ageFilter, setAgeFilter] = useState<VoiceAge | null>(null);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
-  // 음성 탭: 'premade' | 'library'
-  const [voiceTab, setVoiceTab] = useState<'premade' | 'library'>('premade');
+  // 음성 탭: 'premade' | 'library' | 'favorites'
+  const [voiceTab, setVoiceTab] = useState<'premade' | 'library' | 'favorites'>('premade');
+  // 즐겨찾기 음성
+  const [favoriteVoiceIds, setFavoriteVoiceIds] = useState<Set<string>>(new Set());
+  const [favoriteVoices, setFavoriteVoices] = useState<Array<{ voice_id: string; voice_name: string; voice_meta: any }>>([]);
   // 라이브러리 검색 상태
   const [libraryVoices, setLibraryVoices] = useState<SharedVoice[]>([]);
   const [librarySearch, setLibrarySearch] = useState('');
@@ -156,18 +199,54 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     setGptStyleId(savedGptStyle);
     setGptCustomStylePrompt(savedGptCustomStyle);
 
-    // 저장된 프로젝트 목록 로드
-    const savedProjects = localStorage.getItem(CONFIG.STORAGE_KEYS.PROJECTS);
-    if (savedProjects) {
-      try {
-        setProjects(JSON.parse(savedProjects));
-      } catch (e) {
-        console.error('프로젝트 로드 실패:', e);
+    // 서버에서 프리셋 목록 로드 (로그인 시)
+    const token = localStorage.getItem('c2gen_session_token');
+    if (token) {
+      fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preset-list', token }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.presets) {
+            setProjects(d.presets.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              createdAt: new Date(p.created_at).getTime(),
+              updatedAt: new Date(p.updated_at).getTime(),
+              ...p.settings,
+            })));
+          }
+        })
+        .catch(e => console.error('프리셋 로드 실패:', e));
+    } else {
+      // 비로그인: localStorage 폴백
+      const savedProjects = localStorage.getItem(CONFIG.STORAGE_KEYS.PROJECTS);
+      if (savedProjects) {
+        try { setProjects(JSON.parse(savedProjects)); } catch {}
       }
     }
 
     // 서버에 API Key가 있으면 음성 목록 자동 로드
     loadVoices();
+
+    // 즐겨찾기 음성 로드
+    if (token) {
+      fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'favorite-voice-list', token }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.favorites) {
+            setFavoriteVoices(d.favorites);
+            setFavoriteVoiceIds(new Set(d.favorites.map((f: any) => f.voice_id)));
+          }
+        })
+        .catch(() => {});
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -241,8 +320,48 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     }
   }, [genderFilter]);
 
-  // 미리듣기 테스트 문구
-  const PREVIEW_TEXT = "테스트 목소리입니다";
+  // 미리듣기 테스트 문구 (선택된 나레이션 언어에 맞게 동적 변경)
+  const PREVIEW_TEXT = LANGUAGE_CONFIG[language]?.sampleText || "테스트 음성입니다";
+
+  // 즐겨찾기 토글
+  const toggleFavoriteVoice = useCallback(async (voiceId: string, voiceName: string, meta?: any) => {
+    const token = localStorage.getItem('c2gen_session_token');
+    if (!token) return;
+
+    const isFav = favoriteVoiceIds.has(voiceId);
+
+    // Optimistic UI
+    if (isFav) {
+      setFavoriteVoiceIds(prev => { const next = new Set(prev); next.delete(voiceId); return next; });
+      setFavoriteVoices(prev => prev.filter(f => f.voice_id !== voiceId));
+    } else {
+      setFavoriteVoiceIds(prev => new Set(prev).add(voiceId));
+      setFavoriteVoices(prev => [{ voice_id: voiceId, voice_name: voiceName, voice_meta: meta || {} }, ...prev]);
+    }
+
+    try {
+      await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isFav ? 'favorite-voice-remove' : 'favorite-voice-add',
+          token,
+          voiceId,
+          voiceName,
+          voiceMeta: meta || {},
+        }),
+      });
+    } catch {
+      // Rollback on error
+      if (isFav) {
+        setFavoriteVoiceIds(prev => new Set(prev).add(voiceId));
+        setFavoriteVoices(prev => [{ voice_id: voiceId, voice_name: voiceName, voice_meta: meta || {} }, ...prev]);
+      } else {
+        setFavoriteVoiceIds(prev => { const next = new Set(prev); next.delete(voiceId); return next; });
+        setFavoriteVoices(prev => prev.filter(f => f.voice_id !== voiceId));
+      }
+    }
+  }, [favoriteVoiceIds]);
 
   // API를 사용한 음성 미리듣기 (서버 프록시 경유)
   const playVoicePreviewWithApi = async (voiceId: string, voiceName: string) => {
@@ -370,65 +489,185 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     }
   }, [previewStyleId]);
 
+  // 현재 설정을 settings 객체로 수집
+  const collectCurrentSettings = () => ({
+    imageModel: imageModelId,
+    geminiStyle: geminiStyleId,
+    geminiCustomStyle: geminiCustomStylePrompt,
+    gptStyle: gptStyleId,
+    gptCustomStyle: gptCustomStylePrompt,
+    elevenLabsVoiceId: elVoiceId,
+    elevenLabsModel: elModelId,
+    elevenLabsSpeed: elSpeed,
+    elevenLabsStability: elStability,
+    language,
+    videoOrientation,
+    suppressKorean,
+  });
+
   // 프로젝트 저장
-  const saveProject = () => {
+  const saveProject = async () => {
     if (!newProjectName.trim()) return;
 
-    const newProject: ProjectSettings = {
-      id: Date.now().toString(),
-      name: newProjectName.trim(),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      imageModel: imageModelId,
-      elevenLabsVoiceId: elVoiceId,
-      elevenLabsModel: elModelId,
-    };
+    const settings = collectCurrentSettings();
+    const token = localStorage.getItem('c2gen_session_token');
 
-    const updatedProjects = [...projects, newProject];
-    setProjects(updatedProjects);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.PROJECTS, JSON.stringify(updatedProjects));
-    setNewProjectName('');
-    alert(`프로젝트 "${newProject.name}" 저장 완료!`);
+    if (token) {
+      // 서버 저장
+      try {
+        const r = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'preset-save', token, preset: { name: newProjectName.trim(), settings } }),
+        });
+        const d = await r.json();
+        if (d.error) { alert(d.error); return; }
+        const saved: ProjectSettings = {
+          id: d.preset.id,
+          name: d.preset.name,
+          createdAt: new Date(d.preset.created_at).getTime(),
+          updatedAt: new Date(d.preset.updated_at).getTime(),
+          ...d.preset.settings,
+        };
+        setProjects(prev => [saved, ...prev]);
+        setNewProjectName('');
+      } catch (e: any) {
+        alert(`저장 실패: ${e.message}`);
+      }
+    } else {
+      // 비로그인: localStorage 폴백
+      const newProject: ProjectSettings = {
+        id: Date.now().toString(),
+        name: newProjectName.trim(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        ...settings,
+      };
+      const updatedProjects = [newProject, ...projects];
+      setProjects(updatedProjects);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.PROJECTS, JSON.stringify(updatedProjects));
+      setNewProjectName('');
+    }
   };
 
   // 프로젝트 불러오기
   const loadProject = (project: ProjectSettings) => {
-    setImageModelId(project.imageModel as ImageModelId);
-    setElVoiceId(project.elevenLabsVoiceId);
-    setElModelId(project.elevenLabsModel as ElevenLabsModelId);
-
-    // localStorage에도 저장
-    localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, project.imageModel);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID, project.elevenLabsVoiceId);
-    setElevenLabsModelId(project.elevenLabsModel as ElevenLabsModelId);
+    // 이미지 모델
+    if (project.imageModel) {
+      setImageModelId(project.imageModel as ImageModelId);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, project.imageModel);
+    }
+    // Gemini 화풍
+    if (project.geminiStyle) {
+      setGeminiStyleId(project.geminiStyle as GeminiStyleId);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.GEMINI_STYLE, project.geminiStyle);
+    }
+    if (project.geminiCustomStyle !== undefined) {
+      setGeminiCustomStylePrompt(project.geminiCustomStyle || '');
+      localStorage.setItem(CONFIG.STORAGE_KEYS.GEMINI_CUSTOM_STYLE, project.geminiCustomStyle || '');
+    }
+    // GPT 화풍
+    if (project.gptStyle) {
+      setGptStyleId(project.gptStyle as GptStyleId);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.GPT_STYLE, project.gptStyle);
+    }
+    if (project.gptCustomStyle !== undefined) {
+      setGptCustomStylePrompt(project.gptCustomStyle || '');
+      localStorage.setItem(CONFIG.STORAGE_KEYS.GPT_CUSTOM_STYLE, project.gptCustomStyle || '');
+    }
+    // TTS
+    if (project.elevenLabsVoiceId) {
+      setElVoiceId(project.elevenLabsVoiceId);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID, project.elevenLabsVoiceId);
+    }
+    if (project.elevenLabsModel) {
+      setElModelId(project.elevenLabsModel as ElevenLabsModelId);
+      setElevenLabsModelId(project.elevenLabsModel as ElevenLabsModelId);
+    }
+    if (project.elevenLabsSpeed !== undefined) {
+      setElSpeed(project.elevenLabsSpeed);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED, String(project.elevenLabsSpeed));
+    }
+    if (project.elevenLabsStability !== undefined) {
+      setElStability(project.elevenLabsStability);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY, String(project.elevenLabsStability));
+    }
+    // 언어
+    if (project.language) {
+      handleLanguageChange(project.language as Language);
+    }
+    // 영상 방향
+    if (project.videoOrientation) {
+      handleOrientationChange(project.videoOrientation as VideoOrientation);
+    }
+    // 한글 억제
+    if (project.suppressKorean !== undefined) {
+      setSuppressKorean(project.suppressKorean);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.SUPPRESS_KOREAN, String(project.suppressKorean));
+    }
 
     setShowProjectManager(false);
-    alert(`프로젝트 "${project.name}" 불러오기 완료!`);
   };
 
   // 프로젝트 삭제
-  const deleteProject = (projectId: string) => {
-    if (!confirm('이 프로젝트를 삭제하시겠습니까?')) return;
+  const deleteProject = async (projectId: string) => {
+    if (!confirm('이 프리셋을 삭제하시겠습니까?')) return;
+
+    const token = localStorage.getItem('c2gen_session_token');
+    if (token) {
+      try {
+        await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'preset-delete', token, presetId: projectId }),
+        });
+      } catch (e) {
+        console.error('프리셋 삭제 실패:', e);
+      }
+    }
 
     const updatedProjects = projects.filter(p => p.id !== projectId);
     setProjects(updatedProjects);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.PROJECTS, JSON.stringify(updatedProjects));
+    if (!token) {
+      localStorage.setItem(CONFIG.STORAGE_KEYS.PROJECTS, JSON.stringify(updatedProjects));
+    }
   };
 
   // 프로젝트 업데이트 (덮어쓰기)
-  const updateProject = (project: ProjectSettings) => {
-    const updatedProject: ProjectSettings = {
-      ...project,
-      updatedAt: Date.now(),
-      imageModel: imageModelId,
-      elevenLabsVoiceId: elVoiceId,
-      elevenLabsModel: elModelId,
-    };
+  const updateProject = async (project: ProjectSettings) => {
+    const settings = collectCurrentSettings();
+    const token = localStorage.getItem('c2gen_session_token');
 
-    const updatedProjects = projects.map(p => p.id === project.id ? updatedProject : p);
-    setProjects(updatedProjects);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.PROJECTS, JSON.stringify(updatedProjects));
-    alert(`프로젝트 "${project.name}" 업데이트 완료!`);
+    if (token) {
+      try {
+        const r = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'preset-save', token, preset: { id: project.id, name: project.name, settings } }),
+        });
+        const d = await r.json();
+        if (d.error) { alert(d.error); return; }
+        const updated: ProjectSettings = {
+          id: d.preset.id,
+          name: d.preset.name,
+          createdAt: new Date(d.preset.created_at).getTime(),
+          updatedAt: new Date(d.preset.updated_at).getTime(),
+          ...d.preset.settings,
+        };
+        setProjects(prev => prev.map(p => p.id === project.id ? updated : p));
+      } catch (e: any) {
+        alert(`업데이트 실패: ${e.message}`);
+      }
+    } else {
+      const updatedProject: ProjectSettings = {
+        ...project,
+        updatedAt: Date.now(),
+        ...settings,
+      };
+      const updatedProjects = projects.map(p => p.id === project.id ? updatedProject : p);
+      setProjects(updatedProjects);
+      localStorage.setItem(CONFIG.STORAGE_KEYS.PROJECTS, JSON.stringify(updatedProjects));
+    }
   };
 
   // 선택된 Gemini 스타일 정보 가져오기 (useMemo로 캐싱 - O(1) 조회)
@@ -584,9 +823,9 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                 </svg>
               </div>
               <div>
-                <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>프로젝트 관리</h3>
+                <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>프리셋 관리</h3>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {projects.length > 0 ? `${projects.length}개 저장됨` : '설정을 프로젝트로 저장'}
+                  {projects.length > 0 ? `${projects.length}개 저장됨 (클라우드 동기화)` : '모델, 화풍, 음성 등 전체 설정을 저장'}
                 </p>
               </div>
             </div>
@@ -599,13 +838,13 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
             <div className="mt-4 pt-4 space-y-4" style={{ borderTop: '1px solid var(--border-default)' }}>
               {/* 새 프로젝트 저장 */}
               <div>
-                <label className="block text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>새 프로젝트 저장</label>
+                <label className="block text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>새 프리셋 저장</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
-                    placeholder="프로젝트 이름 입력..."
+                    placeholder="프리셋 이름 입력..."
                     className="flex-1 rounded-xl px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none placeholder:text-[var(--text-muted)]"
                     style={{ backgroundColor: 'var(--bg-elevated)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
                     onKeyDown={(e) => e.key === 'Enter' && saveProject()}
@@ -624,7 +863,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
               {/* 저장된 프로젝트 목록 */}
               {projects.length > 0 && (
                 <div>
-                  <label className="block text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>저장된 프로젝트</label>
+                  <label className="block text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>저장된 프리셋</label>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {projects.map((project) => (
                       <div
@@ -634,8 +873,12 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{project.name}</div>
-                          <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                            {new Date(project.updatedAt).toLocaleDateString('ko-KR')} • Gemini
+                          <div className="text-[10px] flex flex-wrap gap-1" style={{ color: 'var(--text-muted)' }}>
+                            <span>{new Date(project.updatedAt).toLocaleDateString('ko-KR')}</span>
+                            <span>•</span>
+                            <span>{project.imageModel === 'gpt-image-1' ? 'GPT' : 'Gemini'}</span>
+                            {project.language && project.language !== 'ko' && <span>• {project.language.toUpperCase()}</span>}
+                            {project.videoOrientation === 'portrait' && <span>• 세로</span>}
                           </div>
                         </div>
                         <div className="flex gap-1 ml-2">
@@ -670,8 +913,8 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
 
               {projects.length === 0 && (
                 <p className="text-center text-xs py-4" style={{ color: 'var(--text-muted)' }}>
-                  저장된 프로젝트가 없습니다.<br />
-                  현재 설정을 프로젝트로 저장해보세요.
+                  저장된 프리셋이 없습니다.<br />
+                  현재 설정을 프리셋으로 저장하면 어디서든 불러올 수 있습니다.
                 </p>
               )}
             </div>
@@ -849,7 +1092,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
         </div>
 
         {/* 🎤 ElevenLabs 음성 설정 (참조 이미지 바로 아래) */}
-        <div className="p-4 border rounded-2xl backdrop-blur-sm" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 50%, transparent)', borderColor: 'var(--border-default)' }}>
+        <div className="p-4 border rounded-2xl" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 80%, transparent)', borderColor: 'var(--border-default)', overflow: 'visible' }}>
           <button
             type="button"
             onClick={() => setShowElevenLabsSettings(!showElevenLabsSettings)}
@@ -863,8 +1106,14 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
               </div>
               <div>
                 <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>🎤 나레이션 음성 설정</h3>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {`✅ ${getSelectedVoiceInfo().name}`}
+                <p className="text-xs flex flex-wrap items-center gap-x-1" style={{ color: 'var(--text-muted)' }}>
+                  <span>{LANGUAGE_CONFIG[language].name}</span>
+                  <span>·</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{getSelectedVoiceInfo().name}</span>
+                  <span>·</span>
+                  <span>{ELEVENLABS_MODELS.find(m => m.id === elModelId)?.name || elModelId}</span>
+                  {elSpeed !== 1.0 && <><span>·</span><span className="text-purple-400">{elSpeed.toFixed(2)}x</span></>}
+                  {elStability !== 0.6 && <><span>·</span><span className="text-purple-400">{Math.round(elStability * 100)}%</span></>}
                 </p>
               </div>
             </div>
@@ -875,23 +1124,34 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
 
           {showElevenLabsSettings && (
             <div className="mt-4 pt-4 space-y-4" style={{ borderTop: '1px solid var(--border-default)' }}>
-              {/* API Key 상태 표시 (서버 프록시에서 관리) */}
-              <div className="p-3 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)' }}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400">✅</span>
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>서버 연결됨</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => loadVoices()}
-                    disabled={isLoadingVoices}
-                    className="px-3 py-1.5 hover:opacity-80 disabled:opacity-50 text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
-                    style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-primary)' }}
-                  >
-                    {isLoadingVoices ? '로딩...' : '커스텀 음성 불러오기'}
-                  </button>
+              {/* 나레이션 언어 선택 */}
+              <div>
+                <label className="block text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>나레이션 언어</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(LANGUAGE_CONFIG) as Language[]).map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => handleLanguageChange(lang)}
+                      className={`p-2 rounded-xl border text-center transition-all text-xs font-bold ${
+                        language === lang
+                          ? 'bg-purple-600/20 border-purple-500'
+                          : 'hover:opacity-80'
+                      }`}
+                      style={language === lang ? { color: 'var(--text-primary)' } : { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
+                    >
+                      {LANGUAGE_CONFIG[lang].name}
+                    </button>
+                  ))}
                 </div>
+                {language !== 'ko' && (
+                  <div className="mt-2 px-3 py-1.5 rounded-lg text-[10px]" style={{ backgroundColor: 'rgba(139,92,246,0.08)', color: 'var(--text-secondary)' }}>
+                    <span className="text-purple-400 font-bold">TIP</span>
+                    {language === 'en'
+                      ? ' — 영어 나레이션에는 Rachel(여), Adam(남) + Multilingual v2 모델 추천'
+                      : ' — 일본어 나레이션에는 Rachel(여), Adam(남) + Multilingual v2 모델 추천'}
+                  </div>
+                )}
               </div>
 
               {/* Voice Selection - 확장된 UI */}
@@ -928,13 +1188,13 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
 
                 {/* 드롭다운 목록 */}
                 {showVoiceDropdown && (
-                  <div className="absolute z-50 w-full mt-2 rounded-2xl shadow-2xl max-h-[29rem] overflow-hidden flex flex-col" style={{ backgroundColor: 'var(--bg-surface)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)' }}>
-                    {/* 탭: 프리메이드 / 라이브러리 */}
+                  <div className="absolute z-[9999] w-full mt-2 rounded-2xl shadow-2xl max-h-[29rem] overflow-hidden flex flex-col" style={{ backgroundColor: 'var(--bg-surface)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)' }}>
+                    {/* 탭: 프리메이드 / 라이브러리 / 즐겨찾기 */}
                     <div className="flex" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                       <button
                         type="button"
                         onClick={() => setVoiceTab('premade')}
-                        className={`flex-1 px-4 py-2.5 text-xs font-bold transition-all ${
+                        className={`flex-1 px-3 py-2.5 text-xs font-bold transition-all ${
                           voiceTab === 'premade' ? 'text-purple-400 border-b-2 border-purple-400' : ''
                         }`}
                         style={voiceTab === 'premade' ? { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' } : { color: 'var(--text-muted)' }}
@@ -944,12 +1204,22 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                       <button
                         type="button"
                         onClick={() => { setVoiceTab('library'); if (libraryVoices.length === 0) searchLibrary(''); }}
-                        className={`flex-1 px-4 py-2.5 text-xs font-bold transition-all ${
+                        className={`flex-1 px-3 py-2.5 text-xs font-bold transition-all ${
                           voiceTab === 'library' ? 'text-amber-400 border-b-2 border-amber-400' : ''
                         }`}
                         style={voiceTab === 'library' ? { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' } : { color: 'var(--text-muted)' }}
                       >
                         커뮤니티 라이브러리
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVoiceTab('favorites')}
+                        className={`flex-1 px-3 py-2.5 text-xs font-bold transition-all ${
+                          voiceTab === 'favorites' ? 'text-yellow-400 border-b-2 border-yellow-400' : ''
+                        }`}
+                        style={voiceTab === 'favorites' ? { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' } : { color: 'var(--text-muted)' }}
+                      >
+                        ★ 즐겨찾기 {favoriteVoices.length > 0 && `(${favoriteVoices.length})`}
                       </button>
                     </div>
 
@@ -1073,6 +1343,16 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                                   </span>
                                 </div>
                                 <div className="text-[11px] mt-0.5 line-clamp-1" style={{ color: 'var(--text-muted)' }}>{voice.description}</div>
+                              </button>
+
+                              {/* 즐겨찾기 별 */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); toggleFavoriteVoice(voice.id, voice.name, { gender: voice.gender, accent: voice.accent, description: voice.description }); }}
+                                className="flex-shrink-0 p-1 rounded transition-colors hover:bg-yellow-500/20"
+                                title={favoriteVoiceIds.has(voice.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                              >
+                                <span className="text-sm">{favoriteVoiceIds.has(voice.id) ? '★' : '☆'}</span>
                               </button>
 
                               {elVoiceId === voice.id && (
@@ -1240,6 +1520,16 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                                 )}
                               </button>
 
+                              {/* 즐겨찾기 별 */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); toggleFavoriteVoice(voice.voice_id, voice.name, { gender: voice.gender, accent: voice.accent, description: voice.description }); }}
+                                className="flex-shrink-0 p-1 rounded transition-colors hover:bg-yellow-500/20"
+                                title={favoriteVoiceIds.has(voice.voice_id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                              >
+                                <span className="text-sm">{favoriteVoiceIds.has(voice.voice_id) ? '★' : '☆'}</span>
+                              </button>
+
                               {elVoiceId === voice.voice_id && (
                                 <div className="text-amber-400 flex-shrink-0">
                                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
@@ -1261,6 +1551,92 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                           )}
                         </div>
                       </>
+                    )}
+
+                    {/* 즐겨찾기 탭 */}
+                    {voiceTab === 'favorites' && (
+                      <div className="overflow-y-auto flex-1" style={{ maxHeight: '22rem' }}>
+                        {favoriteVoices.length === 0 ? (
+                          <div className="py-12 text-center">
+                            <span className="text-3xl mb-3 block">☆</span>
+                            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                              즐겨찾기한 음성이 없습니다.
+                            </p>
+                            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                              프리메이드/커뮤니티 음성 옆의 ☆를 눌러 추가하세요.
+                            </p>
+                          </div>
+                        ) : (
+                          favoriteVoices.map((fav) => {
+                            const meta = fav.voice_meta || {};
+                            return (
+                              <div
+                                key={fav.voice_id}
+                                className={`flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors ${elVoiceId === fav.voice_id ? 'bg-purple-600/20' : ''}`}
+                                style={{ borderBottom: '1px solid color-mix(in srgb, var(--border-default) 50%, transparent)' }}
+                              >
+                                {/* 미리듣기 */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); playVoicePreviewWithApi(fav.voice_id, fav.voice_name); }}
+                                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                    playingVoiceId === fav.voice_id ? 'bg-purple-500 text-white animate-pulse' : 'hover:bg-purple-600 hover:text-white'
+                                  }`}
+                                  style={playingVoiceId === fav.voice_id ? undefined : { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                                >
+                                  {playingVoiceId === fav.voice_id ? (
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                                  ) : (
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                  )}
+                                </button>
+
+                                {/* 음성 정보 */}
+                                <button
+                                  type="button"
+                                  onClick={() => { setElVoiceId(fav.voice_id); setShowVoiceDropdown(false); }}
+                                  className="flex-1 text-left min-w-0"
+                                >
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{fav.voice_name}</span>
+                                    {meta.gender && (
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                        meta.gender === 'female' ? 'bg-pink-500/20 text-pink-400' : 'bg-blue-500/20 text-blue-400'
+                                      }`}>
+                                        {meta.gender === 'female' ? '여' : '남'}
+                                      </span>
+                                    )}
+                                    {meta.accent && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-hover) 50%, transparent)', color: 'var(--text-secondary)' }}>
+                                        {meta.accent}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {meta.description && (
+                                    <div className="text-[11px] mt-0.5 line-clamp-1" style={{ color: 'var(--text-muted)' }}>{meta.description}</div>
+                                  )}
+                                </button>
+
+                                {/* 즐겨찾기 해제 */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); toggleFavoriteVoice(fav.voice_id, fav.voice_name, meta); }}
+                                  className="flex-shrink-0 p-1 rounded transition-colors hover:bg-red-500/20"
+                                  title="즐겨찾기 해제"
+                                >
+                                  <span className="text-sm text-yellow-400">★</span>
+                                </button>
+
+                                {elVoiceId === fav.voice_id && (
+                                  <div className="text-purple-400 flex-shrink-0">
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     )}
 
                     {/* Voice ID 직접 입력 토글 */}
@@ -1332,50 +1708,77 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                 </div>
               </div>
 
-              {/* 음성 속도 슬라이더 */}
+              {/* 상세설정 토글 */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>음성 속도</label>
-                  <span className="text-xs font-black text-purple-400">{elSpeed.toFixed(2)}x</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.7"
-                  max="1.3"
-                  step="0.05"
-                  value={elSpeed}
-                  onChange={(e) => setElSpeed(parseFloat(e.target.value))}
-                  className="w-full accent-purple-500"
-                />
-                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                  <span>0.7x (느림)</span>
-                  <span>1.0x (기본)</span>
-                  <span>1.3x (빠름)</span>
-                </div>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDetailedSettings(!showDetailedSettings)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all text-xs font-bold"
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 30%, transparent)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                    상세설정 <span className="font-normal opacity-60">(음성속도 / 리듬 안정성)</span>
+                    {(elSpeed !== 1.0 || elStability !== 0.6) && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold">커스텀</span>
+                    )}
+                  </span>
+                  <svg className={`w-4 h-4 transition-transform ${showDetailedSettings ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
 
-              {/* 리듬 안정성 슬라이더 */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>리듬 안정성</label>
-                  <span className="text-xs font-black text-purple-400">{Math.round(elStability * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.3"
-                  max="0.9"
-                  step="0.05"
-                  value={elStability}
-                  onChange={(e) => setElStability(parseFloat(e.target.value))}
-                  className="w-full accent-purple-500"
-                />
-                <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                  <span>낮음 (자연스러운 강약)</span>
-                  <span>높음 (일정한 속도)</span>
-                </div>
-                <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                  ※ 낮추면 감정 표현 풍부, 높이면 문장 간 포즈가 명확해짐
-                </p>
+                {showDetailedSettings && (
+                  <div className="mt-3 space-y-4 pl-1">
+                    {/* 음성 속도 슬라이더 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>음성 속도</label>
+                        <span className="text-xs font-black text-purple-400">{elSpeed.toFixed(2)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.7"
+                        max="1.3"
+                        step="0.05"
+                        value={elSpeed}
+                        onChange={(e) => setElSpeed(parseFloat(e.target.value))}
+                        className="w-full accent-purple-500"
+                      />
+                      <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                        <span>0.7x (느림)</span>
+                        <span>1.0x (기본)</span>
+                        <span>1.3x (빠름)</span>
+                      </div>
+                    </div>
+
+                    {/* 리듬 안정성 슬라이더 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>리듬 안정성</label>
+                        <span className="text-xs font-black text-purple-400">{Math.round(elStability * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.3"
+                        max="0.9"
+                        step="0.05"
+                        value={elStability}
+                        onChange={(e) => setElStability(parseFloat(e.target.value))}
+                        className="w-full accent-purple-500"
+                      />
+                      <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                        <span>낮음 (자연스러운 강약)</span>
+                        <span>높음 (일정한 속도)</span>
+                      </div>
+                      <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                        ※ 낮추면 감정 표현 풍부, 높이면 문장 간 포즈가 명확해짐
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 저장 버튼 */}
@@ -1390,37 +1793,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
           )}
         </div>
 
-        {/* 나레이션 언어 선택 */}
-        <div className="p-4 border rounded-2xl backdrop-blur-sm" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 50%, transparent)', borderColor: 'var(--border-default)' }}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>나레이션 언어</h3>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>스크립트·나레이션·자막 언어 설정</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {(Object.keys(LANGUAGE_CONFIG) as Language[]).map((lang) => (
-              <button
-                key={lang}
-                type="button"
-                onClick={() => handleLanguageChange(lang)}
-                className={`p-3 rounded-xl border text-center transition-all ${
-                  language === lang
-                    ? 'bg-emerald-600/20 border-emerald-500'
-                    : 'hover:opacity-80'
-                }`}
-                style={language === lang ? { color: 'var(--text-primary)' } : { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
-              >
-                <span className="font-bold text-sm">{LANGUAGE_CONFIG[lang].name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* 나레이션 언어 선택 — TTS 설정 안으로 이동됨 */}
 
         {/* 영상 방향 선택 (가로 / 세로) */}
         <div className="p-4 border rounded-2xl backdrop-blur-sm" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 50%, transparent)', borderColor: 'var(--border-default)' }}>
@@ -1641,12 +2014,12 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                     <textarea
                       value={geminiCustomStylePrompt}
                       onChange={(e) => saveGeminiCustomStyle(e.target.value)}
-                      placeholder="예: Watercolor painting style with soft edges, pastel colors, dreamy atmosphere..."
+                      placeholder="예: 부드러운 수채화 느낌, 파스텔 색감, 몽환적 분위기 / Watercolor style, soft edges..."
                       className="w-full h-24 rounded-xl px-4 py-3 text-sm focus:border-teal-500 focus:outline-none resize-none placeholder:text-[var(--text-muted)]"
                       style={{ backgroundColor: 'var(--bg-elevated)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
                     />
                     <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                      영어로 화풍을 상세히 설명하세요. 이 설명이 Gemini 이미지 생성에 적용됩니다.
+                      한국어든 영어든, 마음 가는 대로 적어주세요. 제가 3개국어를 할줄 알아요 :)
                     </p>
                   </div>
                 )}
@@ -1765,12 +2138,12 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
                     <textarea
                       value={gptCustomStylePrompt}
                       onChange={(e) => saveGptCustomStyle(e.target.value)}
-                      placeholder="예: Oil painting style with rich textures, dramatic chiaroscuro lighting..."
+                      placeholder="예: 풍부한 질감의 유화풍, 극적인 명암 대비 / Oil painting, rich textures..."
                       className="w-full h-24 rounded-xl px-4 py-3 text-sm focus:border-violet-500 focus:outline-none resize-none placeholder:text-[var(--text-muted)]"
                       style={{ backgroundColor: 'var(--bg-elevated)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
                     />
                     <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                      영어로 화풍을 상세히 설명하세요. 이 설명이 GPT 이미지 생성에 적용됩니다.
+                      한국어든 영어든, 마음 가는 대로 적어주세요. 제가 3개국어를 할줄 알아요 :)
                     </p>
                   </div>
                 )}
@@ -1849,7 +2222,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
       {/* Tabs and Submit */}
       <div className="flex justify-center mb-6">
         <div className="p-1.5 rounded-2xl flex gap-1" style={{ backgroundColor: 'var(--bg-surface)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-default)' }}>
-          <button type="button" onClick={() => setActiveTab('auto')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'auto' ? 'bg-brand-600 text-white' : ''}`} style={activeTab === 'auto' ? undefined : { color: 'var(--text-muted)' }}>자동 트렌드</button>
+          <button type="button" onClick={() => setActiveTab('auto')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'auto' ? 'bg-brand-600 text-white' : ''}`} style={activeTab === 'auto' ? undefined : { color: 'var(--text-muted)' }}>자동 대본</button>
           <button type="button" onClick={() => setActiveTab('manual')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'manual' ? 'bg-brand-600 text-white' : ''}`} style={activeTab === 'manual' ? undefined : { color: 'var(--text-muted)' }}>수동 대본</button>
         </div>
       </div>
@@ -1859,7 +2232,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-brand-600 to-blue-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative flex items-center rounded-2xl overflow-hidden pr-2" style={{ backgroundColor: 'var(--bg-surface)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)' }}>
-              <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} disabled={isDisabled} placeholder="경제 트렌드 키워드 입력 (예: 비트코인, 금리)..." className="block w-full bg-transparent py-5 px-6 focus:ring-0 focus:outline-none text-lg disabled:opacity-50 placeholder:text-[var(--text-muted)]" style={{ color: 'var(--text-primary)' }} />
+              <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} disabled={isDisabled} placeholder={PLACEHOLDER_EXAMPLES[placeholderIndex]} className={`block w-full bg-transparent py-5 px-6 focus:ring-0 focus:outline-none text-lg disabled:opacity-50 placeholder:text-[var(--text-muted)] placeholder:transition-opacity placeholder:duration-[400ms] ${placeholderFade ? 'placeholder:opacity-100' : 'placeholder:opacity-0'}`} style={{ color: 'var(--text-primary)' }} />
               <button type="submit" disabled={isDisabled || !topic.trim()} className="bg-brand-600 hover:bg-brand-500 text-white font-black py-3 px-8 rounded-xl transition-all disabled:opacity-50 whitespace-nowrap animate-wiggle">{isProcessing ? '생성 중' : isReviewing ? '검토 중' : '시작'}</button>
             </div>
           </div>

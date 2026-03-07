@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface PaymentSuccessProps {
   orderId: string;
@@ -6,6 +7,7 @@ interface PaymentSuccessProps {
 }
 
 const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ orderId, onDone }) => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
   const [credits, setCredits] = useState(0);
 
@@ -83,8 +85,8 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ orderId, onDone }) => {
         {status === 'verifying' && (
           <>
             <div className="w-12 h-12 border-3 border-brand-500 border-t-transparent animate-spin rounded-full mx-auto mb-4" />
-            <h3 className="text-lg font-black mb-2" style={{ color: 'var(--text-primary)' }}>결제 확인 중...</h3>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>잠시만 기다려주세요.</p>
+            <h3 className="text-lg font-black mb-2" style={{ color: 'var(--text-primary)' }}>{t('creditShop.verifyingPayment')}</h3>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.pleaseWait')}</p>
           </>
         )}
 
@@ -93,14 +95,14 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ orderId, onDone }) => {
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">+</span>
             </div>
-            <h3 className="text-lg font-black text-emerald-400 mb-2">충전 완료!</h3>
-            <p className="text-2xl font-black mb-1" style={{ color: 'var(--text-primary)' }}>{credits.toLocaleString()} 크레딧</p>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>크레딧이 충전되었습니다.</p>
+            <h3 className="text-lg font-black text-emerald-400 mb-2">{t('creditShop.chargeComplete')}</h3>
+            <p className="text-2xl font-black mb-1" style={{ color: 'var(--text-primary)' }}>{credits.toLocaleString()} {t('creditShop.credits')}</p>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.creditsCharged')}</p>
             <button
               onClick={onDone}
               className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-black text-sm transition-all"
             >
-              확인
+              {t('common.confirm')}
             </button>
           </>
         )}
@@ -110,8 +112,8 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ orderId, onDone }) => {
             <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl text-red-400">!</span>
             </div>
-            <h3 className="text-lg font-black text-red-400 mb-2">결제 실패</h3>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>결제 처리에 실패했습니다. 다시 시도해주세요.</p>
+            <h3 className="text-lg font-black text-red-400 mb-2">{t('creditShop.paymentFailed')}</h3>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.paymentFailedDesc')}</p>
             <button
               onClick={onDone}
               className="w-full py-3 rounded-xl font-black text-sm transition-all"
@@ -119,7 +121,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ orderId, onDone }) => {
               onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--bg-elevated)'; }}
               onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
             >
-              닫기
+              {t('common.close')}
             </button>
           </>
         )}

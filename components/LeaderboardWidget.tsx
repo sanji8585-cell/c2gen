@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface LeaderboardWidgetProps {
   isOpen: boolean;
@@ -47,6 +48,8 @@ const LeaderboardWidget: React.FC<LeaderboardWidgetProps> = ({
   userStreak,
   isDark,
 }) => {
+  const { t } = useTranslation();
+
   if (!isOpen) return null;
 
   return (
@@ -84,7 +87,7 @@ const LeaderboardWidget: React.FC<LeaderboardWidgetProps> = ({
               className="text-base font-bold"
               style={{ color: isDark ? '#e2e8f0' : '#1e293b' }}
             >
-              리더보드
+              {t('game.leaderboardTitle')}
             </h3>
           </div>
           <button
@@ -94,7 +97,7 @@ const LeaderboardWidget: React.FC<LeaderboardWidgetProps> = ({
               background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
               color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)',
             }}
-            aria-label="닫기"
+            aria-label={t('common.close')}
           >
             &times;
           </button>
@@ -108,27 +111,27 @@ const LeaderboardWidget: React.FC<LeaderboardWidgetProps> = ({
               className="text-xs font-semibold mb-3 tracking-wide uppercase"
               style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}
             >
-              내 기록
+              {t('game.myRecord')}
             </p>
             <div className="flex gap-3">
               <StatCard
                 icon="⭐"
-                label="레벨"
+                label={t('game.level')}
                 value={userLevel}
                 accent="#f59e0b"
                 isDark={isDark}
               />
               <StatCard
                 icon="✨"
-                label="경험치"
+                label={t('game.xp')}
                 value={userXp.toLocaleString()}
                 accent="#8b5cf6"
                 isDark={isDark}
               />
               <StatCard
                 icon="🔥"
-                label="연속"
-                value={`${userStreak}일`}
+                label={t('game.streak')}
+                value={`${userStreak}${t('game.days')}`}
                 accent="#ef4444"
                 isDark={isDark}
               />
@@ -141,7 +144,7 @@ const LeaderboardWidget: React.FC<LeaderboardWidgetProps> = ({
               className="text-xs font-semibold mb-3 tracking-wide uppercase"
               style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}
             >
-              전체 순위
+              {t('game.globalRanking')}
             </p>
             <div
               className="flex flex-col items-center justify-center py-8 rounded-xl"
@@ -155,13 +158,13 @@ const LeaderboardWidget: React.FC<LeaderboardWidgetProps> = ({
                 className="text-sm font-medium"
                 style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}
               >
-                리더보드 (준비 중)
+                {t('game.leaderboardComingSoon')}
               </p>
               <p
                 className="text-[11px] mt-1"
                 style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }}
               >
-                곧 다른 크리에이터들과 순위를 겨룰 수 있어요!
+                {t('game.leaderboardComingSoonDesc')}
               </p>
             </div>
           </div>

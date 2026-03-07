@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { DailyQuest } from '../types/gamification';
 
 interface DailyQuestPanelProps {
@@ -27,6 +28,7 @@ function formatCountdown(t: { hours: number; minutes: number; seconds: number })
 }
 
 const DailyQuestPanel: React.FC<DailyQuestPanelProps> = ({ quests, onClaimReward, isDark }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [countdown, setCountdown] = useState(getTimeUntilMidnight());
   const panelRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,7 @@ const DailyQuestPanel: React.FC<DailyQuestPanelProps> = ({ quests, onClaimReward
           background: 'linear-gradient(135deg, #f59e0b, #d97706)',
           color: '#fff',
         }}
-        title="일일 퀘스트"
+        title={t('game.dailyQuest')}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -125,7 +127,7 @@ const DailyQuestPanel: React.FC<DailyQuestPanelProps> = ({ quests, onClaimReward
               className="text-sm font-bold"
               style={{ color: 'var(--text-primary, #111827)' }}
             >
-              일일 퀘스트
+              {t('game.dailyQuest')}
             </span>
           </div>
           <div
@@ -271,7 +273,7 @@ const DailyQuestPanel: React.FC<DailyQuestPanelProps> = ({ quests, onClaimReward
                       >
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
-                      완료
+                      {t('game.claimed')}
                     </div>
                   )}
 
@@ -285,7 +287,7 @@ const DailyQuestPanel: React.FC<DailyQuestPanelProps> = ({ quests, onClaimReward
                         animation: 'questGlow 1.5s ease-in-out infinite alternate',
                       }}
                     >
-                      보상 받기
+                      {t('game.claimReward')}
                     </button>
                   )}
                 </div>

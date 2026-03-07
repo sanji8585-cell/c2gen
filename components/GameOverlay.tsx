@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { GachaSettings, Rarity } from '../types/gamification';
 import { playSFX, getGachaSoundType } from '../services/soundService';
 
@@ -11,12 +12,12 @@ const RARITY_COLORS: Record<string, string> = {
   legendary: '#ef4444',
 };
 
-const RARITY_LABELS: Record<string, string> = {
-  common: '일반',
-  uncommon: '고급',
-  rare: '희귀',
-  epic: '영웅',
-  legendary: '전설',
+const RARITY_LABEL_KEYS: Record<string, string> = {
+  common: 'game.rarityCommon',
+  uncommon: 'game.rarityUncommon',
+  rare: 'game.rarityRare',
+  epic: 'game.rarityEpic',
+  legendary: 'game.rarityLegendary',
 };
 
 // ── Achievement category colors ──
@@ -188,6 +189,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
   onDismiss,
   gachaSettings,
 }) => {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
   const onDismissRef = useRef(onDismiss);
@@ -320,7 +322,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
     if (gachaSettings?.rarities?.[rarity]?.label) {
       return gachaSettings.rarities[rarity].label;
     }
-    return RARITY_LABELS[rarity] || rarity;
+    return RARITY_LABEL_KEYS[rarity] ? t(RARITY_LABEL_KEYS[rarity]) : rarity;
   };
 
   const handleBackdropClick = () => {
@@ -435,7 +437,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                       <div className="flex items-center gap-1 bg-yellow-500/20 px-3 py-1.5 rounded-full">
                         <span className="text-lg">💰</span>
                         <span className="text-yellow-300 font-bold text-sm">
-                          +{levelUp.reward.credits} 크레딧
+                          +{levelUp.reward.credits} {t('common.credits')}
                         </span>
                       </div>
                     )}
@@ -443,7 +445,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                       <div className="flex items-center gap-1 bg-purple-500/20 px-3 py-1.5 rounded-full">
                         <span className="text-lg">🎫</span>
                         <span className="text-purple-300 font-bold text-sm">
-                          +{levelUp.reward.gacha_tickets} 뽑기권
+                          +{levelUp.reward.gacha_tickets} {t('completion.gachaTicket')}
                         </span>
                       </div>
                     )}
@@ -452,7 +454,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
 
                 {/* Dismiss hint */}
                 <p className="text-xs text-gray-400 mt-5">
-                  클릭하여 닫기
+                  {t('game.clickToDismiss')}
                 </p>
               </div>
             </div>
@@ -475,7 +477,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                   className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white"
                   style={{ backgroundColor: catColor }}
                 >
-                  업적 달성!
+                  {t('game.achievementUnlocked')}
                 </div>
 
                 {/* Icon */}
@@ -510,7 +512,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                     <div className="flex items-center gap-1 bg-yellow-500/20 px-3 py-1.5 rounded-full">
                       <span className="text-sm">💰</span>
                       <span className="text-yellow-300 font-bold text-sm">
-                        +{achievementUnlock.rewardCredits} 크레딧
+                        +{achievementUnlock.rewardCredits} {t('common.credits')}
                       </span>
                     </div>
                   )}
@@ -518,7 +520,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
 
                 {/* Dismiss hint */}
                 <p className="text-xs text-gray-400 mt-5">
-                  클릭하여 닫기
+                  {t('game.clickToDismiss')}
                 </p>
               </div>
             );
@@ -612,14 +614,14 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                       transform: 'rotate(-12deg)',
                     }}
                   >
-                    NEW!
+                    {t('game.new')}
                   </div>
                 )}
 
                 {/* Phase indicator */}
                 {!isRevealed && (
                   <div className="text-xs font-bold tracking-widest uppercase mb-3 text-gray-400">
-                    {gachaPhase === 'spinning' ? '🎰 뽑기 중...' : '✨ 결과 확인 중...'}
+                    {gachaPhase === 'spinning' ? `🎰 ${t('game.gachaSpinning')}` : `✨ ${t('game.gachaRevealing')}`}
                   </div>
                 )}
 
@@ -729,11 +731,11 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                         opacity: 0,
                       }}
                     >
-                      {gachaResult.item.itemType === 'title' && '🏷️ 칭호'}
-                      {gachaResult.item.itemType === 'badge' && '🎖️ 뱃지'}
-                      {gachaResult.item.itemType === 'avatar_frame' && '🖼️ 아바타 프레임'}
-                      {gachaResult.item.itemType === 'xp_booster' && '⚡ XP 부스터'}
-                      {gachaResult.item.itemType === 'credit_voucher' && '💰 크레딧 쿠폰'}
+                      {gachaResult.item.itemType === 'title' && `🏷️ ${t('game.title')}`}
+                      {gachaResult.item.itemType === 'badge' && `🎖️ ${t('game.badge')}`}
+                      {gachaResult.item.itemType === 'avatar_frame' && `🖼️ ${t('game.avatarFrame')}`}
+                      {gachaResult.item.itemType === 'xp_booster' && `⚡ ${t('game.xpBooster')}`}
+                      {gachaResult.item.itemType === 'credit_voucher' && `💰 ${t('game.creditVoucher')}`}
                     </p>
 
                     {/* Rarity indicator dots */}
@@ -769,7 +771,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                 {/* Dismiss hint (only after reveal) */}
                 {isRevealed && (
                   <p className="text-xs text-gray-400" style={{ animation: 'overlay-reward-pop 0.3s 0.6s ease-out forwards', opacity: 0 }}>
-                    클릭하여 닫기
+                    {t('game.clickToDismiss')}
                   </p>
                 )}
               </div>
@@ -791,7 +793,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                 className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white"
                 style={{ backgroundColor: '#f59e0b' }}
               >
-                마일스톤 달성!
+                {t('game.milestoneUnlocked', '마일스톤 달성!')}
               </div>
 
               {/* Emoji */}
@@ -821,7 +823,7 @@ const GameOverlay: React.FC<GameOverlayProps> = ({
                   <div className="flex items-center gap-1 bg-yellow-500/20 px-3 py-1.5 rounded-full">
                     <span className="text-sm">💰</span>
                     <span className="text-yellow-300 font-bold text-sm">
-                      +{milestone.credits} 크레딧
+                      +{milestone.credits} {t('common.credits')}
                     </span>
                   </div>
                 )}

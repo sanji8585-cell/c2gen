@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SavedProject, GeneratedAsset } from '../types';
 import {
   getPlaygroundFeed,
@@ -28,19 +29,20 @@ interface PlaygroundProps {
   savedProjects: SavedProject[];
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, t: (key: string, opts?: any) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const min = Math.floor(diff / 60000);
-  if (min < 1) return '방금 전';
-  if (min < 60) return `${min}분 전`;
+  if (min < 1) return t('playground.ago.justNow');
+  if (min < 60) return t('playground.ago.minutes', { count: min });
   const hrs = Math.floor(min / 60);
-  if (hrs < 24) return `${hrs}시간 전`;
+  if (hrs < 24) return t('playground.ago.hours', { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}일 전`;
-  return `${Math.floor(days / 30)}개월 전`;
+  if (days < 30) return t('playground.ago.days', { count: days });
+  return t('playground.ago.months', { count: Math.floor(days / 30) });
 }
 
 const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModal, savedProjects }) => {
+  const { t } = useTranslation();
   const [posts, setPosts] = useState<PlaygroundPost[]>([]);
   const [sort, setSort] = useState<'latest' | 'popular'>('latest');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -159,7 +161,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
 
   // 삭제
   const handleDelete = useCallback(async (postId: string) => {
-    if (!confirm('이 게시물을 삭제하시겠습니까?')) return;
+    if (!confirm(t('playground.deletePost'))) return;
     try {
       await deletePlaygroundPost(postId);
       setPosts(prev => prev.filter(p => p.id !== postId));
@@ -171,7 +173,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
 
   // 공유 (렌더링 → 업로드 → DB 저장)
   const handleShare = useCallback(async () => {
-    if (!shareProjectId) { setShareError('프로젝트를 선택해주세요.'); return; }
+    if (!shareProjectId) { setShareError(t('playground.selectProjectError')); return; }
     setSharing(true);
     setShareError(null);
     setShareProgress('공유 준비 중...');
@@ -379,7 +381,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
                 color: sort === s ? '#fff' : 'var(--text-secondary)',
               }}
             >
-              {s === 'latest' ? '최신순' : '인기순'}
+              {s === 'latest' ? t('playground.latest') : t('playground.popular')}
             </button>
           ))}
         </div>
@@ -389,14 +391,14 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
             className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}
           >
-            내 프로젝트 공유
+            {t('playground.shareProject')}
           </button>
         ) : (
           <button onClick={onShowAuthModal}
             className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
           >
-            로그인하고 공유하기
+            {t('common.login')}
           </button>
         )}
       </div>
@@ -405,7 +407,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       {error && (
         <div className="text-center py-4">
           <p className="text-sm" style={{ color: '#f87171' }}>{error}</p>
-          <button onClick={() => loadFeed(true)} className="mt-2 text-xs underline" style={{ color: 'var(--text-muted)' }}>다시 시도</button>
+          <button onClick={() => loadFeed(true)} className="mt-2 text-xs underline" style={{ color: 'var(--text-muted)' }}>{t('common.error')}</button>
         </div>
       )}
 
@@ -454,7 +456,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
                 className="px-8 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
                 style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
               >
-                {loadingMore ? '로딩 중...' : '더 보기'}
+                {loadingMore ? t('common.loading') : t('common.confirm')}
               </button>
             </div>
           )}
@@ -503,6 +505,7 @@ const PostCard: React.FC<{
   onDelete: () => void;
   onClick: () => void;
 }> = ({ post, isMine, onLike, onDelete, onClick }) => {
+  const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -597,7 +600,7 @@ const PostCard: React.FC<{
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{timeAgo(post.createdAt)}</p>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{timeAgo(post.createdAt, t)}</p>
             {post.equipped?.title && <TitleBadge title={post.equipped.title} compact />}
           </div>
         </div>
@@ -763,14 +766,16 @@ const ShareModal: React.FC<{
   onChangeCaption: (v: string) => void;
   onSubmit: () => void;
   onClose: () => void;
-}> = ({ projects, projectId, caption, sharing, progress, error, onSelectProject, onChangeCaption, onSubmit, onClose }) => (
+}> = ({ projects, projectId, caption, sharing, progress, error, onSelectProject, onChangeCaption, onSubmit, onClose }) => {
+  const { t } = useTranslation();
+  return (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
     <div className="w-full max-w-md rounded-2xl border p-5 space-y-4"
       style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
       onClick={e => e.stopPropagation()}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>놀이터에 공유</h3>
+        <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('playground.shareProject')}</h3>
         <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
@@ -782,7 +787,7 @@ const ShareModal: React.FC<{
 
       {/* 프로젝트 선택 */}
       <div>
-        <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>공유할 프로젝트</label>
+        <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>{t('playground.selectProject')}</label>
         {projects.length === 0 ? (
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>저장된 프로젝트가 없습니다. 먼저 프로젝트를 저장해주세요.</p>
         ) : (
@@ -816,11 +821,11 @@ const ShareModal: React.FC<{
 
       {/* 캡션 */}
       <div>
-        <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>한마디 (선택)</label>
+        <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>{t('playground.caption')}</label>
         <textarea
           value={caption}
           onChange={e => onChangeCaption(e.target.value.slice(0, 200))}
-          placeholder="프로젝트에 대해 한마디..."
+          placeholder={t('playground.captionPlaceholder')}
           rows={2}
           className="w-full px-3 py-2 rounded-lg text-sm border resize-none focus:outline-none"
           style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
@@ -841,11 +846,12 @@ const ShareModal: React.FC<{
         className="w-full py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
         style={{ background: sharing ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: sharing ? 'var(--text-muted)' : '#fff' }}
       >
-        {sharing ? '영상 준비 중...' : '공유하기'}
+        {sharing ? t('playground.sharing') : t('playground.share')}
       </button>
     </div>
   </div>
-);
+  );
+};
 
 // ── 스켈레톤 카드 ──
 
@@ -880,6 +886,7 @@ const DetailModal: React.FC<{
   onClose: () => void;
   onShowAuthModal: () => void;
 }> = ({ data, loading, isMine, isAuthenticated, onLike, onDelete, onClose, onShowAuthModal }) => {
+  const { t } = useTranslation();
   // API 에셋 → PreviewPlayer 호환 GeneratedAsset 변환
   const playerAssets = useMemo<GeneratedAsset[]>(() => {
     if (!data?.assets) return [];
@@ -916,7 +923,7 @@ const DetailModal: React.FC<{
         {/* 헤더 */}
         <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-subtle)' }}>
           <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-            {data?.post.topic || '게시물 상세'}
+            {data?.post.topic || ''}
           </h3>
           <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -977,14 +984,14 @@ const DetailModal: React.FC<{
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{timeAgo(data.post.createdAt)}</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{timeAgo(data.post.createdAt, t)}</p>
                   {detailEquipped?.title && <TitleBadge title={detailEquipped.title} />}
                 </div>
               </div>
               {isMine && (
                 <button onClick={onDelete} className="px-3 py-1 text-xs rounded-lg transition-all hover:bg-red-500/20"
                   style={{ color: '#f87171' }}>
-                  삭제
+                  {t('common.delete')}
                 </button>
               )}
             </div>
@@ -1004,7 +1011,7 @@ const DetailModal: React.FC<{
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
                 </svg>
                 <span className="text-sm font-medium" style={{ color: data.liked ? '#ef4444' : 'var(--text-secondary)' }}>
-                  {data.post.likeCount > 0 ? data.post.likeCount : '좋아요'}
+                  {data.post.likeCount > 0 ? data.post.likeCount : '♡'}
                 </span>
               </button>
             </div>

@@ -3085,6 +3085,146 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ── 프리셋 목록 조회 ──
+      case 'preset-list': {
+        const { token } = params;
+        if (!token) return res.status(401).json({ error: 'Token required' });
+
+        const { data: session } = await supabase
+          .from('c2gen_sessions')
+          .select('email')
+          .eq('token', token)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        const { data: presets, error: listErr } = await supabase
+          .from('c2gen_presets')
+          .select('id, name, settings, created_at, updated_at')
+          .eq('email', session.email)
+          .order('updated_at', { ascending: false });
+
+        if (listErr) throw listErr;
+        return res.json({ presets: presets || [] });
+      }
+
+      // ── 프리셋 저장 (생성 or 업데이트) ──
+      case 'preset-save': {
+        const { token, preset } = params;
+        if (!token) return res.status(401).json({ error: 'Token required' });
+        if (!preset?.name || !preset?.settings) return res.status(400).json({ error: 'name and settings required' });
+
+        const { data: session } = await supabase
+          .from('c2gen_sessions')
+          .select('email')
+          .eq('token', token)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        // 업데이트 (id가 있는 경우)
+        if (preset.id) {
+          const { data: updated, error: upErr } = await supabase
+            .from('c2gen_presets')
+            .update({ name: preset.name, settings: preset.settings, updated_at: new Date().toISOString() })
+            .eq('id', preset.id)
+            .eq('email', session.email)
+            .select('id, name, settings, created_at, updated_at')
+            .single();
+          if (upErr) throw upErr;
+          return res.json({ preset: updated });
+        }
+
+        // 새로 생성 — 최대 20개 제한
+        const { count } = await supabase
+          .from('c2gen_presets')
+          .select('id', { count: 'exact', head: true })
+          .eq('email', session.email);
+
+        if ((count ?? 0) >= 20) {
+          return res.status(400).json({ error: '프리셋은 최대 20개까지 저장할 수 있습니다.' });
+        }
+
+        const { data: created, error: crErr } = await supabase
+          .from('c2gen_presets')
+          .insert({ email: session.email, name: preset.name, settings: preset.settings })
+          .select('id, name, settings, created_at, updated_at')
+          .single();
+        if (crErr) throw crErr;
+        return res.json({ preset: created });
+      }
+
+      // ── 프리셋 삭제 ──
+      case 'preset-delete': {
+        const { token, presetId } = params;
+        if (!token || !presetId) return res.status(400).json({ error: 'token and presetId required' });
+
+        const { data: session } = await supabase
+          .from('c2gen_sessions')
+          .select('email')
+          .eq('token', token)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        const { error: delErr } = await supabase
+          .from('c2gen_presets')
+          .delete()
+          .eq('id', presetId)
+          .eq('email', session.email);
+
+        if (delErr) throw delErr;
+        return res.json({ success: true });
+      }
+
+      // ── 즐겨찾기 음성 목록 ──
+      case 'favorite-voice-list': {
+        const { token } = params;
+        if (!token) return res.status(401).json({ error: 'Token required' });
+        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        const { data: favorites } = await supabase
+          .from('c2gen_favorite_voices')
+          .select('voice_id, voice_name, voice_meta, created_at')
+          .eq('email', session.email)
+          .order('created_at', { ascending: false });
+
+        return res.json({ favorites: favorites || [] });
+      }
+
+      // ── 즐겨찾기 음성 추가 ──
+      case 'favorite-voice-add': {
+        const { token, voiceId, voiceName, voiceMeta } = params;
+        if (!token || !voiceId || !voiceName) return res.status(400).json({ error: 'token, voiceId, voiceName required' });
+        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        // 최대 50개 제한
+        const { count } = await supabase.from('c2gen_favorite_voices').select('id', { count: 'exact', head: true }).eq('email', session.email);
+        if ((count ?? 0) >= 50) return res.status(400).json({ error: 'Maximum 50 favorites' });
+
+        await supabase.from('c2gen_favorite_voices').upsert({
+          email: session.email,
+          voice_id: voiceId,
+          voice_name: voiceName,
+          voice_meta: voiceMeta || {},
+        }, { onConflict: 'email,voice_id' });
+
+        return res.json({ success: true });
+      }
+
+      // ── 즐겨찾기 음성 제거 ──
+      case 'favorite-voice-remove': {
+        const { token, voiceId } = params;
+        if (!token || !voiceId) return res.status(400).json({ error: 'token and voiceId required' });
+        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        await supabase.from('c2gen_favorite_voices').delete().eq('email', session.email).eq('voice_id', voiceId);
+        return res.json({ success: true });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }

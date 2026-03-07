@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { GameEvent } from '../types/gamification';
 
 interface EventBannerProps {
@@ -7,19 +8,19 @@ interface EventBannerProps {
 }
 
 /** Calculate remaining time string from now until endAt */
-function getRemainingTime(endAt: string): string {
+function getRemainingTime(endAt: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const now = Date.now();
   const end = new Date(endAt).getTime();
   const diff = end - now;
-  if (diff <= 0) return '종료됨';
+  if (diff <= 0) return t('event.ended');
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
-  if (days > 0) return `${days}일 ${hours}시간 남음`;
-  if (hours > 0) return `${hours}시간 ${minutes}분 남음`;
-  return `${minutes}분 남음`;
+  if (days > 0) return t('event.remainingDaysHours', { days, hours });
+  if (hours > 0) return t('event.remainingHoursMinutes', { hours, minutes });
+  return t('event.remainingMinutes', { minutes });
 }
 
 /** Filter events that are currently active (within start/end range and isActive) */
@@ -34,6 +35,7 @@ function getActiveEvents(events: GameEvent[]): GameEvent[] {
 }
 
 const EventBanner: React.FC<EventBannerProps> = ({ events, isDark }) => {
+  const { t } = useTranslation();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [, setTick] = useState(0);
 
@@ -108,14 +110,14 @@ const EventBanner: React.FC<EventBannerProps> = ({ events, isDark }) => {
 
           {/* Remaining time */}
           <span className="text-white/80 text-[10px] flex-shrink-0 hidden sm:inline">
-            {getRemainingTime(event.endAt)}
+            {getRemainingTime(event.endAt, t)}
           </span>
 
           {/* Dismiss button */}
           <button
             onClick={() => handleDismiss(event.id)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors p-0.5 leading-none w-6 h-6 flex items-center justify-center"
-            aria-label="이벤트 배너 닫기"
+            aria-label={t('common.close')}
             style={{ fontSize: '14px', lineHeight: 1 }}
           >
             &times;

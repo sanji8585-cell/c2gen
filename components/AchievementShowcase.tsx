@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Achievement, AchievementCategory, UserAchievement } from '../types/gamification';
 
 // ── Props ──
@@ -25,6 +26,15 @@ interface CategoryMeta {
   bgColor: string;    // Tailwind background for active tab
   textColor: string;  // Tailwind text for active tab
 }
+
+const CATEGORY_I18N_KEYS: Record<CategoryFilter, string> = {
+  all: 'game.categoryAll',
+  creation: 'game.categoryCreation',
+  exploration: 'game.categoryExploration',
+  dedication: 'game.categoryDedication',
+  mastery: 'game.categoryMastery',
+  hidden: 'game.categoryHidden',
+};
 
 const CATEGORIES: CategoryMeta[] = [
   { key: 'all',         label: '전체',     color: 'blue',   bgColor: 'bg-blue-600',   textColor: 'text-white' },
@@ -131,6 +141,7 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
   achievements,
   isDark,
 }) => {
+  const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
 
   // Inject keyframe styles on mount
@@ -190,12 +201,12 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
                 🏆
               </span>
               <div>
-                <h2 className={`text-xl font-bold ${textPrimary}`}>업적</h2>
+                <h2 className={`text-xl font-bold ${textPrimary}`}>{t('header.achievements')}</h2>
                 <p className={`text-sm ${textSecondary} mt-0.5`}>
                   <span className="font-semibold text-yellow-500">{unlockedCount}</span>
                   {' / '}
                   <span>{totalActive}</span>
-                  {' 업적 달성'}
+                  {' '}{t('game.achievementsUnlocked')}
                 </p>
               </div>
             </div>
@@ -204,7 +215,7 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
             <button
               onClick={onClose}
               className={`p-2 rounded-lg transition-colors ${closeBtnClass}`}
-              aria-label="닫기"
+              aria-label={t('common.close')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -226,7 +237,7 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
                       : tabInactiveBg
                   }`}
                 >
-                  {cat.label}
+                  {t(CATEGORY_I18N_KEYS[cat.key])}
                 </button>
               );
             })}
@@ -238,7 +249,7 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
           {filtered.length === 0 ? (
             <div className={`text-center py-16 ${textMuted}`}>
               <p className="text-4xl mb-3">📭</p>
-              <p className="text-sm">이 카테고리에 업적이 없습니다.</p>
+              <p className="text-sm">{t('game.noAchievementsInCategory')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -265,8 +276,8 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
                       }`}>
                         <span className={`text-2xl ${textMuted}`}>???</span>
                       </div>
-                      <p className={`text-sm font-medium ${textMuted}`}>히든 업적</p>
-                      <p className={`text-xs mt-1 ${textMuted}`}>조건을 달성하면 공개됩니다</p>
+                      <p className={`text-sm font-medium ${textMuted}`}>{t('game.hiddenAchievement')}</p>
+                      <p className={`text-xs mt-1 ${textMuted}`}>{t('game.hiddenAchievementDesc')}</p>
                     </div>
                   );
                 }
@@ -321,7 +332,7 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
                     {!isUnlocked && (
                       <div className="mt-3">
                         <div className="flex items-center justify-between mb-1">
-                          <span className={`text-xs ${textMuted}`}>진행률</span>
+                          <span className={`text-xs ${textMuted}`}>{t('game.progress')}</span>
                           <span className={`text-xs font-medium ${textSecondary}`}>
                             {progress} / {def.conditionTarget}
                           </span>
@@ -352,7 +363,7 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
                               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badgeBg} ${textSecondary}`}
                             >
                               <span className="text-emerald-500">&#9670;</span>
-                              {def.rewardCredits} 크레딧
+                              {def.rewardCredits} {t('common.credits')}
                             </span>
                           )}
                           {(def.rewardGachaTickets ?? 0) > 0 && (
@@ -376,10 +387,10 @@ const AchievementShowcase: React.FC<AchievementShowcaseProps> = ({
                     {/* Rewards preview for in-progress */}
                     {!isUnlocked && (def.rewardXp > 0 || def.rewardCredits > 0) && (
                       <div className={`mt-2 flex items-center gap-2 ${textMuted} text-xs`}>
-                        <span>보상:</span>
+                        <span>{t('game.reward')}:</span>
                         {def.rewardXp > 0 && <span>{def.rewardXp} XP</span>}
                         {def.rewardXp > 0 && def.rewardCredits > 0 && <span>+</span>}
-                        {def.rewardCredits > 0 && <span>{def.rewardCredits} 크레딧</span>}
+                        {def.rewardCredits > 0 && <span>{def.rewardCredits} {t('common.credits')}</span>}
                       </div>
                     )}
                   </div>

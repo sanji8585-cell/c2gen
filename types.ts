@@ -141,7 +141,7 @@ export interface CostBreakdown {
   videoCount: number;  // 생성된 영상 수
 }
 
-// 프로젝트 설정 저장용 타입
+// 프로젝트 설정 저장용 타입 (프리셋)
 export interface ProjectSettings {
   id: string;
   name: string;
@@ -150,10 +150,25 @@ export interface ProjectSettings {
 
   // 이미지 모델 설정
   imageModel: string;
+  // Gemini 화풍
+  geminiStyle?: string;
+  geminiCustomStyle?: string;
+  // GPT 화풍
+  gptStyle?: string;
+  gptCustomStyle?: string;
 
   // TTS 설정
   elevenLabsVoiceId: string;
   elevenLabsModel: string;
+  elevenLabsSpeed?: number;
+  elevenLabsStability?: number;
+
+  // 언어 설정
+  language?: string;
+  // 영상 방향
+  videoOrientation?: string;
+  // 이미지 내 한글 억제
+  suppressKorean?: boolean;
 }
 
 // 생성된 콘텐츠 포함 저장 프로젝트

@@ -10,7 +10,10 @@
       "mcp__ide__getDiagnostics",
       "Bash(wc -l /c/Users/USER/Desktop/자동화컨텐츠AI/자동화컨텐츠/services/*.ts)",
       "Bash(xargs grep -l \"SUPABASE\")",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "Bash(npx vite build)",
+      "Bash(npx vercel --prod)",
+      "Bash(npm install i18next react-i18next)"
     ]
   }
 }

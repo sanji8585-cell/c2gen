@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface AuthGateProps {
   onSuccess: (name: string) => void;
@@ -29,6 +30,7 @@ async function authFetch(body: Record<string, any>) {
 }
 
 const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = 'page', onClose, skipAutoValidation, initialTab }) => {
+  const { t } = useTranslation();
   const isModal = mode === 'modal';
   const [tab, setTab] = useState<Tab>(initialTab || 'login');
   const [loading, setLoading] = useState(true);
@@ -147,7 +149,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
   const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
-    if (!loginEmail || !loginPassword) { setError('이메일과 비밀번호를 입력해주세요.'); return; }
+    if (!loginEmail || !loginPassword) { setError(t('auth.enterEmailPassword')); return; }
     setSubmitting(true);
     try {
       const { ok, data } = await authFetch({ action: 'login', email: loginEmail, password: loginPassword });
@@ -156,20 +158,20 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
         localStorage.setItem(STORAGE_KEYS.USER_NAME, data.name);
         onSuccess(data.name);
       } else {
-        setError(data.message || '로그인에 실패했습니다.');
+        setError(data.message || t('auth.loginFailed'));
       }
-    } catch { setError('서버 연결에 실패했습니다.'); }
+    } catch { setError(t('auth.serverError')); }
     setSubmitting(false);
-  }, [loginEmail, loginPassword, onSuccess]);
+  }, [loginEmail, loginPassword, onSuccess, t]);
 
   // 회원가입 핸들러
   const handleRegister = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
-    if (!regName || !regEmail || !regPassword) { setError('모든 필드를 입력해주세요.'); return; }
-    if (regPassword !== regConfirm) { setError('비밀번호가 일치하지 않습니다.'); return; }
-    if (regPassword.length < 4) { setError('비밀번호는 4자 이상이어야 합니다.'); return; }
-    if (!regTermsAgreed) { setError('이용약관 및 개인정보처리방침에 동의해주세요.'); return; }
+    if (!regName || !regEmail || !regPassword) { setError(t('auth.fillAllFields')); return; }
+    if (regPassword !== regConfirm) { setError(t('auth.passwordMismatch')); return; }
+    if (regPassword.length < 4) { setError(t('auth.passwordTooShort')); return; }
+    if (!regTermsAgreed) { setError(t('auth.agreeTerms')); return; }
     setSubmitting(true);
     try {
       const { ok, data } = await authFetch({ action: 'register', name: regName, email: regEmail, password: regPassword, termsAgreedAt: new Date().toISOString(), marketingAgreed: regMarketingAgreed, referralCode: regReferralCode || undefined });
@@ -178,11 +180,11 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
         setRegName(''); setRegEmail(''); setRegPassword(''); setRegConfirm(''); setRegTermsAgreed(false); setRegMarketingAgreed(false);
         setTimeout(() => setTab('login'), 2000);
       } else {
-        setError(data.message || '회원가입에 실패했습니다.');
+        setError(data.message || t('auth.registerFailed'));
       }
-    } catch { setError('서버 연결에 실패했습니다.'); }
+    } catch { setError(t('auth.serverError')); }
     setSubmitting(false);
-  }, [regName, regEmail, regPassword, regConfirm, regTermsAgreed]);
+  }, [regName, regEmail, regPassword, regConfirm, regTermsAgreed, t]);
 
   // ── 소셜 로그인 핸들러 ──
   const handleOAuthLogin = useCallback(async (provider: 'google' | 'kakao', token: string) => {
@@ -197,22 +199,22 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
       } else if (data.pending) {
         setSuccess(data.message);
       } else {
-        setError(data.message || `${provider} 로그인에 실패했습니다.`);
+        setError(data.message || t('auth.loginFailed'));
       }
     } catch {
-      setError('서버 연결에 실패했습니다.');
+      setError(t('auth.serverError'));
     }
     setSubmitting(false);
-  }, [onSuccess]);
+  }, [onSuccess, t]);
 
   const handleGoogleLogin = useCallback(() => {
     const google = (window as any).google;
     if (!google?.accounts?.id) {
-      setError('Google 로그인 SDK가 로드되지 않았습니다.');
+      setError(t('auth.googleSdkNotLoaded', 'Google login SDK not loaded.'));
       return;
     }
     if (!oauthConfig?.googleClientId) {
-      setError('Google 로그인이 설정되지 않았습니다.');
+      setError(t('auth.googleNotConfigured', 'Google login not configured.'));
       return;
     }
     google.accounts.id.initialize({
@@ -229,11 +231,11 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
   const handleKakaoLogin = useCallback(() => {
     const Kakao = (window as any).Kakao;
     if (!Kakao) {
-      setError('Kakao 로그인 SDK가 로드되지 않았습니다.');
+      setError(t('auth.kakaoSdkNotLoaded', 'Kakao login SDK not loaded.'));
       return;
     }
     if (!oauthConfig?.kakaoJsKey) {
-      setError('Kakao 로그인이 설정되지 않았습니다.');
+      setError(t('auth.kakaoNotConfigured', 'Kakao login not configured.'));
       return;
     }
     if (!Kakao.isInitialized()) {
@@ -244,7 +246,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
         handleOAuthLogin('kakao', authObj.access_token);
       },
       fail: () => {
-        setError('Kakao 로그인이 취소되었습니다.');
+        setError(t('auth.kakaoCancelled', 'Kakao login cancelled.'));
       },
     });
   }, [handleOAuthLogin, oauthConfig]);
@@ -253,7 +255,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
   const handleAdminLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
-    if (!adminPassword) { setError('관리자 비밀번호를 입력해주세요.'); return; }
+    if (!adminPassword) { setError(t('auth.enterAdminPassword', '관리자 비밀번호를 입력해주세요.')); return; }
     setSubmitting(true);
     try {
       const { ok, data } = await authFetch({ action: 'adminLogin', password: adminPassword });
@@ -262,18 +264,18 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
         setAdminPassword('');
         onAdminSuccess(data.token);
       } else {
-        setError(data.message || '관리자 인증에 실패했습니다.');
+        setError(data.message || t('auth.adminAuthFailed', '관리자 인증에 실패했습니다.'));
       }
-    } catch { setError('서버 연결에 실패했습니다.'); }
+    } catch { setError(t('auth.serverError')); }
     setSubmitting(false);
-  }, [adminPassword, onAdminSuccess]);
+  }, [adminPassword, onAdminSuccess, t]);
 
   if (loading) {
     return (
       <div className={isModal ? 'flex items-center justify-center py-16' : 'min-h-screen flex items-center justify-center'} style={isModal ? undefined : { backgroundColor: 'var(--bg-base)' }}>
         <div className="text-center">
           <div className="w-10 h-10 border-3 border-cyan-500 border-t-transparent animate-spin rounded-full mx-auto mb-4"></div>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>인증 확인 중...</p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('auth.verifying', '인증 확인 중...')}</p>
         </div>
       </div>
     );
@@ -299,14 +301,14 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
           <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
             C2 GEN
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>AI 스토리보드 & 영상 자동 생성</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{t('auth.subtitle', 'AI 스토리보드 & 영상 자동 생성')}</p>
         </div>
 
         {/* 탭 전환 (로그인/회원가입만) */}
         <div className="flex rounded-xl overflow-hidden mb-6 border" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 50%, transparent)', borderColor: 'color-mix(in srgb, var(--border-default) 50%, transparent)' }}>
           {[
-            { id: 'login' as Tab, label: '로그인' },
-            { id: 'register' as Tab, label: '회원가입' },
+            { id: 'login' as Tab, label: t('auth.loginTitle') },
+            { id: 'register' as Tab, label: t('auth.registerTitle') },
           ].map(t => (
             <button
               key={t.id}
@@ -357,7 +359,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
         {tab === 'login' && (
           <form onSubmit={handleLogin} className="backdrop-blur-md rounded-2xl border p-6 space-y-4" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-default) 60%, transparent)' }}>
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>이메일</label>
+              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('auth.email', '이메일')}</label>
               <input
                 type="email"
                 value={loginEmail}
@@ -369,12 +371,12 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
               />
             </div>
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>비밀번호</label>
+              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('auth.password', '비밀번호')}</label>
               <input
                 type="password"
                 value={loginPassword}
                 onChange={e => setLoginPassword(e.target.value)}
-                placeholder="비밀번호 입력"
+                placeholder={t('auth.passwordPlaceholder', '비밀번호 입력')}
                 className="w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)', color: 'var(--text-primary)' }}
                 autoComplete="current-password"
@@ -385,7 +387,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
               disabled={submitting}
               className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? '로그인 중...' : '로그인'}
+              {submitting ? t('auth.loggingIn', '로그인 중...') : t('auth.loginTitle')}
             </button>
 
             {/* 소셜 로그인 (설정된 경우에만 표시) */}
@@ -395,7 +397,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                 <div className="w-full border-t" style={{ borderColor: 'var(--border-subtle)' }} />
               </div>
               <div className="relative flex justify-center text-[11px]">
-                <span className="px-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 60%, transparent)', color: 'var(--text-muted)' }}>또는</span>
+                <span className="px-3" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 60%, transparent)', color: 'var(--text-muted)' }}>{t('auth.or', '또는')}</span>
               </div>
             </div>
 
@@ -415,7 +417,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                Google로 로그인
+                {t('auth.googleLogin', 'Google로 로그인')}
               </button>
               )}
               {oauthConfig?.kakaoJsKey && (
@@ -429,7 +431,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#191919">
                   <path d="M12 3C6.48 3 2 6.36 2 10.44c0 2.62 1.75 4.93 4.38 6.24l-1.12 4.12c-.1.36.3.65.62.45l4.84-3.2c.42.04.85.06 1.28.06 5.52 0 10-3.36 10-7.5S17.52 3 12 3z"/>
                 </svg>
-                Kakao로 로그인
+                {t('auth.kakaoLogin', 'Kakao로 로그인')}
               </button>
               )}
             </div>
@@ -441,19 +443,19 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
         {tab === 'register' && (
           <form onSubmit={handleRegister} className="backdrop-blur-md rounded-2xl border p-6 space-y-4" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-default) 60%, transparent)' }}>
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>이름</label>
+              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('auth.name', '이름')}</label>
               <input
                 type="text"
                 value={regName}
                 onChange={e => setRegName(e.target.value)}
-                placeholder="이름 입력"
+                placeholder={t('auth.namePlaceholder', '이름 입력')}
                 className="w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)', color: 'var(--text-primary)' }}
                 autoComplete="name"
               />
             </div>
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>이메일</label>
+              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('auth.email', '이메일')}</label>
               <input
                 type="email"
                 value={regEmail}
@@ -465,24 +467,24 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
               />
             </div>
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>비밀번호</label>
+              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('auth.password', '비밀번호')}</label>
               <input
                 type="password"
                 value={regPassword}
                 onChange={e => setRegPassword(e.target.value)}
-                placeholder="비밀번호 (4자 이상)"
+                placeholder={t('auth.passwordMinLength', '비밀번호 (4자 이상)')}
                 className="w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)', color: 'var(--text-primary)' }}
                 autoComplete="new-password"
               />
             </div>
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>비밀번호 확인</label>
+              <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('auth.confirmPassword', '비밀번호 확인')}</label>
               <input
                 type="password"
                 value={regConfirm}
                 onChange={e => setRegConfirm(e.target.value)}
-                placeholder="비밀번호 재입력"
+                placeholder={t('auth.confirmPasswordPlaceholder', '비밀번호 재입력')}
                 className="w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)', color: 'var(--text-primary)' }}
                 autoComplete="new-password"
@@ -499,11 +501,8 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                   className="mt-0.5 w-4 h-4 accent-cyan-500 cursor-pointer"
                 />
                 <label htmlFor="terms-agree" className="text-[11px] leading-relaxed cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="text-red-400 font-bold mr-0.5">[필수]</span>
-                  <button type="button" onClick={() => setShowTerms(true)} className="text-cyan-500 hover:text-cyan-400 underline underline-offset-2">이용약관</button>
-                  {' 및 '}
-                  <button type="button" onClick={() => setShowTerms(true)} className="text-cyan-500 hover:text-cyan-400 underline underline-offset-2">개인정보처리방침</button>
-                  에 동의합니다.
+                  <span className="text-red-400 font-bold mr-0.5">[{t('auth.required', '필수')}]</span>
+                  {t('auth.termsAgree')}
                 </label>
               </div>
               <div className="flex items-start gap-2">
@@ -515,15 +514,15 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                   className="mt-0.5 w-4 h-4 accent-cyan-500 cursor-pointer"
                 />
                 <label htmlFor="marketing-agree" className="text-[11px] leading-relaxed cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="text-slate-400 font-bold mr-0.5">[선택]</span>
-                  마케팅 및 광고성 정보 수신에 동의합니다.
+                  <span className="text-slate-400 font-bold mr-0.5">[{t('auth.optional', '선택')}]</span>
+                  {t('auth.marketingAgree')}
                 </label>
               </div>
             </div>
 
             {/* 추천 코드 */}
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>추천 코드 (선택)</label>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>{t('auth.referralCode')}</label>
               <input type="text" value={regReferralCode} onChange={e => {
                 const v = e.target.value.toUpperCase();
                 setRegReferralCode(v);
@@ -534,13 +533,13 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                     .then(r => r.json()).then(d => { if (d.valid) setReferrerName(d.referrerName); }).catch(() => {});
                 }
               }}
-                placeholder="추천 코드 입력"
+                placeholder={t('auth.referralCodePlaceholder', '추천 코드 입력')}
                 className="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none"
                 style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
               />
               {referrerName && (
                 <p className="text-[11px] mt-1" style={{ color: '#22c55e' }}>
-                  {referrerName} 님의 추천으로 가입합니다. 가입 승인 시 보너스 크레딧을 받을 수 있어요!
+                  {t('auth.referredBy')} {referrerName}
                 </p>
               )}
             </div>
@@ -550,10 +549,10 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
               disabled={submitting}
               className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? '가입 중...' : '회원가입'}
+              {submitting ? t('auth.registering', '가입 중...') : t('auth.registerTitle')}
             </button>
             <p className="text-[11px] text-center" style={{ color: 'var(--text-muted)' }}>
-              가입 후 관리자 승인이 필요합니다
+              {t('auth.adminApprovalRequired', '가입 후 관리자 승인이 필요합니다')}
             </p>
           </form>
         )}
@@ -563,12 +562,12 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
           <div className="backdrop-blur-md rounded-2xl border p-6" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-default) 60%, transparent)' }}>
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div>
-                <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>관리자 비밀번호</label>
+                <label className="block text-xs mb-1.5" style={{ color: 'var(--text-secondary)' }}>{t('auth.adminPassword')}</label>
                 <input
                   type="password"
                   value={adminPassword}
                   onChange={e => setAdminPassword(e.target.value)}
-                  placeholder="관리자 비밀번호 입력"
+                  placeholder={t('auth.adminPasswordPlaceholder', '관리자 비밀번호 입력')}
                   className="w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
                 style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 60%, transparent)', borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)', color: 'var(--text-primary)' }}
                 />
@@ -578,7 +577,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                 disabled={submitting}
                 className="w-full py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {submitting ? '인증 중...' : '관리자 인증'}
+                {submitting ? t('auth.authenticating', '인증 중...') : t('auth.adminTitle')}
               </button>
             </form>
           </div>
@@ -590,7 +589,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowTerms(false)}>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>이용약관 및 개인정보처리방침</h2>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{t('auth.termsTitle', '이용약관 및 개인정보처리방침')}</h2>
               <button onClick={() => setShowTerms(false)} className="text-slate-400 hover:text-slate-200 text-xl leading-none px-2">&times;</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 text-[12px] leading-relaxed space-y-5" style={{ color: 'var(--text-secondary)' }}>
@@ -704,7 +703,7 @@ const AuthGate: React.FC<AuthGateProps> = ({ onSuccess, onAdminSuccess, mode = '
                 onClick={() => { setRegTermsAgreed(true); setShowTerms(false); }}
                 className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium rounded-lg transition-all"
               >
-                동의하고 닫기
+                {t('auth.agreeAndClose', '동의하고 닫기')}
               </button>
             </div>
           </div>

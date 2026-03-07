@@ -1,8 +1,72 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { LevelInfo, EquippedItems } from '../types/gamification';
 import { getSoundEnabled, setSoundEnabled } from '../services/soundService';
+import { UI_LANGUAGE_KEY } from '../services/i18n';
 import AvatarFrame from './AvatarFrame';
+
+const UI_LANGUAGES = [
+  { code: 'ko', label: '한국어', flag: '🇰🇷' },
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'ja', label: '日本語', flag: '🇯🇵' },
+] as const;
+
+const LanguageToggle: React.FC = () => {
+  const { i18n } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = UI_LANGUAGES.find(l => l.code === i18n.language) || UI_LANGUAGES[0];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const handleChange = (code: string) => {
+    i18n.changeLanguage(code);
+    localStorage.setItem(UI_LANGUAGE_KEY, code);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110 text-sm"
+        style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
+        title="UI Language"
+      >
+        {current.flag}
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-[calc(100%+4px)] rounded-lg shadow-xl border overflow-hidden z-[100]"
+          style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
+        >
+          {UI_LANGUAGES.map(lang => (
+            <button
+              key={lang.code}
+              onClick={() => handleChange(lang.code)}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium transition-colors whitespace-nowrap ${
+                lang.code === i18n.language ? 'text-brand-400' : ''
+              }`}
+              style={lang.code !== i18n.language ? { color: 'var(--text-secondary)' } : undefined}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--bg-elevated)'; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <span>{lang.flag}</span>
+              <span>{lang.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const FourLeafClover: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
   <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -41,12 +105,13 @@ const FourLeafClover: React.FC<{ className?: string }> = ({ className = "w-8 h-8
 
 const SoundToggle: React.FC = () => {
   const [on, setOn] = useState(getSoundEnabled);
+  const { t } = useTranslation();
   return (
     <button
       onClick={() => { const next = !on; setSoundEnabled(next); setOn(next); }}
       className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110"
       style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
-      title={on ? '효과음 끄기' : '효과음 켜기'}
+      title={on ? t('header.soundOn') : t('header.soundOff')}
     >
       {on ? (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ color: 'var(--text-secondary)' }}>
@@ -141,10 +206,11 @@ const Header: React.FC<HeaderProps> = ({
     }
   }, []);
 
+  const { t } = useTranslation();
   const tabs: { key: 'main' | 'gallery' | 'playground'; label: string; count?: number }[] = [
-    { key: 'main', label: '스토리보드 생성' },
-    { key: 'gallery', label: '저장된 프로젝트', count: projectCount },
-    { key: 'playground', label: '놀이터' },
+    { key: 'main', label: t('header.storyboard') },
+    { key: 'gallery', label: t('header.savedProjects'), count: projectCount },
+    { key: 'playground', label: t('header.playground') },
   ];
 
   const lv = levelInfo?.level;
@@ -237,7 +303,7 @@ const Header: React.FC<HeaderProps> = ({
                   onClick={onShowProfile}
                   className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md transition-all hover:brightness-110 cursor-pointer"
                   style={{ backgroundColor: `${lColor}15`, border: `1px solid ${lColor}30` }}
-                  title={`Lv.${lv} — 프로필 보기`}
+                  title={`Lv.${lv} — ${t('header.viewProfile')}`}
                 >
                   <span className="text-[11px] font-bold" style={{ color: lColor }}>
                     {lEmoji} Lv.{lv}
@@ -259,23 +325,26 @@ const Header: React.FC<HeaderProps> = ({
                   border: `1px solid ${plan === 'operator' ? 'rgba(249,115,22,0.25)' : credits <= 10 ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`,
                   color: plan === 'operator' ? '#f97316' : credits <= 10 ? '#ef4444' : '#10b981',
                 }}
-                title={plan === 'operator' ? '운영자 (무제한)' : '크레딧 충전'}
+                title={plan === 'operator' ? t('header.operatorUnlimited') : t('header.creditCharge')}
               >
                 <span>{plan === 'operator' ? '∞' : `💰 ${credits.toLocaleString()}`}</span>
                 {plan === 'operator' && (
-                  <span className="text-[9px] opacity-70">운영자</span>
+                  <span className="text-[9px] opacity-70">{t('header.operator')}</span>
                 )}
               </button>
 
               {/* Sound toggle */}
               <SoundToggle />
 
+              {/* UI Language toggle */}
+              <LanguageToggle />
+
               {/* Theme toggle */}
               <button
                 onClick={onToggleTheme}
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110"
                 style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
-                title={isDark ? '라이트 모드' : '다크 모드'}
+                title={isDark ? t('header.lightMode') : t('header.darkMode')}
               >
                 {isDark ? (
                   <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -334,16 +403,16 @@ const Header: React.FC<HeaderProps> = ({
 
                     {/* Menu items */}
                     <div className="py-1">
-                      <DropdownItem icon="👤" label="프로필" onClick={() => { setShowDropdown(false); onShowProfile?.(); }} isDark={isDark} />
-                      <DropdownItem icon="🎒" label="인벤토리" onClick={() => { setShowDropdown(false); onShowInventory?.(); }} isDark={isDark} />
-                      <DropdownItem icon="🏆" label="업적" onClick={() => { setShowDropdown(false); onShowAchievements?.(); }} isDark={isDark} />
-                      <DropdownItem icon="🏅" label="리더보드" onClick={() => { setShowDropdown(false); onShowLeaderboard?.(); }} isDark={isDark} />
+                      <DropdownItem icon="👤" label={t('header.profile')} onClick={() => { setShowDropdown(false); onShowProfile?.(); }} isDark={isDark} />
+                      <DropdownItem icon="🎒" label={t('header.inventory')} onClick={() => { setShowDropdown(false); onShowInventory?.(); }} isDark={isDark} />
+                      <DropdownItem icon="🏆" label={t('header.achievements')} onClick={() => { setShowDropdown(false); onShowAchievements?.(); }} isDark={isDark} />
+                      <DropdownItem icon="🏅" label={t('header.leaderboard')} onClick={() => { setShowDropdown(false); onShowLeaderboard?.(); }} isDark={isDark} />
                     </div>
 
                     <div className="border-t" style={{ borderColor: 'var(--border-subtle)' }} />
 
                     <div className="py-1">
-                      <DropdownItem icon="🚪" label="로그아웃" onClick={() => { setShowDropdown(false); onLogout?.(); }} isDark={isDark} danger />
+                      <DropdownItem icon="🚪" label={t('common.logout')} onClick={() => { setShowDropdown(false); onLogout?.(); }} isDark={isDark} danger />
                     </div>
                   </div>
                 )}
@@ -351,13 +420,14 @@ const Header: React.FC<HeaderProps> = ({
             </>
           ) : (
             <>
-              {/* Not authenticated: sound + theme + login button */}
+              {/* Not authenticated: sound + language + theme + login button */}
               <SoundToggle />
+              <LanguageToggle />
               <button
                 onClick={onToggleTheme}
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-110"
                 style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
-                title={isDark ? '라이트 모드' : '다크 모드'}
+                title={isDark ? t('header.lightMode') : t('header.darkMode')}
               >
                 {isDark ? (
                   <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -374,7 +444,7 @@ const Header: React.FC<HeaderProps> = ({
                 onClick={onShowAuthModal}
                 className="text-[12px] px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg transition-all font-bold"
               >
-                로그인
+                {t('common.login')}
               </button>
             </>
           )}

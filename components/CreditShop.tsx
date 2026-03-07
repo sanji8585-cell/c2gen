@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CREDIT_CONFIG } from '../config';
 import type { CreditTransaction } from '../types';
 
@@ -11,6 +12,7 @@ interface CreditShopProps {
 type Tab = 'packs' | 'plans' | 'history';
 
 const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, currentPlan }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>('packs');
   const [history, setHistory] = useState<CreditTransaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -81,9 +83,9 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
         return;
       }
 
-      setMessage({ type: 'error', text: '결제 준비에 실패했습니다.' });
+      setMessage({ type: 'error', text: t('creditShop.paymentPrepareFailed', '결제 준비에 실패했습니다.') });
     } catch (e: any) {
-      setMessage({ type: 'error', text: e.message || '결제 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: e.message || t('creditShop.paymentError', '결제 오류가 발생했습니다.') });
     } finally {
       setProcessing(false);
     }
@@ -105,15 +107,15 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-default)' }}>
           <div>
             <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>
-              {currentPlan === 'operator' ? '운영자 계정' : '크레딧 충전'}
+              {currentPlan === 'operator' ? t('creditShop.operatorTitle') : t('creditShop.title')}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
               {currentPlan === 'operator' ? (
-                <span className="font-bold text-orange-400">크레딧 무제한 (운영자)</span>
+                <span className="font-bold text-orange-400">{t('creditShop.unlimitedCredits')} ({t('header.operator')})</span>
               ) : (
                 <>
-                  현재 잔액: <span className={`font-bold ${currentCredits <= 10 ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {currentCredits.toLocaleString()} 크레딧
+                  {t('creditShop.currentBalance')}: <span className={`font-bold ${currentCredits <= 10 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {currentCredits.toLocaleString()} {t('creditShop.credits')}
                   </span>
                   {currentPlan !== 'free' && (
                     <span className="ml-2 px-1.5 py-0.5 bg-brand-500/20 text-brand-400 rounded text-[9px] font-bold uppercase">
@@ -141,24 +143,24 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>운영자 계정</h3>
-            <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>모든 기능을 크레딧 차감 없이 무제한 사용할 수 있습니다.</p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>4K 해상도, 워터마크 제거 등 프로 기능 전체 포함</p>
+            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{t('creditShop.operatorTitle')}</h3>
+            <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.operatorDesc')}</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('creditShop.operatorFeatures')}</p>
           </div>
         ) : (
         <>
         {/* 탭 */}
         <div className="flex border-b px-4" style={{ borderColor: 'var(--border-default)' }}>
           <button className={tabClass('packs')} onClick={() => setActiveTab('packs')} style={activeTab !== 'packs' ? { color: 'var(--text-secondary)' } : undefined}>
-            크레딧 팩
+            {t('creditShop.packs')}
             {activeTab === 'packs' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />}
           </button>
           <button className={tabClass('plans')} onClick={() => setActiveTab('plans')} style={activeTab !== 'plans' ? { color: 'var(--text-secondary)' } : undefined}>
-            구독 요금제
+            {t('creditShop.plans')}
             {activeTab === 'plans' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />}
           </button>
           <button className={tabClass('history')} onClick={() => setActiveTab('history')} style={activeTab !== 'history' ? { color: 'var(--text-secondary)' } : undefined}>
-            사용 내역
+            {t('creditShop.history')}
             {activeTab === 'history' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500" />}
           </button>
         </div>
@@ -192,12 +194,12 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                     <div className="text-left">
                       <div className="font-bold" style={{ color: 'var(--text-primary)' }}>{pack.label}</div>
                       <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        1크레딧 = {(pack.price_krw / pack.credits).toFixed(1)}원
+                        1{t('creditShop.credits')} = {(pack.price_krw / pack.credits).toFixed(1)}{t('creditShop.won')}
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="font-black text-lg text-brand-400">
-                        {pack.price_krw.toLocaleString()}원
+                        {pack.price_krw.toLocaleString()}{t('creditShop.won')}
                       </div>
                     </div>
                   </button>
@@ -207,7 +209,7 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
               {/* 결제 수단 */}
               {selectedPack && (
                 <div className="space-y-3 pt-2">
-                  <div className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>결제 수단</div>
+                  <div className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.paymentMethod')}</div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setPaymentMethod('toss')}
@@ -218,8 +220,8 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                       }`}
                       style={paymentMethod !== 'toss' ? { borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' } : undefined}
                     >
-                      토스페이먼츠
-                      <div className="text-[10px] opacity-60 mt-0.5">카드/카카오/네이버/토스</div>
+                      {t('creditShop.toss')}
+                      <div className="text-[10px] opacity-60 mt-0.5">{t('creditShop.tossDesc')}</div>
                     </button>
                     <button
                       onClick={() => setPaymentMethod('stripe')}
@@ -231,7 +233,7 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                       style={paymentMethod !== 'stripe' ? { borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' } : undefined}
                     >
                       Stripe
-                      <div className="text-[10px] opacity-60 mt-0.5">해외 카드/PayPal</div>
+                      <div className="text-[10px] opacity-60 mt-0.5">{t('creditShop.stripeDesc')}</div>
                     </button>
                   </div>
 
@@ -240,20 +242,20 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                     disabled={processing}
                     className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-black text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {processing ? '처리 중...' : `${CREDIT_CONFIG.PACKS.find(p => p.id === selectedPack)?.price_krw.toLocaleString()}원 결제하기`}
+                    {processing ? t('creditShop.processing') : `${CREDIT_CONFIG.PACKS.find(p => p.id === selectedPack)?.price_krw.toLocaleString()}${t('creditShop.won')} ${t('creditShop.purchase')}`}
                   </button>
                 </div>
               )}
 
               {/* 크레딧 비용 안내 */}
               <div className="mt-4 p-3 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' }}>
-                <div className="text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>크레딧 사용 안내</div>
+                <div className="text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.usageGuide')}</div>
                 <div className="grid grid-cols-2 gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  <div>스크립트 생성: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>5 크레딧</span></div>
-                  <div>이미지 (Gemini): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>16 크레딧</span></div>
-                  <div>이미지 (GPT): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>21 크레딧</span></div>
-                  <div>TTS (1000자): <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>15 크레딧</span></div>
-                  <div>영상 변환: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>73 크레딧</span></div>
+                  <div>{t('creditShop.scriptGen')}: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>5 {t('creditShop.credits')}</span></div>
+                  <div>{t('creditShop.imageGemini', 'Image (Gemini)')}: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>16 {t('creditShop.credits')}</span></div>
+                  <div>{t('creditShop.imageGpt', 'Image (GPT)')}: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>21 {t('creditShop.credits')}</span></div>
+                  <div>{t('creditShop.ttsPerK')}: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>15 {t('creditShop.credits')}</span></div>
+                  <div>{t('creditShop.videoConvert')}: <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>73 {t('creditShop.credits')}</span></div>
                 </div>
               </div>
             </div>
@@ -279,23 +281,23 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                         <span className="font-black" style={{ color: 'var(--text-primary)' }}>{plan.name}</span>
                         {isCurrentPlan && (
                           <span className="ml-2 px-2 py-0.5 bg-brand-500/20 text-brand-400 rounded text-[10px] font-bold">
-                            현재 플랜
+                            {t('creditShop.currentPlan')}
                           </span>
                         )}
                       </div>
                       <div className="text-right">
                         {plan.price_krw === 0 ? (
-                          <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>무료</span>
+                          <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.free')}</span>
                         ) : (
                           <span className="font-black text-lg text-brand-400">
-                            {plan.price_krw.toLocaleString()}원<span className="text-xs font-normal" style={{ color: 'var(--text-secondary)' }}>/월</span>
+                            {plan.price_krw.toLocaleString()}{t('creditShop.won')}<span className="text-xs font-normal" style={{ color: 'var(--text-secondary)' }}>{t('creditShop.perMonth', '/월')}</span>
                           </span>
                         )}
                       </div>
                     </div>
                     {plan.monthly_credits > 0 && (
                       <div className="text-sm text-emerald-400 font-bold mb-1">
-                        매월 {plan.monthly_credits.toLocaleString()} 크레딧
+                        {t('creditShop.monthlyCredits', { count: plan.monthly_credits.toLocaleString() })}
                       </div>
                     )}
                     <ul className="space-y-0.5">
@@ -308,9 +310,9 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                     {!isCurrentPlan && plan.price_krw > 0 && (
                       <button
                         className="mt-3 w-full py-2 rounded-lg bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 text-xs font-bold border border-brand-500/30 transition-all"
-                        onClick={() => setMessage({ type: 'error', text: '구독 기능은 준비 중입니다. 크레딧 팩을 이용해주세요.' })}
+                        onClick={() => setMessage({ type: 'error', text: t('creditShop.subscriptionNotReady') })}
                       >
-                        {plan.name} 구독하기
+                        {plan.name} {t('creditShop.subscribe', '구독하기')}
                       </button>
                     )}
                   </div>
@@ -323,9 +325,9 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
           {activeTab === 'history' && (
             <div>
               {historyLoading ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>로딩 중...</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</div>
               ) : history.length === 0 ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>사용 내역이 없습니다.</div>
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('creditShop.noHistory')}</div>
               ) : (
                 <div className="space-y-1">
                   {history.map(tx => (
@@ -340,7 +342,7 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                         <div className={`text-sm font-bold ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {tx.amount > 0 ? '+' : ''}{tx.amount}
                         </div>
-                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tx.balance_after.toLocaleString()} 잔액</div>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tx.balance_after.toLocaleString()} {t('creditShop.balance')}</div>
                       </div>
                     </div>
                   ))}

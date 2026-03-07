@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { InventoryItem, EquippedItems, Rarity } from '../types/gamification';
 import AvatarFrame from './AvatarFrame';
 
@@ -19,7 +20,7 @@ interface InventoryModalProps {
   gachaTickets: number;
   onEquipItem: (slot: 'title' | 'badge' | 'frame', itemId: string | null) => void;
   onUseConsumable: (inventoryItemId: string) => void;
-  onPullGacha: () => void;
+  onPullGacha: () => Promise<void>;
   isDark: boolean;
 }
 
@@ -33,25 +34,35 @@ const RARITY_COLORS: Record<Rarity, string> = {
   legendary: '#ef4444',
 };
 
-const RARITY_LABELS: Record<Rarity, string> = {
-  common: '일반',
-  uncommon: '고급',
-  rare: '희귀',
-  epic: '영웅',
-  legendary: '전설',
+const RARITY_LABEL_KEYS: Record<Rarity, string> = {
+  common: 'game.rarityCommon',
+  uncommon: 'game.rarityUncommon',
+  rare: 'game.rarityRare',
+  epic: 'game.rarityEpic',
+  legendary: 'game.rarityLegendary',
 };
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'titles', label: '칭호', icon: '🏷️' },
-  { key: 'badges', label: '뱃지', icon: '🎖️' },
-  { key: 'frames', label: '프레임', icon: '🖼️' },
-  { key: 'consumables', label: '소모품', icon: '🧪' },
-  { key: 'gacha', label: '뽑기', icon: '🎰' },
-];
+const TAB_LABEL_KEYS: Record<TabKey, string> = {
+  titles: 'game.title',
+  badges: 'game.badge',
+  frames: 'game.frame',
+  consumables: 'game.consumable',
+  gacha: 'game.gacha',
+};
+
+const TAB_ICONS: Record<TabKey, string> = {
+  titles: '🏷️',
+  badges: '🎖️',
+  frames: '🖼️',
+  consumables: '🧪',
+  gacha: '🎰',
+};
+
+const TAB_ORDER: TabKey[] = ['titles', 'badges', 'frames', 'consumables', 'gacha'];
 
 // ── 서브 컴포넌트 ──
 
-const RarityBadge: React.FC<{ rarity: Rarity }> = ({ rarity }) => (
+const RarityBadge: React.FC<{ rarity: Rarity; label: string }> = ({ rarity, label }) => (
   <span
     className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase leading-none"
     style={{
@@ -60,7 +71,7 @@ const RarityBadge: React.FC<{ rarity: Rarity }> = ({ rarity }) => (
       border: `1px solid ${RARITY_COLORS[rarity]}40`,
     }}
   >
-    {RARITY_LABELS[rarity]}
+    {label}
   </span>
 );
 
@@ -110,7 +121,10 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
   onPullGacha,
   isDark,
 }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabKey>('titles');
+
+  const getRarityLabel = (rarity: Rarity) => t(RARITY_LABEL_KEYS[rarity]);
 
   // 탭별 아이템 정렬: 장착 중 우선, 전설 우선
   const RARITY_ORDER: Record<Rarity, number> = useMemo(
@@ -225,7 +239,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
 
         {/* 희귀도 + 수량 */}
         <div className="flex items-center gap-1.5">
-          <RarityBadge rarity={item.rarity} />
+          <RarityBadge rarity={item.rarity} label={getRarityLabel(item.rarity)} />
           {item.quantity > 1 && (
             <span
               className="text-[10px] font-bold"
@@ -300,7 +314,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
               }
             }}
           >
-            {isEquipped ? '해제' : '장착'}
+            {isEquipped ? t('game.unequip') : t('game.equip')}
           </button>
         )}
 
@@ -320,7 +334,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
               (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(34,197,94,0.12)';
             }}
           >
-            사용
+            {t('game.use')}
           </button>
         )}
       </div>
@@ -330,10 +344,10 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
   // 빈 상태 렌더링
   const renderEmptyState = (tabKey: TabKey) => {
     const messages: Record<TabKey, { icon: string; text: string }> = {
-      titles: { icon: '🏷️', text: '획득한 칭호가 없습니다.\n업적 달성이나 뽑기를 통해 칭호를 얻어보세요!' },
-      badges: { icon: '🎖️', text: '획득한 뱃지가 없습니다.\n다양한 활동으로 뱃지를 수집해보세요!' },
-      frames: { icon: '🖼️', text: '획득한 프레임이 없습니다.\n뽑기에서 특별한 프레임을 얻어보세요!' },
-      consumables: { icon: '🧪', text: '보유한 소모품이 없습니다.\n뽑기를 통해 부스터 아이템을 얻어보세요!' },
+      titles: { icon: '🏷️', text: t('game.emptyTitles', '획득한 칭호가 없습니다.\n업적 달성이나 뽑기를 통해 칭호를 얻어보세요!') },
+      badges: { icon: '🎖️', text: t('game.emptyBadges', '획득한 뱃지가 없습니다.\n다양한 활동으로 뱃지를 수집해보세요!') },
+      frames: { icon: '🖼️', text: t('game.emptyFrames', '획득한 프레임이 없습니다.\n뽑기에서 특별한 프레임을 얻어보세요!') },
+      consumables: { icon: '🧪', text: t('game.emptyConsumables', '보유한 소모품이 없습니다.\n뽑기를 통해 부스터 아이템을 얻어보세요!') },
       gacha: { icon: '🎰', text: '' },
     };
     const msg = messages[tabKey];
@@ -350,6 +364,32 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
     );
   };
 
+  // 뽑기 상태
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullCountdown, setPullCountdown] = useState<string | null>(null);
+
+  const handlePull = async () => {
+    if (isPulling || gachaTickets <= 0) return;
+    setIsPulling(true);
+    setPullCountdown(t('game.pullCountdown1'));
+
+    // 카드 뒤집기 연출 (0.6초)
+    await new Promise(r => setTimeout(r, 600));
+    setPullCountdown(t('game.pullCountdown2'));
+
+    // API 호출 + 최소 대기 시간 (연출감을 위해)
+    const [resultPromise] = [onPullGacha()];
+    await Promise.all([resultPromise, new Promise(r => setTimeout(r, 800))]);
+
+    setPullCountdown(t('game.pullCountdown3'));
+    await new Promise(r => setTimeout(r, 400));
+
+    // 인벤토리 모달 닫기 → GameOverlay가 결과를 보여줌
+    setIsPulling(false);
+    setPullCountdown(null);
+    onClose();
+  };
+
   // 뽑기 탭 렌더링
   const renderGachaTab = () => (
     <div className="flex flex-col items-center gap-6 py-8">
@@ -357,73 +397,116 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
       <div
         className="relative w-32 h-32 rounded-2xl flex items-center justify-center"
         style={{
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 50%, #f59e0b 100%)',
-          boxShadow: '0 0 40px rgba(139,92,246,0.3), 0 0 80px rgba(236,72,153,0.15)',
+          background: isPulling
+            ? 'linear-gradient(135deg, #f59e0b 0%, #ef4444 50%, #8b5cf6 100%)'
+            : 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 50%, #f59e0b 100%)',
+          boxShadow: isPulling
+            ? '0 0 60px rgba(245,158,11,0.5), 0 0 120px rgba(139,92,246,0.3)'
+            : '0 0 40px rgba(139,92,246,0.3), 0 0 80px rgba(236,72,153,0.15)',
+          transition: 'all 0.5s ease',
         }}
       >
-        <span className="text-6xl animate-bounce">🎰</span>
+        <span
+          className="text-6xl select-none"
+          style={{
+            animation: isPulling
+              ? 'spin 0.3s linear infinite'
+              : 'bounce 1s ease-in-out infinite',
+            display: 'inline-block',
+          }}
+        >
+          {isPulling ? '✨' : '🎰'}
+        </span>
         <div
-          className="absolute inset-0 rounded-2xl animate-pulse"
+          className="absolute inset-0 rounded-2xl"
           style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.1), transparent)',
+            animation: isPulling ? 'pulse 0.5s ease-in-out infinite' : 'pulse 2s ease-in-out infinite',
           }}
         />
+        {/* 뽑기 중 빛나는 테두리 */}
+        {isPulling && (
+          <div
+            className="absolute -inset-1 rounded-2xl pointer-events-none"
+            style={{
+              background: 'conic-gradient(from 0deg, #8b5cf6, #ec4899, #f59e0b, #22c55e, #3b82f6, #8b5cf6)',
+              borderRadius: '18px',
+              zIndex: -1,
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+        )}
       </div>
 
-      {/* 티켓 수 */}
-      <div className="flex flex-col items-center gap-1">
-        <span className="text-sm font-medium" style={{ color: textSecondary }}>
-          보유 뽑기권
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🎫</span>
-          <span
-            className="text-3xl font-black tabular-nums"
-            style={{
-              color: gachaTickets > 0 ? '#8b5cf6' : textSecondary,
-            }}
-          >
-            {gachaTickets}
-          </span>
-          <span className="text-sm font-medium" style={{ color: textSecondary }}>
-            장
-          </span>
+      {/* 뽑기 중 메시지 */}
+      {pullCountdown && (
+        <div
+          className="text-sm font-bold tracking-wider"
+          style={{
+            color: '#f59e0b',
+            animation: 'pulse 0.8s ease-in-out infinite',
+          }}
+        >
+          {pullCountdown}
         </div>
-      </div>
+      )}
+
+      {/* 티켓 수 */}
+      {!isPulling && (
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-sm font-medium" style={{ color: textSecondary }}>
+            {t('game.ticketsOwned')}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🎫</span>
+            <span
+              className="text-3xl font-black tabular-nums"
+              style={{
+                color: gachaTickets > 0 ? '#8b5cf6' : textSecondary,
+              }}
+            >
+              {gachaTickets}
+            </span>
+            <span className="text-sm font-medium" style={{ color: textSecondary }}>
+              {t('game.ticketUnit')}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 뽑기 버튼 */}
       <button
-        onClick={onPullGacha}
-        disabled={gachaTickets <= 0}
+        onClick={handlePull}
+        disabled={gachaTickets <= 0 || isPulling}
         className="relative px-8 py-3.5 rounded-xl text-base font-bold text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
-          background: gachaTickets > 0
+          background: gachaTickets > 0 && !isPulling
             ? 'linear-gradient(135deg, #8b5cf6, #ec4899)'
             : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-          boxShadow: gachaTickets > 0
+          boxShadow: gachaTickets > 0 && !isPulling
             ? '0 4px 20px rgba(139,92,246,0.4)'
             : 'none',
           color: gachaTickets > 0 ? '#ffffff' : textSecondary,
         }}
         onMouseEnter={(e) => {
-          if (gachaTickets > 0) {
+          if (gachaTickets > 0 && !isPulling) {
             (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
             (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 30px rgba(139,92,246,0.5)';
           }
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-          if (gachaTickets > 0) {
+          if (gachaTickets > 0 && !isPulling) {
             (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px rgba(139,92,246,0.4)';
           }
         }}
       >
-        1회 뽑기
+        {isPulling ? t('game.pulling') : t('game.pullGacha')}
       </button>
 
-      {gachaTickets <= 0 && (
+      {gachaTickets <= 0 && !isPulling && (
         <p className="text-xs text-center" style={{ color: textSecondary }}>
-          뽑기권이 부족합니다. 레벨업, 업적 달성, 출석 보상으로 획득할 수 있습니다.
+          {t('game.noTickets')}
         </p>
       )}
 
@@ -439,7 +522,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
           className="text-xs font-bold mb-3 text-center uppercase tracking-wider"
           style={{ color: textSecondary }}
         >
-          등급별 확률
+          {t('game.probabilityTitle')}
         </h4>
         <div className="flex flex-col gap-2">
           {(
@@ -458,7 +541,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
                   style={{ backgroundColor: RARITY_COLORS[rarity] }}
                 />
                 <span className="text-xs font-medium" style={{ color: textPrimary }}>
-                  {RARITY_LABELS[rarity]}
+                  {getRarityLabel(rarity)}
                 </span>
               </div>
               <span
@@ -533,16 +616,16 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             {/* 프레임 미리보기 */}
             <div className="flex flex-col items-center gap-1 min-w-[72px]" style={{ padding: 8, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', border: equipped.frame ? '2px solid #f59e0b' : `1px dashed ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}` }}>
-              <span className="text-[10px] font-medium opacity-50 uppercase tracking-wider">프레임</span>
+              <span className="text-[10px] font-medium opacity-50 uppercase tracking-wider">{t('game.frame')}</span>
               <AvatarFrame name="ME" size={36} rarity={equipped.frame?.rarity} frameName={equipped.frame?.name} />
               <span className="text-[11px] font-medium text-center leading-tight truncate max-w-[64px]">{equipped.frame?.name || <span className="opacity-30">비어있음</span>}</span>
             </div>
-            <EquippedSlot label="칭호" item={equipped.title} isDark={isDark} />
+            <EquippedSlot label={t('game.title')} item={equipped.title} isDark={isDark} />
             {/* 뱃지 슬롯들 (최대 3개 표시) */}
             {[0, 1, 2].map((idx) => (
               <EquippedSlot
                 key={`badge-slot-${idx}`}
-                label={`뱃지${idx + 1}`}
+                label={`${t('game.badge')}${idx + 1}`}
                 item={equipped.badges[idx] || null}
                 isDark={isDark}
               />
@@ -555,12 +638,12 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
           className="flex shrink-0 overflow-x-auto"
           style={{ borderBottom: `1px solid ${borderColor}` }}
         >
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.key;
+          {TAB_ORDER.map((tabKey) => {
+            const isActive = activeTab === tabKey;
             let count: number;
-            if (tab.key === 'gacha') {
+            if (tabKey === 'gacha') {
               count = gachaTickets;
-            } else if (tab.key === 'consumables') {
+            } else if (tabKey === 'consumables') {
               const now = new Date();
               count = (inventory.consumables || []).filter(item => {
                 const isExpired = item.activeUntil ? new Date(item.activeUntil) <= now : false;
@@ -569,12 +652,12 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
                 return true;
               }).length;
             } else {
-              count = (inventory[tab.key as keyof typeof inventory] || []).length;
+              count = (inventory[tabKey as keyof typeof inventory] || []).length;
             }
             return (
               <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                key={tabKey}
+                onClick={() => setActiveTab(tabKey)}
                 className="relative flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-150"
                 style={{
                   color: isActive ? '#8b5cf6' : textSecondary,
@@ -596,8 +679,8 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
                   }
                 }}
               >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
+                <span>{TAB_ICONS[tabKey]}</span>
+                <span>{t(TAB_LABEL_KEYS[tabKey])}</span>
                 {count > 0 && (
                   <span
                     className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none"
