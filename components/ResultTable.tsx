@@ -615,6 +615,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [saveMenuPos, setSaveMenuPos] = useState({ top: 0, right: 0 });
   const [autoZoomPattern, setAutoZoomPattern] = useState('');
   const [showMobileSettings, setShowMobileSettings] = useState(false);
+  const [showMobileSaveMenu, setShowMobileSaveMenu] = useState(false);
   const [expandedCardPrompt, setExpandedCardPrompt] = useState<number | null>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -712,15 +713,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             </button>
-            <button
-              onClick={() => {
-                if (!showSaveMenu && saveButtonRef.current) {
-                  const rect = saveButtonRef.current.getBoundingClientRect();
-                  setSaveMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
-                }
-                setShowSaveMenu(!showSaveMenu);
-              }}
-              ref={saveButtonRef}
+            <button onClick={() => setShowMobileSaveMenu(true)}
               className="h-10 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-brand-600 text-white">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
               {t('common.save')}
@@ -815,6 +808,50 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   <option value="wipeRight">{t('result.wipeRight')}</option>
                 </select>
               </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══ 모바일 저장 바텀시트 ═══ */}
+      {showMobileSaveMenu && (
+        <>
+          <div className="md:hidden fixed inset-0 z-[9990] bg-black/50" onClick={() => setShowMobileSaveMenu(false)} />
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9991] rounded-t-2xl border-t" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('common.save')}</span>
+              <button onClick={() => setShowMobileSaveMenu(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="py-2">
+              <button onClick={() => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowMobileSaveMenu(false); }}
+                className="w-full px-5 py-3.5 text-left text-sm font-semibold flex items-center gap-3 active:bg-[var(--bg-hover)]" style={{ color: 'var(--text-primary)' }}>
+                <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                {t('result.excelImages')}
+              </button>
+              <button onClick={async () => { await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowMobileSaveMenu(false); }}
+                className="w-full px-5 py-3.5 text-left text-sm font-semibold flex items-center gap-3 active:bg-[var(--bg-hover)]" style={{ color: 'var(--text-primary)' }}>
+                <svg className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                SRT
+              </button>
+              <div className="my-1 border-t mx-4" style={{ borderColor: 'var(--border-default)' }} />
+              <button onClick={() => { onExportVideo?.(false, currentSubtitleConfig, sceneGap, selectedResolution); setShowMobileSaveMenu(false); }}
+                disabled={isExporting}
+                className="w-full px-5 py-3.5 text-left text-sm font-semibold flex items-center gap-3 active:bg-[var(--bg-hover)] disabled:opacity-40" style={{ color: 'var(--text-primary)' }}>
+                {isExporting
+                  ? <div className="w-5 h-5 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
+                  : <svg className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+                {t('result.mp4NoSub')}
+              </button>
+              <button onClick={() => { onExportVideo?.(true, currentSubtitleConfig, sceneGap, selectedResolution); setShowMobileSaveMenu(false); }}
+                disabled={isExporting}
+                className="w-full px-5 py-3.5 text-left text-sm font-bold flex items-center gap-3 active:bg-[var(--bg-hover)] disabled:opacity-40 text-brand-400">
+                {isExporting
+                  ? <div className="w-5 h-5 border-2 border-t-transparent animate-spin rounded-full flex-shrink-0" style={{ borderColor: 'var(--text-muted)', borderTopColor: 'transparent' }} />
+                  : <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+                {t('result.mp4WithSub')}
+              </button>
             </div>
           </div>
         </>
