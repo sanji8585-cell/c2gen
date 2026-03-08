@@ -1457,7 +1457,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'admin-inquiryStats': {
-        const adminToken = params.adminToken || params.token || token;
+        const adminToken = params.adminToken || params.token;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
 
         const [totalRes, openRes, repliedRes, closedRes] = await Promise.all([
@@ -1477,7 +1477,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'admin-listInquiries': {
-        const adminToken = params.adminToken || params.token || token;
+        const adminToken = params.adminToken || params.token;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
 
         const { page = 0, limit: ilimit = 20, status: iStatus, category: iCategory, search: iSearch } = params;
@@ -1498,7 +1498,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'admin-replyInquiry': {
-        const adminToken = params.adminToken || params.token || token;
+        const adminToken = params.adminToken || params.token;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
 
         const { inquiryId, reply } = params;
@@ -1515,7 +1515,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'admin-closeInquiry': {
-        const adminToken = params.adminToken || params.token || token;
+        const adminToken = params.adminToken || params.token;
         if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
 
         const { inquiryId } = params;

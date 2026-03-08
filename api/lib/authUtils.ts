@@ -111,10 +111,12 @@ export async function logUsage(
   action: string,
   cost: number
 ): Promise<void> {
-  await supabase.from('usage_logs').insert({
-    email,
-    action,
-    cost_usd: cost,
-    created_at: new Date().toISOString(),
-  }).catch(() => {});
+  try {
+    await supabase.from('usage_logs').insert({
+      email,
+      action,
+      cost_usd: cost,
+      created_at: new Date().toISOString(),
+    });
+  } catch {};
 }
