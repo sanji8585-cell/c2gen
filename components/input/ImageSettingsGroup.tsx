@@ -49,6 +49,7 @@ const cardBase: React.CSSProperties = {
   cursor: 'pointer',
   transition: 'all 0.2s',
   textAlign: 'left' as const,
+  outline: 'none',
 };
 
 const cardSelected: React.CSSProperties = {
@@ -68,6 +69,7 @@ const chipBase: React.CSSProperties = {
   cursor: 'pointer',
   transition: 'all 0.2s',
   textAlign: 'center' as const,
+  outline: 'none',
 };
 
 const chipSelected: React.CSSProperties = {
