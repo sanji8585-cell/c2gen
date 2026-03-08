@@ -536,7 +536,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       try {
         const tkn = localStorage.getItem('c2gen_session_token');
         if (tkn) {
-          fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          fetch('/api/gamification', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'game-recordAction', token: tkn, actionType: 'share_project', count: 1 }) }).catch(() => {});
         }
       } catch {}
