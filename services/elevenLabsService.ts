@@ -163,17 +163,19 @@ export const generateAudioWithElevenLabs = async (
         estimatedDuration = character_end_times_seconds[character_end_times_seconds.length - 1] + 0.3;
       }
 
-      // 자막 의미 청킹을 비동기로 처리 (오디오 반환을 블로킹하지 않음)
-      const chunkingPromise = createMeaningChunks(text, words).then(meaningChunks => {
-        if (meaningChunks.length > 0) {
-          subtitleData!.meaningChunks = meaningChunks;
+      // 자막 의미 청킹 — 최대 2초 타임아웃 (타임아웃 시 백그라운드 작업 취소)
+      try {
+        const timeoutPromise = new Promise<null>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000));
+        const meaningChunks = await Promise.race([
+          createMeaningChunks(text, words),
+          timeoutPromise
+        ]);
+        if (meaningChunks && meaningChunks.length > 0) {
+          subtitleData.meaningChunks = meaningChunks;
         }
-      }).catch(e => {
-        console.warn('[ElevenLabs] AI 자막 분리 실패, 단어 기반 방식 사용:', e);
-      });
-
-      // 청킹 완료를 기다리되 최대 2초만 (넘으면 백그라운드 처리)
-      await Promise.race([chunkingPromise, new Promise(r => setTimeout(r, 2000))]);
+      } catch (e) {
+        // Timeout or error — proceed without meaning chunks (word-based subtitles used instead)
+      }
     }
 
     return { audioData: audioBase64, subtitleData, estimatedDuration };

@@ -92,6 +92,8 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
 
   // 컴포넌트 마운트 시 저장된 설정 로드
   useEffect(() => {
+    const controller = new AbortController();
+
     const savedVoiceId = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID) || '';
     const savedModelId = getElevenLabsModelId();
 
@@ -108,6 +110,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'favorite-voice-list', token }),
+        signal: controller.signal,
       })
         .then(r => r.json())
         .then(d => {
@@ -118,6 +121,8 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
         })
         .catch(() => {});
     }
+
+    return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

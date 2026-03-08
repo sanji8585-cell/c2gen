@@ -126,6 +126,15 @@ const AudioPlayer: React.FC<{ base64: string }> = memo(({ base64 }) => {
     } catch (error) { console.error(error); setIsPlaying(false); }
   };
 
+  useEffect(() => {
+    return () => {
+      stopAudio();
+      audioContextRef.current?.close();
+      audioContextRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <button onClick={playAudio} className={`p-2.5 rounded-full border transition-all ${isPlaying ? 'bg-brand-600 border-brand-500 text-white animate-pulse' : 'hover:text-[var(--text-primary)]'}`} style={isPlaying ? undefined : { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
       {isPlaying
@@ -565,7 +574,7 @@ const TableRow: React.FC<TableRowProps> = memo(({
 
 TableRow.displayName = 'TableRow';
 
-const ResultTable: React.FC<ResultTableProps> = ({
+const ResultTable = React.memo<ResultTableProps>(({
   data,
   editingIndex,
   onEditToggle,
@@ -1482,6 +1491,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
     </div>
     </>
   );
-};
+});
+ResultTable.displayName = 'ResultTable';
 
 export default ResultTable;

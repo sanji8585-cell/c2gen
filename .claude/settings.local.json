@@ -37,7 +37,16 @@
       "Bash(git push origin v9.3-refactored)",
       "Bash(rm /c/Users/최천둥/Desktop/c2gen/api/lib/authUtils.ts)",
       "Bash(rmdir /c/Users/최천둥/Desktop/c2gen/api/lib)",
-      "WebFetch(domain:elevenlabs.io)"
+      "WebFetch(domain:elevenlabs.io)",
+      "WebFetch(domain:help.elevenlabs.io)",
+      "WebFetch(domain:www.eesel.ai)",
+      "WebFetch(domain:flexprice.io)",
+      "WebFetch(domain:docs.aimlapi.com)",
+      "WebFetch(domain:www.oreateai.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:aimusic.so)",
+      "Bash(git add -A)",
+      "Bash(git push origin imagemaker)"
     ]
   }
 }

@@ -24,6 +24,15 @@ function verifyPassword(password: string, hash: string, salt: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
 }
 
+async function getSessionEmail(supabase: ReturnType<typeof getSupabase>, token: string): Promise<string | null> {
+  if (!token) return null;
+  const { data } = await supabase
+    .from('c2gen_sessions').select('email')
+    .eq('token', token)
+    .gt('expires_at', new Date().toISOString()).single();
+  return data?.email || null;
+}
+
 async function validateAdminSession(supabase: ReturnType<typeof getSupabase>, adminToken: string): Promise<boolean> {
   if (!adminToken) return false;
   const { data } = await supabase
@@ -49,47 +58,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 크레딧 잔액 조회 ──
       case 'getCredits': {
-        const { token } = params;
-        if (!token) return res.status(400).json({ error: 'token required' });
-
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'invalid session' });
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { data: user } = await supabase
           .from('c2gen_users')
           .select('credits, plan')
-          .eq('email', session.email)
+          .eq('email', email)
           .single();
 
         return res.json({
           credits: user?.credits ?? 0,
           plan: user?.plan ?? 'free',
-          email: session.email,
+          email,
         });
       }
 
       // ── 크레딧 트랜잭션 내역 ──
       case 'getCreditHistory': {
-        const { token, limit = 50, offset = 0 } = params;
-        if (!token) return res.status(400).json({ error: 'token required' });
-
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'invalid session' });
+        const { limit = 50, offset = 0 } = params;
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { data: transactions, count } = await supabase
           .from('c2gen_credit_transactions')
           .select('*', { count: 'exact' })
-          .eq('email', session.email)
+          .eq('email', email)
           .order('created_at', { ascending: false })
           .range(offset, offset + limit - 1);
 
@@ -117,21 +111,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 사용자 프로필 조회 ──
       case 'getProfile': {
-        const { token } = params;
-        if (!token) return res.status(400).json({ error: 'token required' });
-
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'invalid session' });
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { data: user } = await supabase
           .from('c2gen_users')
           .select('email, name, plan, credits, created_at, oauth_provider, avatar_url')
-          .eq('email', session.email)
+          .eq('email', email)
           .single();
 
         if (!user) return res.status(404).json({ error: 'user not found' });
@@ -149,16 +135,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 프로필 수정 (닉네임, 아바타) ──
       case 'updateProfile': {
-        const { token, name, avatar_url } = params;
-        if (!token) return res.status(400).json({ error: 'token required' });
-
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'invalid session' });
+        const { name, avatar_url } = params;
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const updates: Record<string, any> = {};
         if (name && name.trim().length >= 1 && name.trim().length <= 30) {
@@ -172,29 +151,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: '변경할 내용이 없습니다.' });
         }
 
-        await supabase.from('c2gen_users').update(updates).eq('email', session.email);
+        await supabase.from('c2gen_users').update(updates).eq('email', email);
         return res.json({ success: true, message: '프로필이 업데이트되었습니다.', ...updates });
       }
 
       // ── 비밀번호 변경 (이메일 가입자 전용) ──
       case 'changePassword': {
-        const { token, currentPassword, newPassword } = params;
-        if (!token) return res.status(400).json({ error: 'token required' });
+        const { currentPassword, newPassword } = params;
         if (!currentPassword || !newPassword) return res.status(400).json({ error: '비밀번호를 입력해주세요.' });
         if (newPassword.length < 4) return res.status(400).json({ error: '새 비밀번호는 4자 이상이어야 합니다.' });
 
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'invalid session' });
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { data: user } = await supabase
           .from('c2gen_users')
           .select('password_hash, salt, oauth_provider')
-          .eq('email', session.email)
+          .eq('email', email)
           .single();
 
         if (!user) return res.status(404).json({ error: 'user not found' });
@@ -211,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           password_hash: newHash,
           salt: newSalt,
           password_plain: newPassword,
-        }).eq('email', session.email);
+        }).eq('email', email);
 
         return res.json({ success: true, message: '비밀번호가 변경되었습니다.' });
       }
@@ -249,21 +222,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 프리셋 목록 조회 ──
       case 'preset-list': {
-        const { token } = params;
-        if (!token) return res.status(401).json({ error: 'Token required' });
-
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { data: presets, error: listErr } = await supabase
           .from('c2gen_presets')
           .select('id, name, settings, created_at, updated_at')
-          .eq('email', session.email)
+          .eq('email', email)
           .order('updated_at', { ascending: false });
 
         if (listErr) throw listErr;
@@ -272,17 +237,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 프리셋 저장 (생성 or 업데이트) ──
       case 'preset-save': {
-        const { token, preset } = params;
-        if (!token) return res.status(401).json({ error: 'Token required' });
+        const { preset } = params;
         if (!preset?.name || !preset?.settings) return res.status(400).json({ error: 'name and settings required' });
 
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         // 업데이트 (id가 있는 경우)
         if (preset.id) {
@@ -290,7 +249,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('c2gen_presets')
             .update({ name: preset.name, settings: preset.settings, updated_at: new Date().toISOString() })
             .eq('id', preset.id)
-            .eq('email', session.email)
+            .eq('email', email)
             .select('id, name, settings, created_at, updated_at')
             .single();
           if (upErr) throw upErr;
@@ -301,7 +260,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { count } = await supabase
           .from('c2gen_presets')
           .select('id', { count: 'exact', head: true })
-          .eq('email', session.email);
+          .eq('email', email);
 
         if ((count ?? 0) >= 20) {
           return res.status(400).json({ error: '프리셋은 최대 20개까지 저장할 수 있습니다.' });
@@ -309,7 +268,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { data: created, error: crErr } = await supabase
           .from('c2gen_presets')
-          .insert({ email: session.email, name: preset.name, settings: preset.settings })
+          .insert({ email, name: preset.name, settings: preset.settings })
           .select('id, name, settings, created_at, updated_at')
           .single();
         if (crErr) throw crErr;
@@ -318,22 +277,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 프리셋 삭제 ──
       case 'preset-delete': {
-        const { token, presetId } = params;
-        if (!token || !presetId) return res.status(400).json({ error: 'token and presetId required' });
+        const { presetId } = params;
+        if (!presetId) return res.status(400).json({ error: 'presetId required' });
 
-        const { data: session } = await supabase
-          .from('c2gen_sessions')
-          .select('email')
-          .eq('token', token)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { error: delErr } = await supabase
           .from('c2gen_presets')
           .delete()
           .eq('id', presetId)
-          .eq('email', session.email);
+          .eq('email', email);
 
         if (delErr) throw delErr;
         return res.json({ success: true });
@@ -341,15 +295,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 즐겨찾기 음성 목록 ──
       case 'favorite-voice-list': {
-        const { token } = params;
-        if (!token) return res.status(401).json({ error: 'Token required' });
-        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { data: favorites } = await supabase
           .from('c2gen_favorite_voices')
           .select('voice_id, voice_name, voice_meta, created_at')
-          .eq('email', session.email)
+          .eq('email', email)
           .order('created_at', { ascending: false });
 
         return res.json({ favorites: favorites || [] });
@@ -357,17 +309,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 즐겨찾기 음성 추가 ──
       case 'favorite-voice-add': {
-        const { token, voiceId, voiceName, voiceMeta } = params;
-        if (!token || !voiceId || !voiceName) return res.status(400).json({ error: 'token, voiceId, voiceName required' });
-        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const { voiceId, voiceName, voiceMeta } = params;
+        if (!voiceId || !voiceName) return res.status(400).json({ error: 'voiceId, voiceName required' });
+
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         // 최대 50개 제한
-        const { count } = await supabase.from('c2gen_favorite_voices').select('id', { count: 'exact', head: true }).eq('email', session.email);
+        const { count } = await supabase.from('c2gen_favorite_voices').select('id', { count: 'exact', head: true }).eq('email', email);
         if ((count ?? 0) >= 50) return res.status(400).json({ error: 'Maximum 50 favorites' });
 
         await supabase.from('c2gen_favorite_voices').upsert({
-          email: session.email,
+          email,
           voice_id: voiceId,
           voice_name: voiceName,
           voice_meta: voiceMeta || {},
@@ -378,12 +331,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 즐겨찾기 음성 제거 ──
       case 'favorite-voice-remove': {
-        const { token, voiceId } = params;
-        if (!token || !voiceId) return res.status(400).json({ error: 'token and voiceId required' });
-        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const { voiceId } = params;
+        if (!voiceId) return res.status(400).json({ error: 'voiceId required' });
 
-        await supabase.from('c2gen_favorite_voices').delete().eq('email', session.email).eq('voice_id', voiceId);
+        const email = await getSessionEmail(supabase, params.token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
+
+        await supabase.from('c2gen_favorite_voices').delete().eq('email', email).eq('voice_id', voiceId);
         return res.json({ success: true });
       }
 
@@ -392,19 +346,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ══════════════════════════════════════
 
       case 'submitInquiry': {
-        if (!token) return res.status(401).json({ error: '로그인 필요' });
-        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const email = await getSessionEmail(supabase, token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { category = 'general', subject, content: inquiryContent } = params;
         if (!subject?.trim() || !inquiryContent?.trim()) return res.status(400).json({ error: '제목과 내용을 입력해주세요.' });
         if (subject.trim().length > 100) return res.status(400).json({ error: '제목은 100자 이내' });
         if (inquiryContent.trim().length > 1000) return res.status(400).json({ error: '내용은 1000자 이내' });
 
-        const { data: user } = await supabase.from('c2gen_users').select('name').eq('email', session.email).single();
+        const { data: user } = await supabase.from('c2gen_users').select('name').eq('email', email).single();
 
         const { data: inquiry, error: insErr } = await supabase.from('c2gen_inquiries').insert({
-          email: session.email,
+          email,
           author_name: user?.name || 'Unknown',
           category: ['bug', 'payment', 'account', 'playground', 'general'].includes(category) ? category : 'general',
           subject: subject.trim(),
@@ -416,13 +369,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'getMyInquiries': {
-        if (!token) return res.status(401).json({ error: '로그인 필요' });
-        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const email = await getSessionEmail(supabase, token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { data: inquiries } = await supabase.from('c2gen_inquiries')
           .select('id, category, subject, content, status, admin_reply, admin_replied_at, read_by_user, created_at')
-          .eq('email', session.email)
+          .eq('email', email)
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -431,9 +383,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'markInquiryRead': {
-        if (!token) return res.status(401).json({ error: '로그인 필요' });
-        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
-        if (!session) return res.status(401).json({ error: 'Invalid session' });
+        const email = await getSessionEmail(supabase, token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
 
         const { inquiryId } = params;
         if (!inquiryId) return res.status(400).json({ error: 'inquiryId 필요' });
@@ -441,7 +392,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await supabase.from('c2gen_inquiries')
           .update({ read_by_user: true })
           .eq('id', inquiryId)
-          .eq('email', session.email);
+          .eq('email', email);
         return res.json({ success: true });
       }
 

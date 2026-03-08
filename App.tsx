@@ -171,11 +171,14 @@ const AppContent: React.FC<{
   // Konami
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiRef = useRef<string[]>([]);
+  const avatarLoadedRef = useRef(false);
+  const sessionComboRef = useRef(0);
   // 항상 최신 game 상태를 ref로 유지 (stale closure 방지)
   const gameRef = useRef({ isAuthenticated, synced: game.synced, recordAction: game.recordAction, setOverlayAchievement });
   useEffect(() => {
     gameRef.current = { isAuthenticated, synced: game.synced, recordAction: game.recordAction, setOverlayAchievement };
   });
+  useEffect(() => { sessionComboRef.current = sessionCombo; }, [sessionCombo]);
 
   const fetchCredits = useCallback(async () => {
     const token = localStorage.getItem('c2gen_session_token');
@@ -190,9 +193,9 @@ const AppContent: React.FC<{
       if (d.credits !== undefined) setUserCredits(d.credits);
       if (d.plan) setUserPlan(d.plan);
       // 아바타 URL 로드 (프로필 API)
-      if (!userAvatarUrl) {
+      if (!avatarLoadedRef.current) {
         fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getProfile', token }) })
-          .then(r => r.json()).then(p => { if (p.avatarUrl) setUserAvatarUrl(p.avatarUrl); }).catch(() => {});
+          .then(r => r.json()).then(p => { if (p.avatarUrl) { setUserAvatarUrl(p.avatarUrl); avatarLoadedRef.current = true; } }).catch(() => {});
       }
     } catch { /* ignore */ }
   }, []);
@@ -779,7 +782,7 @@ const AppContent: React.FC<{
         // 서버에 recordAction → 모든 결과를 응답으로 받음
         const result = await recordNow('generation_complete', 1, {
           imageCount: imgCount, audioCount, videoCount,
-          sessionCombo: sessionCombo + 1,
+          sessionCombo: sessionComboRef.current + 1,
         });
         if (result) {
           const newLvl = result.newLevel ?? result.oldLevel;
@@ -834,7 +837,7 @@ const AppContent: React.FC<{
             cost: { ...costRef.current },
             sceneCount: assetsRef.current.length,
             xpGained: result.xpGained || 0,
-            combo: sessionCombo + 1,
+            combo: sessionComboRef.current + 1,
             elapsedSeconds: elapsed,
             questProgress: questTotal > 0 ? { completed: questCompleted, total: questTotal } : undefined,
             gachaTickets: result.gachaResult ? 1 : undefined,
@@ -846,7 +849,7 @@ const AppContent: React.FC<{
             cost: { ...costRef.current },
             sceneCount: assetsRef.current.length,
             xpGained: 0,
-            combo: sessionCombo + 1,
+            combo: sessionComboRef.current + 1,
             elapsedSeconds: elapsed,
           });
         }
@@ -857,7 +860,7 @@ const AppContent: React.FC<{
           cost: { ...costRef.current },
           sceneCount: assetsRef.current.length,
           xpGained: 0,
-          combo: sessionCombo + 1,
+          combo: sessionComboRef.current + 1,
           elapsedSeconds: elapsed,
         });
       }
