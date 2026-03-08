@@ -1099,16 +1099,7 @@ const AppContent: React.FC<{
       const costMsg = `이미지 ${cost.imageCount}장 ${formatKRW(cost.images)} + TTS ${cost.ttsCharacters}자 ${formatKRW(cost.tts)} = 총 ${formatKRW(cost.total)}`;
       setProgressMessage(`${t('progress.generationComplete')} ${costMsg}`);
 
-      // 자동 저장 (비용 정보 포함)
-      try {
-        console.log(`[App] 프로젝트 저장 시도: topic="${targetTopic}", assets=${assetsRef.current.length}개`);
-        const savedProject = await saveProject(targetTopic, assetsRef.current, undefined, costRef.current);
-        refreshProjects();
-        setProgressMessage(`${t('progress.projectSaved', { name: savedProject.name })} | ${costMsg}`);
-      } catch (e: any) {
-        console.error('프로젝트 자동 저장 실패:', e);
-        setProgressMessage(`${t('progress.projectSaveFailed', { error: e.message })} | ${costMsg}`);
-      }
+      // 자동 저장 비활성화 — 사용자가 "프로젝트 저장" 버튼으로 수동 저장
 
     } catch (error: any) {
       if (!isAbortedRef.current) {
@@ -1246,8 +1237,7 @@ const AppContent: React.FC<{
         // 영상 비용 추가
         addCost('video', PRICING.VIDEO.perVideo, 1);
         setProgressMessage(`씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`);
-        // 영상 변환 후 자동 저장
-        try { await saveProject(currentTopic, assetsRef.current, undefined, costRef.current); refreshProjects(); } catch {}
+        // 자동 저장 비활성화 — 사용자가 "프로젝트 저장" 버튼으로 수동 저장
         // 영상 퀘스트 진행
         const { isAuthenticated: authV, synced: syncV, recordAction: recordV } = gameRef.current;
         if (authV && syncV) recordV('generation_complete', 1, { videoCount: 1 }).catch(() => {});

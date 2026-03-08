@@ -1137,12 +1137,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
           {/* 프로젝트 저장 */}
           {onSaveProject && (
             <button onClick={handleSaveProject} disabled={savingProject}
-              className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                saveSuccess ? 'bg-green-500/20 border-green-500/40 text-green-400'
-                : savingProject ? 'opacity-60 cursor-wait border-brand-500/40'
-                : 'hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]'
-              }`}
-              style={saveSuccess || savingProject ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
+              className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
+                saveSuccess ? 'bg-green-600 text-white shadow-green-900/20'
+                : savingProject ? 'bg-amber-600 text-white opacity-80 cursor-wait shadow-amber-900/20'
+                : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-900/20'
+              }`}>
               {savingProject ? (
                 <div className="w-3.5 h-3.5 border-2 border-brand-400 border-t-transparent animate-spin rounded-full" />
               ) : saveSuccess ? (
