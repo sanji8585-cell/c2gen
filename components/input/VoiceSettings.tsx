@@ -371,27 +371,38 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
         className="w-full flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
           </div>
-          <div>
-            <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>🎤 나레이션 음성 설정</h3>
-            <p className="text-xs flex flex-wrap items-center gap-x-1" style={{ color: 'var(--text-muted)' }}>
-              <span>{LANGUAGE_CONFIG[language].name}</span>
-              <span>·</span>
-              <span style={{ color: 'var(--text-secondary)' }}>{getSelectedVoiceInfo().name}</span>
-              <span>·</span>
-              <span>{ELEVENLABS_MODELS.find(m => m.id === elModelId)?.name || elModelId}</span>
-              {elSpeed !== 1.0 && <><span>·</span><span className="text-purple-400">{elSpeed.toFixed(2)}x</span></>}
-              {elStability !== 0.6 && <><span>·</span><span className="text-purple-400">{Math.round(elStability * 100)}%</span></>}
-            </p>
-          </div>
+          <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>🎤 나레이션 음성 설정</h3>
         </div>
-        <svg className={`w-5 h-5 transition-transform ${showElevenLabsSettings ? 'rotate-180' : ''}`} style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+              background: 'rgba(96,165,250,0.12)', color: '#93c5fd',
+            }}>{LANGUAGE_CONFIG[language].name}</span>
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+              background: 'var(--bg-hover)', color: 'var(--text-primary)',
+            }}>{getSelectedVoiceInfo().name}</span>
+            <span style={{
+              fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6,
+              background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+            }}>{ELEVENLABS_MODELS.find(m => m.id === elModelId)?.name || elModelId}</span>
+            {elSpeed !== 1.0 && (
+              <span style={{
+                fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6,
+                background: 'rgba(96,165,250,0.1)', color: '#60a5fa',
+              }}>{elSpeed.toFixed(2)}x</span>
+            )}
+          </div>
+          <svg className={`w-5 h-5 transition-transform flex-shrink-0 ${showElevenLabsSettings ? 'rotate-180' : ''}`} style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
       </button>
 
       {showElevenLabsSettings && (
@@ -407,7 +418,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                   onClick={() => onLanguageChange(lang)}
                   className={`p-2 rounded-xl border text-center transition-all text-xs font-bold ${
                     language === lang
-                      ? 'bg-purple-600/20 border-purple-500'
+                      ? 'bg-blue-600/20 border-blue-500'
                       : 'hover:opacity-80'
                   }`}
                   style={language === lang ? { color: 'var(--text-primary)' } : { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
@@ -418,7 +429,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
             </div>
             {language !== 'ko' && (
               <div className="mt-2 px-3 py-1.5 rounded-lg text-[10px]" style={{ backgroundColor: 'rgba(139,92,246,0.08)', color: 'var(--text-secondary)' }}>
-                <span className="text-purple-400 font-bold">TIP</span>
+                <span className="text-blue-400 font-bold">TIP</span>
                 {language === 'en'
                   ? ' — 영어 나레이션에는 Rachel(여), Adam(남) + Multilingual v2 모델 추천'
                   : ' — 일본어 나레이션에는 Rachel(여), Adam(남) + Multilingual v2 모델 추천'}
@@ -430,7 +441,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
           <div ref={voiceDropdownRef} className="relative">
             <label className="block text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>
               음성 선택
-              <span className="text-purple-400 ml-2 font-normal">
+              <span className="text-blue-400 ml-2 font-normal">
                 (프리메이드 {ELEVENLABS_DEFAULT_VOICES.length}개 + 라이브러리 수천 개)
               </span>
             </label>
@@ -439,11 +450,11 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
             <button
               type="button"
               onClick={() => setShowVoiceDropdown(!showVoiceDropdown)}
-              className="w-full rounded-xl px-4 py-3 text-left flex items-center justify-between hover:border-purple-500/50 transition-colors"
+              className="w-full rounded-xl px-4 py-3 text-left flex items-center justify-between hover:border-blue-500/50 transition-colors"
               style={{ backgroundColor: 'var(--bg-elevated)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)' }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
@@ -467,7 +478,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                     type="button"
                     onClick={() => setVoiceTab('premade')}
                     className={`flex-1 px-3 py-2.5 text-xs font-bold transition-all ${
-                      voiceTab === 'premade' ? 'text-purple-400 border-b-2 border-purple-400' : ''
+                      voiceTab === 'premade' ? 'text-blue-400 border-b-2 border-blue-400' : ''
                     }`}
                     style={voiceTab === 'premade' ? { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' } : { color: 'var(--text-muted)' }}
                   >
@@ -506,18 +517,18 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                         value={voiceSearchQuery}
                         onChange={(e) => setVoiceSearchQuery(e.target.value)}
                         placeholder="이름, 억양, 설명으로 검색..."
-                        className="w-full rounded-lg px-3 py-2 text-xs focus:border-purple-500 focus:outline-none placeholder:text-[var(--text-muted)]"
+                        className="w-full rounded-lg px-3 py-2 text-xs focus:border-blue-500 focus:outline-none placeholder:text-[var(--text-muted)]"
                         style={{ backgroundColor: 'var(--bg-surface)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
                       />
                       {/* 성별 필터 */}
                       <div className="flex gap-1">
                         <button type="button" onClick={() => setGenderFilter(null)}
-                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === null ? 'bg-purple-600 text-white' : 'hover:opacity-80'}`}
+                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === null ? 'bg-blue-600 text-white' : 'hover:opacity-80'}`}
                           style={genderFilter === null ? undefined : { backgroundColor: 'color-mix(in srgb, var(--bg-hover) 50%, transparent)', color: 'var(--text-secondary)' }}>
                           전체
                         </button>
                         <button type="button" onClick={() => setGenderFilter('female')}
-                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'female' ? 'bg-pink-600 text-white' : 'hover:opacity-80'}`}
+                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'female' ? 'bg-blue-600 text-white' : 'hover:opacity-80'}`}
                           style={genderFilter === 'female' ? undefined : { backgroundColor: 'color-mix(in srgb, var(--bg-hover) 50%, transparent)', color: 'var(--text-secondary)' }}>
                           여성
                         </button>
@@ -530,7 +541,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                       {/* 연령 필터 */}
                       <div className="flex gap-1">
                         <button type="button" onClick={() => setAgeFilter(null)}
-                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${ageFilter === null ? 'bg-purple-600 text-white' : 'hover:opacity-80'}`}
+                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${ageFilter === null ? 'bg-blue-600 text-white' : 'hover:opacity-80'}`}
                           style={ageFilter === null ? undefined : { backgroundColor: 'color-mix(in srgb, var(--bg-hover) 50%, transparent)', color: 'var(--text-secondary)' }}>
                           전 연령
                         </button>
@@ -558,7 +569,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                       <button
                         type="button"
                         onClick={() => { setElVoiceId(''); setShowVoiceDropdown(false); }}
-                        className={`w-full px-4 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors ${!elVoiceId ? 'bg-purple-600/20' : ''}`}
+                        className={`w-full px-4 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors ${!elVoiceId ? 'bg-blue-600/20' : ''}`}
                         style={{ borderBottom: '1px solid var(--border-default)' }}
                       >
                         <div className="font-bold text-sm" style={{ color: 'var(--text-secondary)' }}>기본값 (Rachel)</div>
@@ -575,7 +586,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                       {filteredDefaultVoices.map((voice) => (
                         <div
                           key={voice.id}
-                          className={`flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors ${elVoiceId === voice.id ? 'bg-purple-600/20' : ''}`}
+                          className={`flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors ${elVoiceId === voice.id ? 'bg-blue-600/20' : ''}`}
                           style={{ borderBottom: '1px solid color-mix(in srgb, var(--border-default) 50%, transparent)' }}
                         >
                           {/* 미리듣기 버튼 */}
@@ -584,8 +595,8 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                             onClick={(e) => playDefaultVoicePreview(e, voice)}
                             className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                               playingVoiceId === voice.id
-                                ? 'bg-purple-500 text-white animate-pulse'
-                                : 'hover:bg-purple-600 hover:text-white'
+                                ? 'bg-blue-500 text-white animate-pulse'
+                                : 'hover:bg-blue-600 hover:text-white'
                             }`}
                             style={playingVoiceId === voice.id ? undefined : { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                             title="미리듣기"
@@ -628,7 +639,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                           </button>
 
                           {elVoiceId === voice.id && (
-                            <div className="text-purple-400 flex-shrink-0">
+                            <div className="text-blue-400 flex-shrink-0">
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
                             </div>
                           )}
@@ -646,7 +657,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                           {filteredApiVoices.map((voice) => (
                             <div
                               key={voice.voice_id}
-                              className={`flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors ${elVoiceId === voice.voice_id ? 'bg-purple-600/20' : ''}`}
+                              className={`flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors ${elVoiceId === voice.voice_id ? 'bg-blue-600/20' : ''}`}
                               style={{ borderBottom: '1px solid color-mix(in srgb, var(--border-default) 50%, transparent)' }}
                             >
                               <button type="button" onClick={(e) => playVoicePreview(e, voice)}
@@ -667,7 +678,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                                 </div>
                               </button>
                               {elVoiceId === voice.voice_id && (
-                                <div className="text-purple-400"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg></div>
+                                <div className="text-blue-400"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg></div>
                               )}
                             </div>
                           ))}
@@ -704,7 +715,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                           전체
                         </button>
                         <button type="button" onClick={() => { setGenderFilter('female'); searchLibrary(librarySearch, 0, 'female'); }}
-                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'female' ? 'bg-pink-600 text-white' : 'hover:opacity-80'}`}
+                          className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all ${genderFilter === 'female' ? 'bg-blue-600 text-white' : 'hover:opacity-80'}`}
                           style={genderFilter === 'female' ? undefined : { backgroundColor: 'color-mix(in srgb, var(--bg-hover) 50%, transparent)', color: 'var(--text-secondary)' }}>
                           여성
                         </button>
@@ -844,7 +855,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                         return (
                           <div
                             key={fav.voice_id}
-                            className={`flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors ${elVoiceId === fav.voice_id ? 'bg-purple-600/20' : ''}`}
+                            className={`flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors ${elVoiceId === fav.voice_id ? 'bg-blue-600/20' : ''}`}
                             style={{ borderBottom: '1px solid color-mix(in srgb, var(--border-default) 50%, transparent)' }}
                           >
                             {/* 미리듣기 */}
@@ -852,7 +863,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                               type="button"
                               onClick={(e) => { e.stopPropagation(); playVoicePreviewWithApi(fav.voice_id, fav.voice_name); }}
                               className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                                playingVoiceId === fav.voice_id ? 'bg-purple-500 text-white animate-pulse' : 'hover:bg-purple-600 hover:text-white'
+                                playingVoiceId === fav.voice_id ? 'bg-blue-500 text-white animate-pulse' : 'hover:bg-blue-600 hover:text-white'
                               }`}
                               style={playingVoiceId === fav.voice_id ? undefined : { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
                             >
@@ -900,7 +911,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                             </button>
 
                             {elVoiceId === fav.voice_id && (
-                              <div className="text-purple-400 flex-shrink-0">
+                              <div className="text-blue-400 flex-shrink-0">
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
                               </div>
                             )}
@@ -934,14 +945,14 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                         value={elVoiceId}
                         onChange={(e) => setElVoiceId(e.target.value)}
                         placeholder="Voice ID를 붙여넣으세요..."
-                        className="flex-1 rounded-lg px-3 py-2 text-xs focus:border-purple-500 focus:outline-none font-mono placeholder:text-[var(--text-muted)]"
+                        className="flex-1 rounded-lg px-3 py-2 text-xs focus:border-blue-500 focus:outline-none font-mono placeholder:text-[var(--text-muted)]"
                         style={{ backgroundColor: 'var(--bg-surface)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
                       />
                       <button
                         type="button"
                         onClick={() => { if (elVoiceId.trim()) setShowVoiceDropdown(false); }}
                         disabled={!elVoiceId.trim()}
-                        className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
                       >
                         적용
                       </button>
@@ -965,7 +976,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                   onClick={() => setElModelId(model.id)}
                   className={`p-2.5 rounded-xl border text-left transition-all ${
                     elModelId === model.id
-                      ? 'bg-purple-600/20 border-purple-500'
+                      ? 'bg-blue-600/20 border-blue-500'
                       : 'hover:opacity-80'
                   }`}
                   style={elModelId === model.id ? { color: 'var(--text-primary)' } : { backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
@@ -994,7 +1005,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                 </svg>
                 상세설정 <span className="font-normal opacity-60">(음성속도 / 리듬 안정성)</span>
                 {(elSpeed !== 1.0 || elStability !== 0.6) && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold">커스텀</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold">커스텀</span>
                 )}
               </span>
               <svg className={`w-4 h-4 transition-transform ${showDetailedSettings ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1008,7 +1019,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>음성 속도</label>
-                    <span className="text-xs font-black text-purple-400">{elSpeed.toFixed(2)}x</span>
+                    <span className="text-xs font-black text-blue-400">{elSpeed.toFixed(2)}x</span>
                   </div>
                   <input
                     type="range"
@@ -1017,7 +1028,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                     step="0.05"
                     value={elSpeed}
                     onChange={(e) => setElSpeed(parseFloat(e.target.value))}
-                    className="w-full accent-purple-500"
+                    className="w-full accent-blue-500"
                   />
                   <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
                     <span>0.7x (느림)</span>
@@ -1030,7 +1041,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>리듬 안정성</label>
-                    <span className="text-xs font-black text-purple-400">{Math.round(elStability * 100)}%</span>
+                    <span className="text-xs font-black text-blue-400">{Math.round(elStability * 100)}%</span>
                   </div>
                   <input
                     type="range"
@@ -1039,7 +1050,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                     step="0.05"
                     value={elStability}
                     onChange={(e) => setElStability(parseFloat(e.target.value))}
-                    className="w-full accent-purple-500"
+                    className="w-full accent-blue-500"
                   />
                   <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
                     <span>낮음 (자연스러운 강약)</span>
@@ -1057,7 +1068,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
           <button
             type="button"
             onClick={saveElevenLabsSettings}
-            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
           >
             설정 저장
           </button>

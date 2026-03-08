@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { GeneratedAsset, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
 import { downloadSrt } from '../services/srtService';
 import { exportAssetsToZip } from '../services/exportService';
-import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier, canAccessResolution, getVideoResolution, setVideoResolution, BGM_LIBRARY, BGM_MOODS } from '../config';
+import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier, canAccessResolution, getVideoResolution, setVideoResolution, BGM_LIBRARY, BGM_MOODS, CREDIT_CONFIG } from '../config';
+import { generateMusicWithElevenLabs } from '../services/elevenLabsService';
 import PreviewPlayer from './PreviewPlayer';
 
 interface ResultTableProps {
@@ -669,6 +670,24 @@ const ResultTable = React.memo<ResultTableProps>(({
     e.target.value = '';
   };
 
+  const [generatingBgm, setGeneratingBgm] = useState(false);
+  const handleAiBgm = async (mood?: string) => {
+    if (generatingBgm) return;
+    setGeneratingBgm(true);
+    try {
+      const result = await generateMusicWithElevenLabs(mood || 'calm', 30000);
+      if (result.audioBase64) {
+        onBgmChange?.(result.audioBase64);
+      } else {
+        console.warn('[AI BGM]', result.error);
+      }
+    } catch (e) {
+      console.error('[AI BGM] Failed:', e);
+    } finally {
+      setGeneratingBgm(false);
+    }
+  };
+
   const handleDragStart = useCallback((idx: number) => { dragIndexRef.current = idx; }, []);
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); }, []);
   const handleDrop = useCallback((toIdx: number) => {
@@ -835,13 +854,27 @@ const ResultTable = React.memo<ResultTableProps>(({
               <div>
                 <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--text-muted)' }}>BGM</label>
                 <select className="w-full h-11 px-3 rounded-lg text-sm border bg-purple-500/10 text-purple-300 border-purple-500/30" value=""
+                  disabled={generatingBgm}
                   onChange={async (e) => {
-                    const track = BGM_LIBRARY.find(t => t.id === e.target.value);
-                    if (!track) return;
-                    try { const r = await fetch(track.url); if (!r.ok) return; const b = await r.blob(); const reader = new FileReader(); reader.onloadend = () => { onBgmChange?.((reader.result as string).split(',')[1]); }; reader.readAsDataURL(b); } catch {}
+                    const val = e.target.value;
+                    if (!val) return;
+                    if (val.startsWith('ai-')) {
+                      handleAiBgm(val.slice(3));
+                    } else {
+                      const track = BGM_LIBRARY.find(t => t.id === val);
+                      if (!track) return;
+                      try { const r = await fetch(track.url); if (!r.ok) return; const b = await r.blob(); const reader = new FileReader(); reader.onloadend = () => { onBgmChange?.((reader.result as string).split(',')[1]); }; reader.readAsDataURL(b); } catch {}
+                    }
                   }}>
-                  <option>{bgmData ? t('result.bgmSelected') : 'BGM'}</option>
-                  {BGM_LIBRARY.map(track => (<option key={track.id} value={track.id}>{BGM_MOODS[track.mood]?.emoji} {track.name}</option>))}
+                  <option>{generatingBgm ? t('result.aiBgmGenerating', 'AI BGM 생성중...') : bgmData ? t('result.bgmSelected') : 'BGM'}</option>
+                  <optgroup label={`AI BGM (${CREDIT_CONFIG.COSTS.bgm_generation}${t('result.credits', '크레딧')})`}>
+                    {Object.entries(BGM_MOODS).map(([key, { emoji, label }]) => (
+                      <option key={`ai-${key}`} value={`ai-${key}`}>{emoji} {label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={`BGM ${t('result.free', '무료')}`}>
+                    {BGM_LIBRARY.map(track => (<option key={track.id} value={track.id}>{BGM_MOODS[track.mood]?.emoji} {track.name}</option>))}
+                  </optgroup>
                 </select>
                 {bgmData && (
                   <div className="mt-2 flex items-center gap-2">
@@ -1037,29 +1070,46 @@ const ResultTable = React.memo<ResultTableProps>(({
             </svg>
             <select
               className="h-8 px-2 rounded-lg text-xs font-semibold border cursor-pointer bg-purple-500/10 text-purple-300 border-purple-500/30"
-              title={t('result.bgmLibraryDesc', 'BGM 라이브러리에서 선택')}
+              title={t('result.aiBgmDesc', 'AI로 BGM 생성 (50크레딧)')}
               value=""
+              disabled={generatingBgm}
               onChange={async (e) => {
-                const track = BGM_LIBRARY.find(t => t.id === e.target.value);
-                if (!track) return;
-                try {
-                  const response = await fetch(track.url);
-                  if (!response.ok) return;
-                  const blob = await response.blob();
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const base64 = (reader.result as string).split(',')[1];
-                    onBgmChange?.(base64);
-                  };
-                  reader.readAsDataURL(blob);
-                } catch {}
+                const val = e.target.value;
+                if (!val) return;
+                // ai- 접두사: AI BGM 생성
+                if (val.startsWith('ai-')) {
+                  handleAiBgm(val.slice(3));
+                } else {
+                  // 정적 BGM 파일
+                  const track = BGM_LIBRARY.find(t => t.id === val);
+                  if (!track) return;
+                  try {
+                    const response = await fetch(track.url);
+                    if (!response.ok) return;
+                    const blob = await response.blob();
+                    const reader = new FileReader();
+                    reader.onloadend = () => onBgmChange?.((reader.result as string).split(',')[1]);
+                    reader.readAsDataURL(blob);
+                  } catch {}
+                }
               }}>
-              <option value="" style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>{bgmData ? t('result.bgmSelected') : 'BGM'}</option>
-              {BGM_LIBRARY.map(track => (
-                <option key={track.id} value={track.id} style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>
-                  {BGM_MOODS[track.mood]?.emoji} {track.name}
-                </option>
-              ))}
+              <option value="" style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>
+                {generatingBgm ? t('result.aiBgmGenerating', 'AI BGM 생성중...') : bgmData ? t('result.bgmSelected') : 'BGM'}
+              </option>
+              <optgroup label={`AI BGM (${CREDIT_CONFIG.COSTS.bgm_generation}${t('result.credits', '크레딧')})`}>
+                {Object.entries(BGM_MOODS).map(([key, { emoji, label }]) => (
+                  <option key={`ai-${key}`} value={`ai-${key}`} style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>
+                    {emoji} {label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label={`BGM ${t('result.free', '무료')}`}>
+                {BGM_LIBRARY.map(track => (
+                  <option key={track.id} value={track.id} style={{ backgroundColor: '#1e1b4b', color: '#c084fc' }}>
+                    {BGM_MOODS[track.mood]?.emoji} {track.name}
+                  </option>
+                ))}
+              </optgroup>
             </select>
             <label className="h-8 w-8 rounded-lg hover:bg-purple-500/15 transition-colors cursor-pointer text-purple-400 flex items-center justify-center" title="BGM 업로드">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
