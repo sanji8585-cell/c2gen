@@ -783,7 +783,7 @@ const AppContent: React.FC<{
 
     try {
       const runAudio = async () => {
-          const TTS_CONCURRENCY = 5; // 동시 TTS 생성 수 (ElevenLabs Pro)
+          const TTS_CONCURRENCY = 8; // 동시 TTS 생성 수
           const MAX_TTS_RETRIES = 2;
           let completedCount = 0;
 
@@ -797,7 +797,7 @@ const AppContent: React.FC<{
                   try {
                       if (attempt > 0) {
                           console.log(`[TTS] 씬 ${i + 1} 재시도 중... (${attempt}/${MAX_TTS_RETRIES})`);
-                          await wait(3000);
+                          await wait(1500);
                       }
 
                       const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
@@ -826,7 +826,7 @@ const AppContent: React.FC<{
                   } catch (e: any) {
                       console.error(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, e.message);
                       if (e.message?.includes('429') || e.message?.includes('rate')) {
-                          await wait(5000);
+                          await wait(3000);
                       }
                   }
               }
