@@ -144,8 +144,8 @@ interface HeaderProps {
   onShowAuthModal?: () => void;
   onLogout?: () => void;
   // Tab navigation
-  activeTab?: 'main' | 'gallery' | 'playground';
-  onTabChange?: (tab: 'main' | 'gallery' | 'playground') => void;
+  activeTab?: 'main' | 'gallery' | 'playground' | 'presets' | 'campaigns';
+  onTabChange?: (tab: 'main' | 'gallery' | 'playground' | 'presets' | 'campaigns') => void;
   projectCount?: number;
   // Gamification shortcuts
   onShowAchievements?: () => void;
@@ -207,9 +207,11 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const { t } = useTranslation();
-  const tabs: { key: 'main' | 'gallery' | 'playground'; label: string; count?: number }[] = [
+  const tabs: { key: 'main' | 'gallery' | 'playground' | 'presets' | 'campaigns'; label: string; count?: number }[] = [
     { key: 'main', label: t('header.storyboard') },
     { key: 'gallery', label: t('header.savedProjects'), count: projectCount },
+    { key: 'presets', label: t('header.brandPresets') },
+    { key: 'campaigns', label: t('header.campaigns') },
     { key: 'playground', label: t('header.playground') },
   ];
 

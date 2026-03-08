@@ -6,6 +6,10 @@
     { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
+  "crons": [
+    { "path": "/api/scheduler-trigger", "schedule": "0 * * * *" },
+    { "path": "/api/analytics", "schedule": "0 */6 * * *" }
+  ],
   "functions": {
     "api/gemini.ts": { "maxDuration": 60 },
     "api/elevenlabs.ts": { "maxDuration": 60 },
@@ -17,6 +21,17 @@
     "api/payments.ts": { "maxDuration": 30 },
     "api/projects.ts": { "maxDuration": 30 },
     "api/playground.ts": { "maxDuration": 10 },
-    "api/user.ts": { "maxDuration": 30 }
+    "api/user.ts": { "maxDuration": 30 },
+    "api/scheduler-trigger.ts": { "maxDuration": 60 },
+    "api/campaign.ts": { "maxDuration": 30 },
+    "api/approval.ts": { "maxDuration": 30 },
+    "api/brand-preset.ts": { "maxDuration": 60 },
+    "api/channel.ts": { "maxDuration": 30 },
+    "api/character.ts": { "maxDuration": 120 },
+    "api/youtube-auth.ts": { "maxDuration": 30 },
+    "api/youtube-upload.ts": { "maxDuration": 120 },
+    "api/tiktok-auth.ts": { "maxDuration": 30 },
+    "api/tiktok-upload.ts": { "maxDuration": 120 },
+    "api/analytics.ts": { "maxDuration": 60 }
   }
 }

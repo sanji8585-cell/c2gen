@@ -226,6 +226,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json(data);
       }
 
+      // ── AI BGM 생성 (Eleven Music) ──
+      case 'generateMusic': {
+        const apiKey = (req.headers['x-custom-api-key'] as string) || pickElevenLabsKey();
+        if (!apiKey || apiKey.length < 10) {
+          return res.json({ audio_base64: null, error: 'API key not configured' });
+        }
+
+        const { prompt, durationMs = 30000 } = params;
+        if (!prompt) {
+          return res.status(400).json({ error: 'prompt is required' });
+        }
+
+        // 크레딧 차감 (BGM: 50크레딧)
+        const bgmCredits = 50;
+        const creditResult = await checkAndDeductCredits(req, bgmCredits, `BGM 생성 (${Math.round(durationMs / 1000)}초)`);
+        if (!creditResult.ok) {
+          return res.status(402).json({
+            error: 'insufficient_credits',
+            message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: ${bgmCredits})`,
+            balance: creditResult.balance,
+          });
+        }
+
+        const musicResponse = await fetch('https://api.elevenlabs.io/v1/music', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            prompt,
+            music_length_ms: durationMs,
+            model_id: 'music_v1',
+            force_instrumental: true,
+          }),
+        });
+
+        if (!musicResponse.ok) {
+          const errorText = await musicResponse.text();
+          console.error('[api/elevenlabs] Music error:', musicResponse.status, errorText);
+          await logError('generateMusic', `Music API ${musicResponse.status}: ${errorText.slice(0, 500)}`);
+          return res.status(musicResponse.status).json({ error: errorText });
+        }
+
+        const arrayBuffer = await musicResponse.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+
+        const durationSec = durationMs / 1000;
+        const musicCost = (durationSec / 60) * 0.70; // $0.70/min (Scale overage rate)
+        logUsage(req, 'music_generation', musicCost);
+
+        return res.json({ audio_base64: base64, creditBalance: creditResult.balance });
+      }
+
       // ── 공유 음성 라이브러리 검색 ──
       case 'searchLibrary': {
         const apiKey = (req.headers['x-custom-api-key'] as string) || pickElevenLabsKey();
@@ -295,6 +349,107 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const data = await response.json();
         return res.json(data);
+      }
+
+      // ── C2 PILOT: Voice Design v3 ──
+      case 'designVoice': {
+        const apiKey = (req.headers['x-custom-api-key'] as string) || pickElevenLabsKey();
+        if (!apiKey || apiKey.length < 10) {
+          return res.status(400).json({ error: 'ElevenLabs API key required' });
+        }
+
+        const { description, sample_text } = params;
+        if (!description) {
+          return res.status(400).json({ error: 'Voice description is required' });
+        }
+
+        // 크레딧 차감 (30크레딧 = 3변형)
+        const creditResult = await checkAndDeductCredits(req, 30, 'Voice Design (캐릭터 음성 3변형)');
+        if (!creditResult.ok) {
+          return res.status(402).json({
+            error: 'insufficient_credits',
+            message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: 30)`,
+            balance: creditResult.balance,
+          });
+        }
+
+        // Generate 3 voice variants
+        const variants: Array<{ voice_id: string; preview_url: string; name: string }> = [];
+        const sampleText = sample_text || '안녕하세요, 저는 새로 만들어진 캐릭터 음성입니다. 이 음성이 마음에 드시나요?';
+
+        for (let i = 0; i < 3; i++) {
+          try {
+            const designRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice/create-previews', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'xi-api-key': apiKey,
+              },
+              body: JSON.stringify({
+                voice_description: description,
+                text: sampleText,
+              }),
+            });
+
+            if (!designRes.ok) {
+              const errText = await designRes.text();
+              console.error(`[designVoice] Variant ${i + 1} failed:`, designRes.status, errText);
+              continue;
+            }
+
+            const designData = await designRes.json();
+            if (designData.previews && designData.previews.length > 0) {
+              const preview = designData.previews[0];
+              variants.push({
+                voice_id: preview.generated_voice_id || `preview_${i}`,
+                preview_url: preview.audio_base_64 ? `data:audio/mpeg;base64,${preview.audio_base_64}` : '',
+                name: `변형 ${String.fromCharCode(65 + i)}`,
+              });
+            }
+
+            // Delay between variants
+            if (i < 2) await new Promise(r => setTimeout(r, 1000));
+          } catch (err: any) {
+            console.error(`[designVoice] Variant ${i + 1} error:`, err.message);
+          }
+        }
+
+        logUsage(req, 'voice_design', 0.10);
+        return res.json({ variants, creditBalance: creditResult.balance });
+      }
+
+      // ── C2 PILOT: Save Designed Voice ──
+      case 'saveDesignedVoice': {
+        const apiKey = (req.headers['x-custom-api-key'] as string) || pickElevenLabsKey();
+        if (!apiKey || apiKey.length < 10) {
+          return res.status(400).json({ error: 'ElevenLabs API key required' });
+        }
+
+        const { generated_voice_id, voice_name, voice_description } = params;
+        if (!generated_voice_id || !voice_name) {
+          return res.status(400).json({ error: 'generated_voice_id and voice_name are required' });
+        }
+
+        const saveRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice/create-voice-from-preview', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            voice_name,
+            voice_description: voice_description || '',
+            generated_voice_id,
+          }),
+        });
+
+        if (!saveRes.ok) {
+          const errText = await saveRes.text();
+          return res.status(saveRes.status).json({ error: `Failed to save voice: ${errText}` });
+        }
+
+        const savedVoice = await saveRes.json();
+        return res.json({ voice_id: savedVoice.voice_id, name: voice_name });
       }
 
       default:

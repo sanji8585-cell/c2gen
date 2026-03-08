@@ -12,10 +12,9 @@ import { useTheme } from './hooks/useTheme';
 import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood } from './services/geminiService';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import { generateImage, getSelectedImageModel } from './services/imageService';
-import { generateAudioWithElevenLabs } from './services/elevenLabsService';
+import { generateAudioWithElevenLabs, generateMusicWithElevenLabs } from './services/elevenLabsService';
 import { generateVideo } from './services/videoService';
 import { generateVideoFromImage } from './services/falService';
-import { generateAmbientBgm } from './services/bgmGenerator';
 // projectService는 useProjectManagement 훅으로 이동
 import { useGameState } from './hooks/useGameState';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -37,6 +36,12 @@ import Playground from './components/Playground';
 import CreditShop from './components/CreditShop';
 import UserProfile from './components/UserProfile';
 import PaymentSuccess from './components/PaymentSuccess';
+import PresetWizard from './components/preset/PresetWizard';
+import EmotionCurveEditor from './components/EmotionCurveEditor';
+import CampaignDashboard from './components/CampaignDashboard';
+import { listPresets, deletePreset as deleteBrandPreset } from './services/brandPresetService';
+import { selectStoryArc, generateEmotionCurve } from './services/emotionCurveEngine';
+import type { BrandPreset, EmotionCurve } from './types';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
@@ -45,7 +50,7 @@ import { AI_PERSONALITY, PRO_TIPS, launchConfetti, getStorytellingPhase, getTime
 import { GalleryErrorBoundary, GlobalErrorBoundary, setupGlobalErrorReporting } from './components/ErrorBoundaries';
 setupGlobalErrorReporting();
 
-type ViewMode = 'main' | 'gallery' | 'playground';
+type ViewMode = 'main' | 'gallery' | 'playground' | 'presets' | 'campaigns';
 
 // 인증 래퍼
 const App: React.FC = () => {
@@ -128,7 +133,7 @@ const AppContent: React.FC<{
   // BGM 관련
   const [bgmData, setBgmData] = useState<string | null>(null);
   const [bgmVolume, setBgmVolume] = useState(0.25);
-  const [bgmDuckingEnabled, setBgmDuckingEnabled] = useState(false);
+  const [bgmDuckingEnabled, setBgmDuckingEnabled] = useState(true);
   const [bgmDuckingAmount, setBgmDuckingAmount] = useState(0.3);
 
   // 크레딧 시스템
@@ -168,6 +173,27 @@ const AppContent: React.FC<{
   const [showAchievements, setShowAchievements] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  // 브랜드 프리셋
+  const [showPresetWizard, setShowPresetWizard] = useState(false);
+  // 감정곡선
+  const [emotionCurve, setEmotionCurve] = useState<EmotionCurve | null>(null);
+  const [brandPresets, setBrandPresets] = useState<BrandPreset[]>([]);
+  const [presetsLoading, setPresetsLoading] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<BrandPreset | undefined>();
+
+  const loadBrandPresets = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setPresetsLoading(true);
+    try {
+      const presets = await listPresets();
+      setBrandPresets(presets);
+    } catch { /* silent */ }
+    finally { setPresetsLoading(false); }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (viewMode === 'presets' && isAuthenticated) loadBrandPresets();
+  }, [viewMode, isAuthenticated, loadBrandPresets]);
   // Konami
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiRef = useRef<string[]>([]);
@@ -544,6 +570,13 @@ const AppContent: React.FC<{
       assetsRef.current = initialAssets;
       setGeneratedData(initialAssets);
 
+      // 감정곡선 자동 생성
+      try {
+        const arc = selectStoryArc(targetTopic);
+        const curve = generateEmotionCurve(arc, 'youtube_shorts', initialAssets.length * 8);
+        setEmotionCurve(curve);
+      } catch { /* 감정곡선 실패해도 계속 진행 */ }
+
       // 스크립트 검토 단계에서 멈춤 — 사용자가 확인/편집 후 "생성 시작" 클릭
       pendingGenContextRef.current = { targetTopic, refImgs, language, hasRefImages, sourceText };
       setStep(GenerationStep.SCRIPT_REVIEW);
@@ -719,23 +752,31 @@ const AppContent: React.FC<{
           const moodResult = await analyzeMood(narrations);
           if (isAbortedRef.current) return;
 
-          const matchedTrack = BGM_LIBRARY.find(t => t.mood === moodResult.mood) || BGM_LIBRARY[0];
-          // 1차: public/bgm/ 폴더 파일 시도, 2차: Web Audio API로 자동 생성
+          const detectedMood = moodResult.mood as BgmMood;
+          // 1차: ElevenLabs Music AI 생성, 2차: public/bgm/ 정적 파일
           let base64: string | null = null;
-          try {
-            const response = await fetch(matchedTrack.url);
-            if (response.ok) {
-              const blob = await response.blob();
-              base64 = await new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve((reader.result as string).split(',')[1]);
-                reader.readAsDataURL(blob);
-              });
-            }
-          } catch { /* 파일 없으면 자동 생성으로 폴백 */ }
 
+          // ElevenLabs Music 시도
+          try {
+            const bgmDurationMs = (localStorage.getItem('tubegen_bgm_duration') === '60' ? 60 : 30) * 1000;
+            const musicResult = await generateMusicWithElevenLabs(detectedMood, bgmDurationMs);
+            if (musicResult.audioBase64) base64 = musicResult.audioBase64;
+          } catch { /* ElevenLabs 실패 시 정적 파일 폴백 */ }
+
+          // 폴백: 정적 BGM 파일
           if (!base64) {
-            base64 = await generateAmbientBgm(moodResult.mood as BgmMood);
+            const matchedTrack = BGM_LIBRARY.find(t => t.mood === detectedMood) || BGM_LIBRARY[0];
+            try {
+              const response = await fetch(matchedTrack.url);
+              if (response.ok) {
+                const blob = await response.blob();
+                base64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                  reader.readAsDataURL(blob);
+                });
+              }
+            } catch { /* 파일 없으면 BGM 없이 진행 */ }
           }
 
           if (!isAbortedRef.current && base64) setBgmData(base64);
@@ -1395,6 +1436,125 @@ const AppContent: React.FC<{
         )
       )}
 
+      {/* 브랜드 프리셋 뷰 */}
+      {viewMode === 'presets' && (
+        isAuthenticated ? (
+          <div className="max-w-5xl mx-auto px-4 py-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>브랜드 프리셋</h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>브랜드 세계관, 캐릭터, 화풍, 톤을 설정하세요</p>
+              </div>
+              <button
+                onClick={() => { setEditingPreset(undefined); setShowPresetWizard(true); }}
+                className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm font-semibold rounded-lg transition-all"
+              >
+                + 새 프리셋
+              </button>
+            </div>
+
+            {presetsLoading ? (
+              <div className="text-center py-12">
+                <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>프리셋 불러오는 중...</p>
+              </div>
+            ) : brandPresets.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {brandPresets.map(preset => (
+                  <div
+                    key={preset.id}
+                    className="rounded-xl border p-5 transition-all hover:shadow-lg cursor-pointer group"
+                    style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
+                    onClick={() => { setEditingPreset(preset); setShowPresetWizard(true); }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{preset.name}</h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full shrink-0 ml-2" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
+                        Step {preset.wizard_step || 1}/6
+                      </span>
+                    </div>
+                    {preset.description && (
+                      <p className="text-xs mb-3 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{preset.description}</p>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {preset.target_audience && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(8,145,178,0.1)', color: '#0891b2' }}>{preset.target_audience}</span>
+                      )}
+                      {preset.character_profiles?.length > 0 && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>캐릭터 {preset.character_profiles.length}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{new Date(preset.updated_at).toLocaleDateString('ko-KR')}</span>
+                      <button
+                        onClick={async (e) => { e.stopPropagation(); if (confirm('프리셋을 삭제하시겠습니까?')) { await deleteBrandPreset(preset.id); loadBrandPresets(); } }}
+                        className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-red-500/10"
+                        style={{ color: '#ef4444' }}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border p-8 text-center" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+                  <svg className="w-8 h-8" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>아직 프리셋이 없습니다</p>
+                <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>브랜드 프리셋을 만들어 일관된 콘텐츠를 생성하세요</p>
+                <button
+                  onClick={() => { setEditingPreset(undefined); setShowPresetWizard(true); }}
+                  className="px-4 py-2 text-sm font-medium rounded-lg border transition-colors hover:border-cyan-500/50"
+                  style={{ borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
+                >
+                  프리셋 만들기
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+            <div className="rounded-2xl border p-8" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>로그인이 필요합니다</h3>
+              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>브랜드 프리셋을 사용하려면 로그인하세요</p>
+              <button onClick={() => setShowAuthModal(true)} className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all">
+                로그인 / 회원가입
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* 프리셋 위자드 모달 */}
+      {showPresetWizard && (
+        <PresetWizard
+          onClose={() => { setShowPresetWizard(false); loadBrandPresets(); }}
+          onComplete={() => { setShowPresetWizard(false); loadBrandPresets(); }}
+          editPreset={editingPreset}
+        />
+      )}
+
+      {/* 캠페인 뷰 */}
+      {viewMode === 'campaigns' && (
+        isAuthenticated ? (
+          <CampaignDashboard onClose={() => setViewMode('main')} />
+        ) : (
+          <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+            <div className="rounded-2xl border p-8" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>로그인이 필요합니다</h3>
+              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>캠페인을 관리하려면 로그인하세요</p>
+              <button onClick={() => setShowAuthModal(true)} className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all">
+                로그인 / 회원가입
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
       {/* 놀이터 뷰 */}
       {viewMode === 'playground' && (
         <Playground
@@ -1407,7 +1567,18 @@ const AppContent: React.FC<{
       {/* 메인 뷰 */}
       {viewMode === 'main' && (
       <main className="py-8">
-        <InputSection onGenerate={handleGenerate} step={step} />
+        <InputSection
+          onGenerate={handleGenerate}
+          step={step}
+          bgmData={bgmData}
+          onBgmDataChange={setBgmData}
+          bgmVolume={bgmVolume}
+          onBgmVolumeChange={setBgmVolume}
+          bgmDuckingEnabled={bgmDuckingEnabled}
+          onBgmDuckingToggle={setBgmDuckingEnabled}
+          bgmDuckingAmount={bgmDuckingAmount}
+          onBgmDuckingAmountChange={setBgmDuckingAmount}
+        />
 
         {step === GenerationStep.IDLE && generatedData.length === 0 && (
           <div className="max-w-7xl mx-auto px-4 text-center py-4">
@@ -1470,6 +1641,17 @@ const AppContent: React.FC<{
         )}
 
         {/* 썸네일 생성 버튼 — ResultTable 툴바로 이동됨 */}
+
+        {/* 감정곡선 에디터 */}
+        {step === GenerationStep.SCRIPT_REVIEW && emotionCurve && (
+          <div className="max-w-7xl mx-auto px-4 mb-4">
+            <EmotionCurveEditor
+              curve={emotionCurve}
+              onChange={setEmotionCurve}
+              totalDuration={emotionCurve.total_duration}
+            />
+          </div>
+        )}
 
         {/* 스크립트 검토 배너 */}
         {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (() => {

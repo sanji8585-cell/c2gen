@@ -345,3 +345,43 @@ ${stylePrompt}
 - Image should tell a story or evoke emotion even without text
 `;
 };
+
+/**
+ * 멀티 캐릭터 프롬프트 생성 (C2 PILOT Phase 1)
+ * - 최대 3캐릭터까지 지원
+ * - 각 캐릭터의 위치, 외형, 구분 태그를 명시
+ */
+export const buildMultiCharacterPrompt = (
+  scene: { narration: string; visualPrompt: string; analysis?: any },
+  characters: Array<{
+    id: string;
+    name: string;
+    appearance: { base_prompt: string; outfit?: string };
+    distinction_tags: string[];
+    position: string;  // 'left' | 'center-left' | 'center' | 'center-right' | 'right'
+  }>,
+  artStylePrompt?: string
+): string => {
+  if (characters.length === 0) return getFinalVisualPrompt(scene, false, artStylePrompt);
+  if (characters.length > 3) {
+    // Safety: max 3 characters per scene
+    characters = characters.slice(0, 3);
+  }
+
+  const charDescriptions = characters.map(c => {
+    const pos = c.position || 'center';
+    return `[${pos.toUpperCase()}] ${c.appearance.base_prompt}${c.appearance.outfit ? `, wearing ${c.appearance.outfit}` : ''}, MUST HAVE: ${c.distinction_tags.join(', ')}`;
+  }).join(' | ');
+
+  const basePrompt = scene.visualPrompt || scene.narration;
+  const style = artStylePrompt ? `STYLE: ${artStylePrompt}` : 'STYLE: 2D hand-drawn illustration';
+
+  return `${basePrompt}
+
+CHARACTERS (${characters.length}): ${charDescriptions}
+
+${style}
+COMPOSITION: Each character must be clearly distinct and separately identifiable.
+NEGATIVE: Do NOT merge characters, mix features, swap accessories, or blend characters together.
+Each character's distinction tags (accessories, clothing) must be clearly visible.`.trim();
+};

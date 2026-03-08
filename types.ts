@@ -248,3 +248,299 @@ export interface CreditPack {
   price_krw: number;
   label: string;
 }
+
+// ══════════════════════════════════════════
+// C2 PILOT Phase 1 — 채널 / 브랜드 프리셋 / 캐릭터
+// ══════════════════════════════════════════
+
+export interface Channel {
+  id: string;
+  owner_email: string;
+  name: string;
+  description?: string;
+  assigned_operators: string[];
+  brand_preset_id?: string;
+  platform_accounts: {
+    youtube?: { id: string; name: string };
+    tiktok?: { id: string; name: string };
+  };
+  settings: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ToneVoiceConfig {
+  style: string;
+  formality: number;       // 0~1
+  humor_level: number;     // 0~1
+  forbidden_words?: string[];
+  catchphrase?: string;
+}
+
+export interface ArtStyleConfig {
+  style_id?: string;
+  custom_prompt: string;
+  seed_values?: Record<string, number>;
+  negative_prompts?: string[];
+  extracted_features?: {
+    line_weight: string;
+    color_mode: string;
+    palette: string[];
+    texture: string;
+    shading: string;
+  };
+}
+
+export interface BgmPreferences {
+  genre: string;
+  mood: string;
+  tempo_range: { min: number; max: number };
+  custom_prompt?: string;
+}
+
+export interface CharacterProfile {
+  id: string;
+  name: string;
+  char_role: 'main' | 'supporting' | 'extra';
+  image_type: 'mascot' | 'photo' | 'sketch';
+  species?: string;
+  personality: string;
+  appearance: {
+    base_prompt: string;
+    outfit?: string;
+    expression_range: string[];
+  };
+  distinction_tags: string[];
+  reference_sheet: {
+    original_upload?: string;
+    background_removed?: string;
+    style_converted?: string;
+    multi_angle: {
+      front?: string;
+      angle_45?: string;
+      side?: string;
+      full_body?: string;
+    };
+  };
+  speech_style?: {
+    tone: string;
+    catchphrase?: string;
+    forbidden_words?: string[];
+  };
+  voice_id?: string;
+}
+
+export interface BrandPreset {
+  id: string;
+  owner_email: string;
+  channel_id?: string;
+  name: string;
+  description?: string;
+  world_view?: string;
+  target_audience?: string;
+  tone_voice: ToneVoiceConfig;
+  tone_reference_texts?: string[];
+  tone_learned_patterns?: Record<string, unknown>;
+  art_style: ArtStyleConfig;
+  style_preview_images?: string[];
+  character_profiles: CharacterProfile[];
+  bgm_preferences: BgmPreferences;
+  seed_values?: Record<string, number>;
+  negative_prompts?: string[];
+  platform_configs?: Record<string, unknown>;
+  wizard_step: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PresetWizardStep = 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface PresetWizardData extends Partial<BrandPreset> {
+  currentStep: PresetWizardStep;
+}
+
+// ══════════════════════════════════════════
+// C2 PILOT Phase 2 — 감정곡선 엔진
+// ══════════════════════════════════════════
+
+export type StoryArcType =
+  | 'problem_solution'  // 문제→해결
+  | 'reversal'          // 반전형
+  | 'emotional'         // 감동형
+  | 'horror_warning'    // 공포/경고형
+  | 'humor'             // 웃음형
+  | 'educational'       // 교육형
+  | 'vlog'              // 일상 브이로그
+  | 'series';           // 시리즈 연결형
+
+export type EmotionType =
+  | 'curiosity' | 'tension' | 'surprise' | 'empathy'
+  | 'warmth' | 'lingering' | 'excitement' | 'calm' | 'fear';
+
+export type PlatformVariant = 'youtube_shorts' | 'tiktok' | 'youtube_long';
+
+export interface EmotionCurvePoint {
+  time: number;
+  emotion: EmotionType;
+  intensity: number;      // 0~1
+  label: string;
+  visual_cue: string;
+  bgm_shift: string;
+  tts_pace: 'fast' | 'normal' | 'slow';
+  subtitle_style: string;
+}
+
+export interface EmotionCurve {
+  story_arc: StoryArcType;
+  platform_variant: PlatformVariant;
+  total_duration: number;
+  curve_points: EmotionCurvePoint[];
+}
+
+export interface SceneEmotionMeta {
+  emotion: EmotionType;
+  intensity: number;
+  visual_cue: string;
+  bgm_shift: string;
+  tts_pace: 'fast' | 'normal' | 'slow';
+}
+
+// ══════════════════════════════════════════
+// C2 PILOT Phase 3 — 플랫폼 연동 + 업로드
+// ══════════════════════════════════════════
+
+export type UploadPlatform = 'youtube' | 'tiktok';
+export type UploadStatus = 'pending' | 'uploading' | 'published' | 'failed' | 'private';
+
+export interface PlatformConnection {
+  id: string;
+  user_email: string;
+  platform: UploadPlatform;
+  channel_id?: string;
+  channel_name?: string;
+  is_active: boolean;
+  token_expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadLog {
+  id: string;
+  user_email: string;
+  campaign_id?: string;
+  platform: UploadPlatform;
+  platform_video_id?: string;
+  title?: string;
+  status: UploadStatus;
+  error_message?: string;
+  metadata: Record<string, unknown>;
+  uploaded_at?: string;
+  published_at?: string;
+  created_at: string;
+}
+
+// ══════════════════════════════════════════
+// C2 PILOT Phase 4 — 캠페인 + 승인 대기열
+// ══════════════════════════════════════════
+
+export type CampaignStatus = 'active' | 'paused' | 'completed';
+export type VideoEngineMode = 'standard' | 'premium' | 'fast';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'published';
+
+export interface TopicStrategy {
+  mode: 'keyword_pool' | 'trend_auto' | 'series' | 'hybrid';
+  keyword_pool?: string[];
+  trend_search?: { enabled: boolean; category: string; region: string; min_relevance: number };
+  series?: { enabled: boolean; template: string; current_episode: number };
+  exclusions?: string[];
+}
+
+export interface CampaignSchedule {
+  frequency: 'daily' | 'weekly' | 'custom';
+  days?: string[];
+  time: string;
+  timezone: string;
+  generation_lead_time: number;
+  next_run?: string;
+}
+
+export interface Campaign {
+  id: string;
+  user_email: string;
+  channel_id?: string;
+  brand_preset_id?: string;
+  name: string;
+  description?: string;
+  topic_strategy: TopicStrategy;
+  emotion_curve_template?: EmotionCurve;
+  target_platforms: UploadPlatform[];
+  video_engine_mode: VideoEngineMode;
+  schedule: CampaignSchedule;
+  auto_approve: boolean;
+  max_daily_count: number;
+  budget_limit_daily: number;
+  budget_limit_monthly: number;
+  budget_used_today: number;
+  budget_used_month: number;
+  status: CampaignStatus;
+  total_generated: number;
+  total_published: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApprovalQueueItem {
+  id: string;
+  campaign_id: string;
+  content_data: Record<string, unknown>;
+  platform_variants: Record<string, unknown>;
+  emotion_curve_used?: EmotionCurve;
+  metadata: Record<string, unknown>;
+  estimated_credits: number;
+  status: ApprovalStatus;
+  reviewer_email?: string;
+  review_notes?: string;
+  approved_at?: string;
+  created_at: string;
+}
+
+// ══════════════════════════════════════════
+// C2 PILOT Phase 5 — 성과 분석 + 피드백 루프
+// ══════════════════════════════════════════
+
+export type SnapshotType = '24h' | '72h' | '7d';
+export type InsightType = 'auto_applied' | 'requires_approval' | 'observation';
+export type InsightCategory = 'retention' | 'comments' | 'ctr' | 'channel_growth';
+
+export interface ContentAnalytics {
+  id: string;
+  upload_log_id: string;
+  platform: UploadPlatform;
+  snapshot_at: string;
+  snapshot_type: SnapshotType;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  avg_watch_duration: number;
+  retention_curve?: number[];
+  top_comments?: Array<{ text: string; sentiment: string; likes: number }>;
+  ctr: number;
+  engagement_rate: number;
+  created_at: string;
+}
+
+export interface FeedbackInsight {
+  id: string;
+  campaign_id: string;
+  insight_type: InsightType;
+  category: InsightCategory;
+  title: string;
+  description?: string;
+  data: Record<string, unknown>;
+  applied: boolean;
+  applied_at?: string;
+  created_at: string;
+}

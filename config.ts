@@ -201,6 +201,13 @@ export const CREDIT_CONFIG = {
     video: 73,                     // 원가 $0.15(218원) → 730원 판매 → 원가율 30%
     script: 5,                     // 원가 ~$0.01(15원) → 50원 판매 → 원가율 30%
     thumbnail: 16,                 // 원가 $0.0315(46원) → 160원 판매 → 원가율 29%
+    bgm_generation: 50,            // ElevenLabs Music 30초 BGM 생성 (Scale 플랜 550분 포함)
+    // C2 PILOT Phase 1
+    character_reference_sheet: 32,  // 멀티앵글 4장 × 8크레딧
+    style_preview: 48,              // A/B 프리뷰 3변형 × 16크레딧
+    situation_gallery: 96,          // 상황별 갤러리 6장 × 16크레딧
+    voice_design: 30,               // 캐릭터 음성 디자인 3변형
+    tone_analysis: 5,               // AI 톤 분석
   } as Record<string, number>,
 
   // 구독 요금제
@@ -242,10 +249,6 @@ export function formatKRW(usd: number): string {
 export const ELEVENLABS_MODELS = [
   { id: 'eleven_multilingual_v2', name: 'Multilingual v2', description: '다국어 29개, 고품질 (기본값)', supportsTimestamp: true },
   { id: 'eleven_v3', name: 'Eleven v3', description: '최신 모델, 70개 언어, 고표현력', supportsTimestamp: true },
-  { id: 'eleven_turbo_v2_5', name: 'Turbo v2.5', description: '빠른 속도, 32개 언어', supportsTimestamp: true },
-  { id: 'eleven_flash_v2_5', name: 'Flash v2.5', description: '초고속 ~75ms, 32개 언어', supportsTimestamp: true },
-  { id: 'eleven_turbo_v2', name: 'Turbo v2', description: '빠른 속도, 영어 최적화', supportsTimestamp: true },
-  { id: 'eleven_monolingual_v1', name: 'Monolingual v1', description: '영어 전용 (레거시)', supportsTimestamp: false },
 ] as const;
 
 export type ElevenLabsModelId = typeof ELEVENLABS_MODELS[number]['id'];
