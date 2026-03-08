@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   TimeSeriesEntry, UserRanking,
   LevelDistEntry, AchievementRate, GachaRarityDist, QuestCompletionRate,
-  authFetch, formatCost, ACTION_LABELS,
+  authFetch, gameFetch, formatCost, ACTION_LABELS,
 } from './adminUtils';
 import { exportUsageToCSV } from './exportUtils';
 
@@ -68,7 +68,7 @@ const AdminAnalytics: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadGameData = useCallback(async () => {
     setGameLoading(true);
     try {
-      const { ok, data } = await authFetch({ action: 'gamificationAnalytics', adminToken });
+      const { ok, data } = await gameFetch({ action: 'gamificationAnalytics', adminToken });
       if (ok) {
         setLevelDist(data.levelDist || []);
         setAchievementRates(data.achievementRates || []);

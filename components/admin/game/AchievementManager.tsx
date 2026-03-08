@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { authFetch } from '../adminUtils';
+import { gameFetch } from '../adminUtils';
 
 interface Props {
   adminToken: string;
@@ -70,7 +70,7 @@ const AchievementManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadAchievements = useCallback(async () => {
     setLoading(true);
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-listAchievements', adminToken });
+      const { ok, data } = await gameFetch({ action: 'game-admin-listAchievements', adminToken });
       if (ok) setAchievements(data.achievements || []);
       else onToast('error', data.message || '업적 목록을 불러올 수 없습니다.');
     } catch {
@@ -101,7 +101,7 @@ const AchievementManager: React.FC<Props> = ({ adminToken, onToast }) => {
     if (!editItem.name) { onToast('error', '업적 이름을 입력해주세요.'); return; }
     setSubmitting(true);
     try {
-      const { ok, data } = await authFetch({
+      const { ok, data } = await gameFetch({
         action: 'game-admin-upsertAchievement',
         adminToken,
         achievement: editItem,
@@ -122,7 +122,7 @@ const AchievementManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const handleDelete = async (id: string) => {
     if (!confirm('이 업적을 삭제하시겠습니까?')) return;
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-deleteAchievement', adminToken, id });
+      const { ok, data } = await gameFetch({ action: 'game-admin-deleteAchievement', adminToken, id });
       if (ok) {
         onToast('success', '삭제되었습니다.');
         setAchievements(prev => prev.filter(a => a.id !== id));

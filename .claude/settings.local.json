@@ -27,7 +27,12 @@
       "Bash(grep -n \"removeEventListener\" App.tsx components/*.tsx services/*.ts)",
       "Bash(grep -n \"dangerouslySetInnerHTML\\\\|innerHTML\" App.tsx components/*.tsx)",
       "Bash(wc -l components/*.tsx)",
-      "Bash(grep -r \"#[0-9a-f]\\\\{3,6\\\\}\" components/ThumbnailGenerator.tsx components/Header.tsx)"
+      "Bash(grep -r \"#[0-9a-f]\\\\{3,6\\\\}\" components/ThumbnailGenerator.tsx components/Header.tsx)",
+      "Bash(git tag v9.2-stable)",
+      "Bash(git push origin v9.2-stable)",
+      "Bash(git add constants/uiConstants.ts hooks/useProjectManagement.ts contexts/AuthContext.tsx components/ErrorBoundaries.tsx App.tsx)",
+      "Bash(git commit:*)",
+      "Bash(sort -t: -k2 -rn)"
     ]
   }
 }

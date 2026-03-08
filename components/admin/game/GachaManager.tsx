@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { authFetch } from '../adminUtils';
+import { gameFetch } from '../adminUtils';
 
 interface Props {
   adminToken: string;
@@ -67,7 +67,7 @@ const GachaManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadItems = useCallback(async () => {
     setLoading(true);
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-listGachaPool', adminToken });
+      const { ok, data } = await gameFetch({ action: 'game-admin-listGachaPool', adminToken });
       if (ok) setItems(data.items || []);
       else onToast('error', data.message || '뽑기 풀을 불러올 수 없습니다.');
     } catch {
@@ -92,7 +92,7 @@ const GachaManager: React.FC<Props> = ({ adminToken, onToast }) => {
     if (!editItem.name) { onToast('error', '아이템 이름을 입력해주세요.'); return; }
     setSubmitting(true);
     try {
-      const { ok, data } = await authFetch({
+      const { ok, data } = await gameFetch({
         action: 'game-admin-upsertGachaItem',
         adminToken,
         item: editItem,
@@ -113,7 +113,7 @@ const GachaManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const handleDelete = async (id: string) => {
     if (!confirm('이 아이템을 삭제하시겠습니까?')) return;
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-deleteGachaItem', adminToken, id });
+      const { ok, data } = await gameFetch({ action: 'game-admin-deleteGachaItem', adminToken, id });
       if (ok) {
         onToast('success', '삭제되었습니다.');
         setItems(prev => prev.filter(i => i.id !== id));
@@ -127,7 +127,7 @@ const GachaManager: React.FC<Props> = ({ adminToken, onToast }) => {
 
   const toggleActive = async (item: GachaItem) => {
     try {
-      const { ok, data } = await authFetch({
+      const { ok, data } = await gameFetch({
         action: 'game-admin-upsertGachaItem',
         adminToken,
         item: { ...item, is_active: !item.is_active },

@@ -28,7 +28,7 @@ let configLoadedAt = 0;
 // ── API 헬퍼 ──
 
 async function gameApiFetch(body: Record<string, any>): Promise<any> {
-  const res = await fetch('/api/auth', {
+  const res = await fetch('/api/gamification', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

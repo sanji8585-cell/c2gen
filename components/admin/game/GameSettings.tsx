@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { authFetch } from '../adminUtils';
+import { gameFetch } from '../adminUtils';
 
 interface Props {
   adminToken: string;
@@ -122,7 +122,7 @@ const GameSettings: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const { ok, data } = await authFetch({ action: 'game-getConfig', adminToken });
+      const { ok, data } = await gameFetch({ action: 'game-getConfig', adminToken });
       if (ok && data.config) {
         const gachaRaw = data.config.gachaSettings || data.config.gacha_settings || {};
         const prestigeRaw = data.config.prestigeSettings || data.config.prestige_settings || {};
@@ -149,7 +149,7 @@ const GameSettings: React.FC<Props> = ({ adminToken, onToast }) => {
   const saveSection = useCallback(async (key: string, value: any) => {
     setSaving(key);
     try {
-      const { ok, data } = await authFetch({ action: 'game-updateConfig', adminToken, key, value });
+      const { ok, data } = await gameFetch({ action: 'game-updateConfig', adminToken, key, value });
       if (ok) {
         onToast('success', data.message || '저장되었습니다.');
       } else {

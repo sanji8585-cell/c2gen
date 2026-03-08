@@ -217,6 +217,17 @@ export async function authFetch(body: Record<string, any>) {
   return { ok: res.ok, data };
 }
 
+export async function gameFetch(body: Record<string, any>) {
+  const res = await fetch('/api/gamification', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok && !data.message) data.message = data.error || `오류가 발생했습니다. (${res.status})`;
+  return { ok: res.ok, data };
+}
+
 export async function projectsFetch(body: Record<string, any>) {
   const res = await fetch('/api/projects', {
     method: 'POST',

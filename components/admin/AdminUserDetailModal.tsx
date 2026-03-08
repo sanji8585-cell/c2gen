@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   UserInfo, UsageBreakdown, UsageLog, ACTION_LABELS,
   GameProfile, EquippedInfo, AchievementSummary,
-  authFetch, formatUsd, formatCost, timeAgo,
+  authFetch, gameFetch, formatUsd, formatCost, timeAgo,
 } from './adminUtils';
 
 interface Props {
@@ -134,7 +134,7 @@ const AdminUserDetailModal: React.FC<Props> = ({ user, adminToken, onClose, onTo
     if (!amount || amount <= 0) { onToast('error', 'XP 수량을 입력하세요.'); return; }
     setGranting(true);
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-grantXp', adminToken, email: user.email, amount });
+      const { ok, data } = await gameFetch({ action: 'game-admin-grantXp', adminToken, email: user.email, amount });
       if (ok) {
         onToast('success', `XP ${amount} 지급 완료 (Lv.${data.newLevel})`);
         setGameProfile(prev => prev ? { ...prev, xp: data.newXp, level: data.newLevel } : prev);
@@ -150,7 +150,7 @@ const AdminUserDetailModal: React.FC<Props> = ({ user, adminToken, onClose, onTo
     if (!amount || amount <= 0) { onToast('error', '뽑기권 수량을 입력하세요.'); return; }
     setGranting(true);
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-grantTickets', adminToken, email: user.email, amount });
+      const { ok, data } = await gameFetch({ action: 'game-admin-grantTickets', adminToken, email: user.email, amount });
       if (ok) {
         onToast('success', `뽑기권 ${amount}장 지급 완료`);
         setGameProfile(prev => prev ? { ...prev, gachaTickets: data.newTickets } : prev);

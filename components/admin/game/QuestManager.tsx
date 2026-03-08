@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { authFetch } from '../adminUtils';
+import { gameFetch } from '../adminUtils';
 
 interface Props {
   adminToken: string;
@@ -58,7 +58,7 @@ const QuestManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadQuests = useCallback(async () => {
     setLoading(true);
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-listQuests', adminToken });
+      const { ok, data } = await gameFetch({ action: 'game-admin-listQuests', adminToken });
       if (ok) setQuests(data.quests || []);
       else onToast('error', data.message || '퀘스트 목록을 불러올 수 없습니다.');
     } catch {
@@ -83,7 +83,7 @@ const QuestManager: React.FC<Props> = ({ adminToken, onToast }) => {
     if (!editItem.name) { onToast('error', '퀘스트 이름을 입력해주세요.'); return; }
     setSubmitting(true);
     try {
-      const { ok, data } = await authFetch({
+      const { ok, data } = await gameFetch({
         action: 'game-admin-upsertQuest',
         adminToken,
         quest: editItem,
@@ -104,7 +104,7 @@ const QuestManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const handleDelete = async (id: string) => {
     if (!confirm('이 퀘스트를 삭제하시겠습니까?')) return;
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-deleteQuest', adminToken, id });
+      const { ok, data } = await gameFetch({ action: 'game-admin-deleteQuest', adminToken, id });
       if (ok) {
         onToast('success', '삭제되었습니다.');
         setQuests(prev => prev.filter(q => q.id !== id));

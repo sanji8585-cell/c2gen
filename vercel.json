@@ -13,6 +13,7 @@
     "api/fal-poll.ts": { "maxDuration": 10 },
     "api/openai.ts": { "maxDuration": 60 },
     "api/auth.ts": { "maxDuration": 60 },
+    "api/gamification.ts": { "maxDuration": 60 },
     "api/payments.ts": { "maxDuration": 15 },
     "api/projects.ts": { "maxDuration": 15 },
     "api/playground.ts": { "maxDuration": 10 }

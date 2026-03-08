@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { authFetch } from '../adminUtils';
+import { gameFetch } from '../adminUtils';
 
 interface Props {
   adminToken: string;
@@ -51,7 +51,7 @@ const BulkActions: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadGachaPool = useCallback(async () => {
     if (poolLoaded) return;
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-listGachaPool', adminToken });
+      const { ok, data } = await gameFetch({ action: 'game-admin-listGachaPool', adminToken });
       if (ok) {
         setGachaPool(data.items || []);
         setPoolLoaded(true);
@@ -62,7 +62,7 @@ const BulkActions: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadAchievements = useCallback(async () => {
     if (achievementsLoaded) return;
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-listAchievements', adminToken });
+      const { ok, data } = await gameFetch({ action: 'game-admin-listAchievements', adminToken });
       if (ok) {
         setAchievements((data.achievements || []).map((a: any) => ({ id: a.id, name: a.name, icon: a.icon })));
         setAchievementsLoaded(true);
@@ -147,7 +147,7 @@ const BulkActions: React.FC<Props> = ({ adminToken, onToast }) => {
         actionParams,
       };
 
-      const { ok, data } = await authFetch(payload);
+      const { ok, data } = await gameFetch(payload);
 
       if (ok) {
         setLastResult(data.result || { success: 0, failed: 0, total: 0 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { authFetch } from '../adminUtils';
+import { gameFetch } from '../adminUtils';
 
 interface Props {
   adminToken: string;
@@ -42,7 +42,7 @@ const EventManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const loadEvents = useCallback(async () => {
     setLoading(true);
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-listEvents', adminToken });
+      const { ok, data } = await gameFetch({ action: 'game-admin-listEvents', adminToken });
       if (ok) setEvents(data.events || []);
       else onToast('error', data.message || '이벤트 목록을 불러올 수 없습니다.');
     } catch {
@@ -81,7 +81,7 @@ const EventManager: React.FC<Props> = ({ adminToken, onToast }) => {
           .map(s => s.trim())
           .filter(Boolean),
       };
-      const { ok, data } = await authFetch({
+      const { ok, data } = await gameFetch({
         action: 'game-admin-upsertEvent',
         adminToken,
         event: itemToSave,
@@ -102,7 +102,7 @@ const EventManager: React.FC<Props> = ({ adminToken, onToast }) => {
   const handleDelete = async (id: string) => {
     if (!confirm('이 이벤트를 삭제하시겠습니까?')) return;
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-deleteEvent', adminToken, id });
+      const { ok, data } = await gameFetch({ action: 'game-admin-deleteEvent', adminToken, id });
       if (ok) {
         onToast('success', '삭제되었습니다.');
         setEvents(prev => prev.filter(e => e.id !== id));
@@ -116,7 +116,7 @@ const EventManager: React.FC<Props> = ({ adminToken, onToast }) => {
 
   const toggleActive = async (item: GameEvent) => {
     try {
-      const { ok, data } = await authFetch({
+      const { ok, data } = await gameFetch({
         action: 'game-admin-upsertEvent',
         adminToken,
         event: { ...item, is_active: !item.is_active },

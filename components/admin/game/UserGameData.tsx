@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { authFetch } from '../adminUtils';
+import { gameFetch } from '../adminUtils';
 
 interface Props {
   adminToken: string;
@@ -90,7 +90,7 @@ const UserGameData: React.FC<Props> = ({ adminToken, onToast }) => {
     setLoading(true);
     setProfile(null);
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-userGameData', adminToken, email: email.trim() });
+      const { ok, data } = await gameFetch({ action: 'game-admin-userGameData', adminToken, email: email.trim() });
       if (ok) {
         setProfile(data.profile || null);
         setAchievements(data.achievements || []);
@@ -111,7 +111,7 @@ const UserGameData: React.FC<Props> = ({ adminToken, onToast }) => {
     if (grantXpAmount <= 0) { onToast('error', 'XP 양을 입력해주세요.'); return; }
     setActionLoading('xp');
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-grantXp', adminToken, email: email.trim(), amount: grantXpAmount });
+      const { ok, data } = await gameFetch({ action: 'game-admin-grantXp', adminToken, email: email.trim(), amount: grantXpAmount });
       if (ok) {
         onToast('success', data.message || `XP ${grantXpAmount} 지급 완료`);
         searchUser();
@@ -128,7 +128,7 @@ const UserGameData: React.FC<Props> = ({ adminToken, onToast }) => {
     if (grantTicketAmount <= 0) { onToast('error', '티켓 수량을 입력해주세요.'); return; }
     setActionLoading('tickets');
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-grantTickets', adminToken, email: email.trim(), amount: grantTicketAmount });
+      const { ok, data } = await gameFetch({ action: 'game-admin-grantTickets', adminToken, email: email.trim(), amount: grantTicketAmount });
       if (ok) {
         onToast('success', data.message || `뽑기티켓 ${grantTicketAmount}장 지급 완료`);
         searchUser();
@@ -145,7 +145,7 @@ const UserGameData: React.FC<Props> = ({ adminToken, onToast }) => {
     if (!grantItemId) { onToast('error', '아이템을 선택해주세요.'); return; }
     setActionLoading('item');
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-grantItem', adminToken, email: email.trim(), itemId: grantItemId });
+      const { ok, data } = await gameFetch({ action: 'game-admin-grantItem', adminToken, email: email.trim(), itemId: grantItemId });
       if (ok) {
         onToast('success', data.message || '아이템 지급 완료');
         searchUser();
@@ -162,7 +162,7 @@ const UserGameData: React.FC<Props> = ({ adminToken, onToast }) => {
     if (!grantAchievementId) { onToast('error', '업적을 선택해주세요.'); return; }
     setActionLoading('achievement');
     try {
-      const { ok, data } = await authFetch({ action: 'game-admin-grantAchievement', adminToken, email: email.trim(), achievementId: grantAchievementId });
+      const { ok, data } = await gameFetch({ action: 'game-admin-grantAchievement', adminToken, email: email.trim(), achievementId: grantAchievementId });
       if (ok) {
         onToast('success', data.message || '업적 부여 완료');
         searchUser();
