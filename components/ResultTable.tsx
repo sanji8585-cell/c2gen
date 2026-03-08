@@ -241,6 +241,28 @@ const TableRow: React.FC<TableRowProps> = memo(({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </button>
+              {/* 씬 복제 */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onDuplicateScene?.(index); }}
+                className="p-1 hover:bg-amber-900/50 hover:text-amber-400 rounded transition-colors w-full flex justify-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
+                title={t('result.duplicateScene')}
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+              {/* 아래에 씬 추가 */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onAddScene?.(index); }}
+                className="p-1 hover:bg-brand-900/50 hover:text-brand-400 rounded transition-colors w-full flex justify-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
+                title={t('result.addSceneBelow')}
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
               {/* 삭제 */}
               <button
                 onClick={(e) => {
@@ -258,28 +280,6 @@ const TableRow: React.FC<TableRowProps> = memo(({
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-              {/* 아래에 씬 추가 */}
-              <button
-                onClick={(e) => { e.stopPropagation(); onAddScene?.(index); }}
-                className="p-1 hover:bg-brand-900/50 hover:text-brand-400 rounded transition-colors w-full flex justify-center"
-                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
-                title={t('result.addSceneBelow')}
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-              {/* 씬 복제 */}
-              <button
-                onClick={(e) => { e.stopPropagation(); onDuplicateScene?.(index); }}
-                className="p-1 hover:bg-amber-900/50 hover:text-amber-400 rounded transition-colors w-full flex justify-center"
-                style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}
-                title={t('result.duplicateScene')}
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </button>
             </div>
@@ -1236,16 +1236,16 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       <button onClick={() => onEditToggle?.(index)} className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }} title={t('result.editScene')}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
-                      <button onClick={() => { if (confirmDelete) { onDeleteScene?.(index); handleConfirmDeleteToggle(null); } else { handleConfirmDeleteToggle(index); } }}
-                        className={`h-9 w-9 rounded-lg flex items-center justify-center ${confirmDelete ? 'bg-red-600 text-white' : ''}`}
-                        style={confirmDelete ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
                       <button onClick={() => onDuplicateScene?.(index)} className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                       </button>
                       <button onClick={() => onAddScene?.(index)} className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      </button>
+                      <button onClick={() => { if (confirmDelete) { onDeleteScene?.(index); handleConfirmDeleteToggle(null); } else { handleConfirmDeleteToggle(index); } }}
+                        className={`h-9 w-9 rounded-lg flex items-center justify-center ${confirmDelete ? 'bg-red-600 text-white' : ''}`}
+                        style={confirmDelete ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                       {/* 위/아래 이동 */}
                       {index > 0 && (
