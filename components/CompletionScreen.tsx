@@ -17,6 +17,7 @@ interface CompletionScreenProps {
   elapsedSeconds: number;
   questProgress?: { completed: number; total: number };
   gachaTickets?: number;
+  bgmCost?: number;
   onClose: () => void;
   onOpenThumbnail?: () => void;
 }
@@ -29,6 +30,7 @@ export default function CompletionScreen({
   elapsedSeconds,
   questProgress,
   gachaTickets,
+  bgmCost = 0,
   onOpenThumbnail,
   onClose,
 }: CompletionScreenProps) {
@@ -36,7 +38,7 @@ export default function CompletionScreen({
   const ttsCredits = Math.ceil(cost.ttsCharacters / 1000) * 15;
   const videoCredits = cost.videoCount * 73;
   const scriptCredits = 5;
-  const totalCredits = scriptCredits + imgCredits + ttsCredits + videoCredits;
+  const totalCredits = scriptCredits + imgCredits + ttsCredits + videoCredits + bgmCost;
 
   const creditsPerScene = sceneCount > 0 ? totalCredits / sceneCount : 999;
   const grade = creditsPerScene <= 15 ? 'SS' : creditsPerScene <= 22 ? 'S' : creditsPerScene <= 30 ? 'AA' : 'A';
@@ -59,6 +61,7 @@ export default function CompletionScreen({
     { icon: '🖼️', label: t('completion.image'), count: `${cost.imageCount}${t('completion.unit.images')}`, credits: imgCredits },
     { icon: '🎙️', label: t('completion.tts'), count: `${cost.ttsCharacters}${t('completion.unit.chars')}`, credits: ttsCredits },
     { icon: '🎥', label: t('completion.video'), count: `${cost.videoCount}${t('completion.unit.videos')}`, credits: videoCredits },
+    ...(bgmCost > 0 ? [{ icon: '🎵', label: 'AI BGM', count: '', credits: bgmCost }] : []),
   ];
 
   return (

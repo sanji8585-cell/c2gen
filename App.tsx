@@ -36,12 +36,7 @@ import Playground from './components/Playground';
 import CreditShop from './components/CreditShop';
 import UserProfile from './components/UserProfile';
 import PaymentSuccess from './components/PaymentSuccess';
-import PresetWizard from './components/preset/PresetWizard';
-import EmotionCurveEditor from './components/EmotionCurveEditor';
-import CampaignDashboard from './components/CampaignDashboard';
-import { listPresets, deletePreset as deleteBrandPreset } from './services/brandPresetService';
-import { selectStoryArc, generateEmotionCurve } from './services/emotionCurveEngine';
-import type { BrandPreset, EmotionCurve } from './types';
+import PilotDashboard from './components/PilotDashboard';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
@@ -50,7 +45,7 @@ import { AI_PERSONALITY, PRO_TIPS, launchConfetti, getStorytellingPhase, getTime
 import { GalleryErrorBoundary, GlobalErrorBoundary, setupGlobalErrorReporting } from './components/ErrorBoundaries';
 setupGlobalErrorReporting();
 
-type ViewMode = 'main' | 'gallery' | 'playground' | 'presets' | 'campaigns';
+type ViewMode = 'main' | 'gallery' | 'playground' | 'pilot';
 
 // 인증 래퍼
 const App: React.FC = () => {
@@ -156,9 +151,11 @@ const AppContent: React.FC<{
   const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
   const [showIdleParticles] = useState(false); // 유휴 파티클 비활성화
   const generationStartRef = useRef<number>(0);
+  const aiBgmUsedRef = useRef(false);
   const [completionData, setCompletionData] = useState<{
     cost: any; sceneCount: number; xpGained: number; combo: number;
     elapsedSeconds: number; questProgress?: { completed: number; total: number }; gachaTickets?: number;
+    bgmCost?: number;
   } | null>(null);
   // Tip of the Day
   const [showTipOfDay, setShowTipOfDay] = useState(false);
@@ -173,27 +170,6 @@ const AppContent: React.FC<{
   const [showAchievements, setShowAchievements] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  // 브랜드 프리셋
-  const [showPresetWizard, setShowPresetWizard] = useState(false);
-  // 감정곡선
-  const [emotionCurve, setEmotionCurve] = useState<EmotionCurve | null>(null);
-  const [brandPresets, setBrandPresets] = useState<BrandPreset[]>([]);
-  const [presetsLoading, setPresetsLoading] = useState(false);
-  const [editingPreset, setEditingPreset] = useState<BrandPreset | undefined>();
-
-  const loadBrandPresets = useCallback(async () => {
-    if (!isAuthenticated) return;
-    setPresetsLoading(true);
-    try {
-      const presets = await listPresets();
-      setBrandPresets(presets);
-    } catch { /* silent */ }
-    finally { setPresetsLoading(false); }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (viewMode === 'presets' && isAuthenticated) loadBrandPresets();
-  }, [viewMode, isAuthenticated, loadBrandPresets]);
   // Konami
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiRef = useRef<string[]>([]);
@@ -483,6 +459,7 @@ const AppContent: React.FC<{
     isProcessingRef.current = true;
     isAbortedRef.current = false;
     generationStartRef.current = Date.now();
+    aiBgmUsedRef.current = false;
 
     setStep(GenerationStep.SCRIPTING);
     setProgressMessage(t('progress.booting'));
@@ -569,13 +546,6 @@ const AppContent: React.FC<{
       }));
       assetsRef.current = initialAssets;
       setGeneratedData(initialAssets);
-
-      // 감정곡선 자동 생성
-      try {
-        const arc = selectStoryArc(targetTopic);
-        const curve = generateEmotionCurve(arc, 'youtube_shorts', initialAssets.length * 8);
-        setEmotionCurve(curve);
-      } catch { /* 감정곡선 실패해도 계속 진행 */ }
 
       // 스크립트 검토 단계에서 멈춤 — 사용자가 확인/편집 후 "생성 시작" 클릭
       pendingGenContextRef.current = { targetTopic, refImgs, language, hasRefImages, sourceText };
@@ -760,7 +730,7 @@ const AppContent: React.FC<{
           try {
             const bgmDurationMs = (localStorage.getItem('tubegen_bgm_duration') === '60' ? 60 : 30) * 1000;
             const musicResult = await generateMusicWithElevenLabs(detectedMood, bgmDurationMs);
-            if (musicResult.audioBase64) base64 = musicResult.audioBase64;
+            if (musicResult.audioBase64) { base64 = musicResult.audioBase64; aiBgmUsedRef.current = true; }
           } catch { /* ElevenLabs 실패 시 정적 파일 폴백 */ }
 
           // 폴백: 정적 BGM 파일
@@ -882,6 +852,7 @@ const AppContent: React.FC<{
             elapsedSeconds: elapsed,
             questProgress: questTotal > 0 ? { completed: questCompleted, total: questTotal } : undefined,
             gachaTickets: result.gachaResult ? 1 : undefined,
+            bgmCost: aiBgmUsedRef.current ? 50 : 0,
           });
         } else {
           // 비로그인 또는 recordAction 실패 시에도 결과 화면 표시
@@ -892,6 +863,7 @@ const AppContent: React.FC<{
             xpGained: 0,
             combo: sessionComboRef.current + 1,
             elapsedSeconds: elapsed,
+            bgmCost: aiBgmUsedRef.current ? 50 : 0,
           });
         }
       } else {
@@ -903,6 +875,7 @@ const AppContent: React.FC<{
           xpGained: 0,
           combo: sessionComboRef.current + 1,
           elapsedSeconds: elapsed,
+          bgmCost: aiBgmUsedRef.current ? 50 : 0,
         });
       }
 
@@ -1436,117 +1409,15 @@ const AppContent: React.FC<{
         )
       )}
 
-      {/* 브랜드 프리셋 뷰 */}
-      {viewMode === 'presets' && (
+      {/* C2 PILOT 뷰 */}
+      {viewMode === 'pilot' && (
         isAuthenticated ? (
-          <div className="max-w-5xl mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>브랜드 프리셋</h2>
-                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>브랜드 세계관, 캐릭터, 화풍, 톤을 설정하세요</p>
-              </div>
-              <button
-                onClick={() => { setEditingPreset(undefined); setShowPresetWizard(true); }}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm font-semibold rounded-lg transition-all"
-              >
-                + 새 프리셋
-              </button>
-            </div>
-
-            {presetsLoading ? (
-              <div className="text-center py-12">
-                <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>프리셋 불러오는 중...</p>
-              </div>
-            ) : brandPresets.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {brandPresets.map(preset => (
-                  <div
-                    key={preset.id}
-                    className="rounded-xl border p-5 transition-all hover:shadow-lg cursor-pointer group"
-                    style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
-                    onClick={() => { setEditingPreset(preset); setShowPresetWizard(true); }}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{preset.name}</h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full shrink-0 ml-2" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>
-                        Step {preset.wizard_step || 1}/6
-                      </span>
-                    </div>
-                    {preset.description && (
-                      <p className="text-xs mb-3 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{preset.description}</p>
-                    )}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {preset.target_audience && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(8,145,178,0.1)', color: '#0891b2' }}>{preset.target_audience}</span>
-                      )}
-                      {preset.character_profiles?.length > 0 && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-muted)' }}>캐릭터 {preset.character_profiles.length}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{new Date(preset.updated_at).toLocaleDateString('ko-KR')}</span>
-                      <button
-                        onClick={async (e) => { e.stopPropagation(); if (confirm('프리셋을 삭제하시겠습니까?')) { await deleteBrandPreset(preset.id); loadBrandPresets(); } }}
-                        className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded hover:bg-red-500/10"
-                        style={{ color: '#ef4444' }}
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border p-8 text-center" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--bg-elevated)' }}>
-                  <svg className="w-8 h-8" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                  </svg>
-                </div>
-                <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>아직 프리셋이 없습니다</p>
-                <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>브랜드 프리셋을 만들어 일관된 콘텐츠를 생성하세요</p>
-                <button
-                  onClick={() => { setEditingPreset(undefined); setShowPresetWizard(true); }}
-                  className="px-4 py-2 text-sm font-medium rounded-lg border transition-colors hover:border-cyan-500/50"
-                  style={{ borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
-                >
-                  프리셋 만들기
-                </button>
-              </div>
-            )}
-          </div>
+          <PilotDashboard onClose={() => setViewMode('main')} />
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-16 text-center">
             <div className="rounded-2xl border p-8" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
               <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>로그인이 필요합니다</h3>
-              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>브랜드 프리셋을 사용하려면 로그인하세요</p>
-              <button onClick={() => setShowAuthModal(true)} className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all">
-                로그인 / 회원가입
-              </button>
-            </div>
-          </div>
-        )
-      )}
-
-      {/* 프리셋 위자드 모달 */}
-      {showPresetWizard && (
-        <PresetWizard
-          onClose={() => { setShowPresetWizard(false); loadBrandPresets(); }}
-          onComplete={() => { setShowPresetWizard(false); loadBrandPresets(); }}
-          editPreset={editingPreset}
-        />
-      )}
-
-      {/* 캠페인 뷰 */}
-      {viewMode === 'campaigns' && (
-        isAuthenticated ? (
-          <CampaignDashboard onClose={() => setViewMode('main')} />
-        ) : (
-          <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-            <div className="rounded-2xl border p-8" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
-              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>로그인이 필요합니다</h3>
-              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>캠페인을 관리하려면 로그인하세요</p>
+              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>C2 PILOT을 사용하려면 로그인하세요</p>
               <button onClick={() => setShowAuthModal(true)} className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-lg transition-all">
                 로그인 / 회원가입
               </button>
@@ -1642,16 +1513,7 @@ const AppContent: React.FC<{
 
         {/* 썸네일 생성 버튼 — ResultTable 툴바로 이동됨 */}
 
-        {/* 감정곡선 에디터 */}
-        {step === GenerationStep.SCRIPT_REVIEW && emotionCurve && (
-          <div className="max-w-7xl mx-auto px-4 mb-4">
-            <EmotionCurveEditor
-              curve={emotionCurve}
-              onChange={setEmotionCurve}
-              totalDuration={emotionCurve.total_duration}
-            />
-          </div>
-        )}
+        {/* 감정곡선 에디터는 C2 PILOT 안에서만 사용 */}
 
         {/* 스크립트 검토 배너 */}
         {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (() => {
@@ -1662,7 +1524,9 @@ const AppContent: React.FC<{
           const scriptCost = 5;
           const imgTotal = sc * imgPer;
           const ttsTotal = Math.max(15, Math.ceil(totalChars / 1000) * 15);
-          const est = scriptCost + imgTotal + ttsTotal;
+          const autoBgmEnabled = localStorage.getItem('tubegen_auto_bgm') === 'true';
+          const bgmCost = (autoBgmEnabled && !bgmData) ? 50 : 0;
+          const est = scriptCost + imgTotal + ttsTotal + bgmCost;
           const isInsufficientCredits = userPlan !== 'operator' && userCredits < est;
 
           return (
@@ -1759,6 +1623,24 @@ const AppContent: React.FC<{
                         </div>
                         <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{ttsTotal}</span>
                       </div>
+                      {bgmCost > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(168,85,247,0.15)' }}>🎵</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>AI BGM <span className="text-[10px] opacity-60">({localStorage.getItem('tubegen_bgm_duration') || '30'}초)</span></span>
+                          </div>
+                          <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{bgmCost}</span>
+                        </div>
+                      )}
+                      {bgmData && !autoBgmEnabled && (
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(168,85,247,0.15)' }}>🎵</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>BGM <span className="text-[10px] opacity-60">(선택됨)</span></span>
+                          </div>
+                          <span className="font-bold tabular-nums text-green-400" style={{}}>무료</span>
+                        </div>
+                      )}
                       <div className="border-t pt-2 mt-1 flex items-center justify-between" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
                         <span className="text-sm font-black" style={{ color: '#f59e0b' }}>{t('scriptReview.estimatedTotal')}</span>
                         <span className="text-lg font-black tabular-nums" style={{ color: '#f59e0b' }}>{est} <span className="text-xs font-bold">{t('common.credits')}</span></span>
