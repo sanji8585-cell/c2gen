@@ -26,7 +26,7 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
     try {
       const token = localStorage.getItem('c2gen_session_token');
       if (!token) return;
-      const r = await fetch('/api/auth', {
+      const r = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'getCreditHistory', token, limit: 50 }),

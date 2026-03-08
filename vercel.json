@@ -16,6 +16,7 @@
     "api/gamification.ts": { "maxDuration": 60 },
     "api/payments.ts": { "maxDuration": 15 },
     "api/projects.ts": { "maxDuration": 15 },
-    "api/playground.ts": { "maxDuration": 10 }
+    "api/playground.ts": { "maxDuration": 10 },
+    "api/user.ts": { "maxDuration": 30 }
   }
 }

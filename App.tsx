@@ -182,7 +182,7 @@ const AppContent: React.FC<{
     const token = localStorage.getItem('c2gen_session_token');
     if (!token) return;
     try {
-      const r = await fetch('/api/auth', {
+      const r = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'getCredits', token }),
@@ -192,7 +192,7 @@ const AppContent: React.FC<{
       if (d.plan) setUserPlan(d.plan);
       // 아바타 URL 로드 (프로필 API)
       if (!userAvatarUrl) {
-        fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getProfile', token }) })
+        fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getProfile', token }) })
           .then(r => r.json()).then(p => { if (p.avatarUrl) setUserAvatarUrl(p.avatarUrl); }).catch(() => {});
       }
     } catch { /* ignore */ }

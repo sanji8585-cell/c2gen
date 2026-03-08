@@ -109,7 +109,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
     if (!token) return;
     setLoading(true);
     try {
-      const r = await fetch('/api/auth', {
+      const r = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'getProfile', token }),
@@ -127,7 +127,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
     if (!token) return;
     setHistoryLoading(true);
     try {
-      const r = await fetch('/api/auth', {
+      const r = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'getCreditHistory', token, limit: 50 }),
@@ -176,7 +176,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
     if (!token) return;
     setInquiryLoading(true);
     try {
-      const r = await fetch('/api/auth', {
+      const r = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'getMyInquiries', token }),
@@ -198,7 +198,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
     setSaving(true);
     setMessage(null);
     try {
-      const r = await fetch('/api/auth', {
+      const r = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'updateProfile', token, name: newName.trim() }),
@@ -296,7 +296,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
     setChangingPassword(true);
     setMessage(null);
     try {
-      const r = await fetch('/api/auth', {
+      const r = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'changePassword', token, currentPassword, newPassword }),
@@ -947,7 +947,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                       if (!inquirySubject.trim() || !inquiryContent.trim()) { setMessage({ type: 'error', text: t('profile.inqFillAll', '제목과 내용을 입력해주세요.') }); return; }
                       setSubmittingInquiry(true);
                       try {
-                        const r = await fetch('/api/auth', {
+                        const r = await fetch('/api/user', {
                           method: 'POST', headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ action: 'submitInquiry', token, category: inquiryCategory, subject: inquirySubject.trim(), content: inquiryContent.trim() }),
                         });
@@ -989,7 +989,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                           onClick={() => {
                             setExpandedInquiry(isExpanded ? null : inq.id);
                             if (!isExpanded && inq.status === 'replied' && !inq.read_by_user) {
-                              fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ action: 'markInquiryRead', token, inquiryId: inq.id }) }).catch(() => {});
                               setInquiries(prev => prev.map(i => i.id === inq.id ? { ...i, read_by_user: true } : i));
                               setInquiryUnread(prev => Math.max(0, prev - 1));

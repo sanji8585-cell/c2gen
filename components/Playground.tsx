@@ -137,7 +137,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
     if (!isAuthenticated) return;
     const token = localStorage.getItem('c2gen_session_token');
     if (!token) return;
-    fetch('/api/auth', {
+    fetch('/api/user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'getProfile', token }),

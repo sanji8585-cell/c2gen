@@ -202,7 +202,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     // 서버에서 프리셋 목록 로드 (로그인 시)
     const token = localStorage.getItem('c2gen_session_token');
     if (token) {
-      fetch('/api/auth', {
+      fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'preset-list', token }),
@@ -233,7 +233,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
 
     // 즐겨찾기 음성 로드
     if (token) {
-      fetch('/api/auth', {
+      fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'favorite-voice-list', token }),
@@ -340,7 +340,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     }
 
     try {
-      await fetch('/api/auth', {
+      await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -515,7 +515,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     if (token) {
       // 서버 저장
       try {
-        const r = await fetch('/api/auth', {
+        const r = await fetch('/api/user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'preset-save', token, preset: { name: newProjectName.trim(), settings } }),
@@ -616,7 +616,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     const token = localStorage.getItem('c2gen_session_token');
     if (token) {
       try {
-        await fetch('/api/auth', {
+        await fetch('/api/user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'preset-delete', token, presetId: projectId }),
@@ -640,7 +640,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
 
     if (token) {
       try {
-        const r = await fetch('/api/auth', {
+        const r = await fetch('/api/user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'preset-save', token, preset: { id: project.id, name: project.name, settings } }),
