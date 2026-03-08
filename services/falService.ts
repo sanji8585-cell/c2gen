@@ -51,7 +51,7 @@ async function callFalProxy(action: string, params: Record<string, any>): Promis
 
 // ── 동시 영상 변환 제한 (최대 2개) ──
 
-const MAX_CONCURRENT_VIDEOS = 2;
+const MAX_CONCURRENT_VIDEOS = 4;
 let activeVideoCount = 0;
 const videoQueue: Array<{ resolve: (token: void) => void }> = [];
 
@@ -122,8 +122,8 @@ export async function generateVideoFromImage(
     console.log('[FAL] 요청 ID:', requestId);
 
     // Step 3: 완료까지 폴링 (연속 실패 시 조기 종료)
-    const POLL_INTERVAL = 4000;
-    const MAX_POLLS = 45;          // 최대 3분
+    const POLL_INTERVAL = 2000;
+    const MAX_POLLS = 90;          // 최대 3분 (2초 × 90)
     const MAX_CONSECUTIVE_FAILS = 5; // 연속 5회 폴링 실패 시 조기 종료
     let consecutiveFails = 0;
 
