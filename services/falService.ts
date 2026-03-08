@@ -49,7 +49,7 @@ async function callFalProxy(action: string, params: Record<string, any>): Promis
   return res.json();
 }
 
-// ── 동시 영상 변환 제한 (최대 2개) ──
+// ── 동시 영상 변환 제한 (최대 4개) ──
 
 const MAX_CONCURRENT_VIDEOS = 4;
 let activeVideoCount = 0;

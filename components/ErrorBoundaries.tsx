@@ -84,6 +84,8 @@ export class GlobalErrorBoundary extends React.Component<
 // 전역 JS 에러 리포팅
 export function setupGlobalErrorReporting() {
   if (typeof window === 'undefined') return;
+  if ((window as any).__c2gen_error_reporting_initialized) return;
+  (window as any).__c2gen_error_reporting_initialized = true;
 
   const reportClientError = (message: string, stack?: string) => {
     const token = localStorage.getItem('c2gen_session_token');

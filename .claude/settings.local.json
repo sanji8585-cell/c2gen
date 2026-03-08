@@ -32,7 +32,12 @@
       "Bash(git push origin v9.2-stable)",
       "Bash(git add constants/uiConstants.ts hooks/useProjectManagement.ts contexts/AuthContext.tsx components/ErrorBoundaries.tsx App.tsx)",
       "Bash(git commit:*)",
-      "Bash(sort -t: -k2 -rn)"
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(git tag v9.3-refactored)",
+      "Bash(git push origin v9.3-refactored)",
+      "Bash(rm /c/Users/최천둥/Desktop/c2gen/api/lib/authUtils.ts)",
+      "Bash(rmdir /c/Users/최천둥/Desktop/c2gen/api/lib)",
+      "WebFetch(domain:elevenlabs.io)"
     ]
   }
 }

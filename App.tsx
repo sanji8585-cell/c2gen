@@ -20,7 +20,6 @@ import { generateAmbientBgm } from './services/bgmGenerator';
 import { useGameState } from './hooks/useGameState';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useProjectManagement } from './hooks/useProjectManagement';
-import type { RecordActionResponse } from './types/gamification';
 import GameOverlay from './components/GameOverlay';
 import DailyQuestPanel from './components/DailyQuestPanel';
 import EventBanner from './components/EventBanner';
