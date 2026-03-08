@@ -691,7 +691,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
             top: saveButtonRef.current ? saveButtonRef.current.getBoundingClientRect().bottom + 6 : 0,
             right: saveButtonRef.current ? window.innerWidth - saveButtonRef.current.getBoundingClientRect().right : 0,
           }}>
-          <button onClick={async () => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowSaveMenu(false); }}
+          <button onClick={async () => { await exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowSaveMenu(false); }}
             className="w-full px-4 py-3 text-left text-sm font-bold flex items-center gap-2.5 hover:bg-[var(--bg-hover)] transition-colors text-brand-400">
             <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
             {t('result.saveAll', '전체 저장 (엑셀+이미지+SRT)')}
@@ -887,7 +887,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               </button>
             </div>
             <div className="py-2">
-              <button onClick={async () => { exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); await downloadSrt(data, `subtitles_${Date.now()}.srt`); setShowMobileSaveMenu(false); }}
+              <button onClick={async () => { await exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`); setShowMobileSaveMenu(false); }}
                 className="w-full px-5 py-4 text-left text-sm font-bold flex items-center gap-3 active:bg-[var(--bg-hover)] text-brand-400">
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                 {t('result.saveAll', '전체 저장 (엑셀+이미지+SRT)')}

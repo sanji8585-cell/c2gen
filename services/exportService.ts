@@ -5,8 +5,10 @@
  */
 
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { GeneratedAsset, SavedProject } from '../types';
+import { generateSrtContent } from './srtService';
 
 /**
  * 파일명에 사용할 수 없는 문자 제거
@@ -122,14 +124,56 @@ export async function exportAssetsToZip(
     });
   }
 
-  // 엑셀 파일 생성 및 다운로드
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  });
-
+  // ZIP 생성
+  const zip = new JSZip();
   const safeName = sanitizeFilename(projectName);
-  saveAs(blob, `${safeName}_스토리보드.xlsx`);
+
+  // 1. 엑셀 파일
+  const excelBuffer = await workbook.xlsx.writeBuffer();
+  zip.file(`${safeName}_스토리보드.xlsx`, excelBuffer);
+
+  // 2. 이미지 파일들
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
+    const num = String(asset.sceneNumber || i + 1).padStart(2, '0');
+    if (asset.imageData) {
+      zip.file(`images/scene_${num}.png`, base64ToBuffer(asset.imageData));
+    }
+  }
+
+  // 3. 영상 파일들 (videoData가 URL인 경우 fetch, base64인 경우 직접)
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
+    if (!asset.videoData) continue;
+    const num = String(asset.sceneNumber || i + 1).padStart(2, '0');
+    try {
+      if (asset.videoData.startsWith('http')) {
+        const res = await fetch(asset.videoData);
+        if (res.ok) zip.file(`videos/scene_${num}.mp4`, await res.blob());
+      } else if (asset.videoData.startsWith('data:')) {
+        const b64 = asset.videoData.split(',')[1];
+        if (b64) zip.file(`videos/scene_${num}.mp4`, base64ToBuffer(b64));
+      }
+    } catch {}
+  }
+
+  // 4. SRT 자막 파일
+  try {
+    const srtContent = await generateSrtContent(assets);
+    zip.file(`${safeName}_subtitles.srt`, srtContent);
+  } catch {}
+
+  // 5. 오디오 파일들
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
+    if (!asset.audioData) continue;
+    const num = String(asset.sceneNumber || i + 1).padStart(2, '0');
+    zip.file(`audio/scene_${num}.mp3`, base64ToBuffer(asset.audioData));
+  }
+
+  // ZIP 생성 및 다운로드
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  saveAs(zipBlob, `${safeName}_전체저장.zip`);
 }
 
 /**
