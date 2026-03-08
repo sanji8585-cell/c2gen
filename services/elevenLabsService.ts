@@ -165,15 +165,18 @@ export const generateAudioWithElevenLabs = async (
 
       console.log(`[ElevenLabs] 모델: ${finalModelId}, 속도: ${speed}x, 자막: ${words.length}개 단어, 추정 길이: ${estimatedDuration?.toFixed(2)}초`);
 
-      try {
-        const meaningChunks = await createMeaningChunks(text, words);
+      // 자막 의미 청킹을 비동기로 처리 (오디오 반환을 블로킹하지 않음)
+      const chunkingPromise = createMeaningChunks(text, words).then(meaningChunks => {
         if (meaningChunks.length > 0) {
-          subtitleData.meaningChunks = meaningChunks;
+          subtitleData!.meaningChunks = meaningChunks;
           console.log(`[ElevenLabs] AI 의미 단위 분리 완료: ${meaningChunks.length}개 청크`);
         }
-      } catch (e) {
+      }).catch(e => {
         console.warn('[ElevenLabs] AI 자막 분리 실패, 단어 기반 방식 사용:', e);
-      }
+      });
+
+      // 청킹 완료를 기다리되 최대 2초만 (넘으면 백그라운드 처리)
+      await Promise.race([chunkingPromise, new Promise(r => setTimeout(r, 2000))]);
     }
 
     return { audioData: audioBase64, subtitleData, estimatedDuration };
