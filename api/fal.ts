@@ -53,7 +53,7 @@ async function logError(action: string, errorMessage: string, options?: {
       request_context: options?.context,
       created_at: new Date().toISOString(),
     });
-  } catch {}
+  } catch (_e) { /* ignore */ }
 }
 
 // ── 크레딧 차감 ──

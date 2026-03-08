@@ -56,7 +56,7 @@ async function resolveEquippedItems(
     if (eq.equipped_frame) allItemIds.push(eq.equipped_frame);
     if (Array.isArray(eq.equipped_badges)) allItemIds.push(...eq.equipped_badges);
   }
-  const uniqueIds = [...new Set(allItemIds.filter(Boolean))];
+  const uniqueIds = Array.from(new Set(allItemIds.filter(Boolean)));
 
   let itemMap: Record<string, { id: string; name: string; emoji: string; rarity: string }> = {};
   if (uniqueIds.length > 0) {
@@ -187,7 +187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 좋아요/북마크 + 장착 아이템 + 레벨 모두 병렬 조회
-        const uniqueEmails = [...new Set(resultPosts.map((p: any) => p.email))] as string[];
+        const uniqueEmails = Array.from(new Set(resultPosts.map((p: any) => p.email))) as string[];
         const postIds = resultPosts.map((p: any) => p.id);
 
         const parallelQueries: Promise<any>[] = [
@@ -501,7 +501,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const allCommentEmails: string[] = [];
         resultComments.forEach((c: any) => allCommentEmails.push(c.email));
         Object.values(replies).forEach(arr => arr.forEach(r => allCommentEmails.push(r.email)));
-        const uniqueCommentEmails = [...new Set(allCommentEmails)];
+        const uniqueCommentEmails = Array.from(new Set(allCommentEmails));
         const [commentEquipped, commentLevels] = await Promise.all([
           resolveEquippedItems(supabase, uniqueCommentEmails),
           resolveLevels(supabase, uniqueCommentEmails),
@@ -874,7 +874,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (filter === 'flagged') query = query.eq('flagged', true);
         if (filter === 'reported') {
           const { data: reportedIds } = await supabase.from('playground_reports').select('post_id');
-          const ids = [...new Set((reportedIds || []).map((r: any) => r.post_id))];
+          const ids = Array.from(new Set((reportedIds || []).map((r: any) => r.post_id)));
           if (ids.length > 0) query = query.in('id', ids);
           else return res.json({ success: true, posts: [], total: 0 });
         }
@@ -959,7 +959,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { data: reports, count } = await query;
 
         // 게시물 정보 조인
-        const postIds = [...new Set((reports || []).map((r: any) => r.post_id))];
+        const postIds = Array.from(new Set((reports || []).map((r: any) => r.post_id)));
         let postMap: Record<string, any> = {};
         if (postIds.length > 0) {
           const { data: posts } = await supabase.from('playground_posts')
@@ -995,7 +995,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { data: comments, count } = await query;
 
         // 게시물 제목 조인
-        const cPostIds = [...new Set((comments || []).map((c: any) => c.post_id))];
+        const cPostIds = Array.from(new Set((comments || []).map((c: any) => c.post_id)));
         let cPostMap: Record<string, string> = {};
         if (cPostIds.length > 0) {
           const { data: posts } = await supabase.from('playground_posts').select('id, topic').in('id', cPostIds);

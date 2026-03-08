@@ -1,8 +1,36 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import {
-  getSupabase, hashPassword, generateSalt, verifyPassword,
-  validateAdminSession,
-} from './lib/authUtils';
+import * as crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+
+// ── Shared utilities (inlined for Vercel serverless compatibility) ──
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
+  return createClient(url, key);
+}
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
+
+function generateSalt(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function verifyPassword(password: string, hash: string, salt: string): boolean {
+  const computed = hashPassword(password, salt);
+  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
+}
+
+async function validateAdminSession(supabase: ReturnType<typeof getSupabase>, adminToken: string): Promise<boolean> {
+  if (!adminToken) return false;
+  const { data } = await supabase
+    .from('c2gen_sessions').select('email').eq('token', adminToken)
+    .gt('expires_at', new Date().toISOString()).single();
+  return data?.email === 'admin';
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

@@ -1,11 +1,47 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'crypto';
-import {
-  getSupabase, hashPassword, generateSalt, verifyPassword,
-  getKSTDateStr, validateAdminSession,
-  SESSION_TTL, ADMIN_SESSION_TTL,
-  type SessionData,
-} from './lib/authUtils';
+import * as crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+
+// ── Shared utilities (inlined for Vercel serverless compatibility) ──
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
+  return createClient(url, key);
+}
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
+
+function generateSalt(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function verifyPassword(password: string, hash: string, salt: string): boolean {
+  const computed = hashPassword(password, salt);
+  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
+}
+
+function getKSTDateStr(offsetDays = 0): string {
+  const now = new Date(Date.now() + offsetDays * 86400000);
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
+interface SessionData { email: string; name: string; }
+
+const SESSION_TTL = 7 * 24 * 60 * 60;
+const ADMIN_SESSION_TTL = 4 * 60 * 60;
+
+async function validateAdminSession(supabase: ReturnType<typeof getSupabase>, adminToken: string): Promise<boolean> {
+  if (!adminToken) return false;
+  const { data } = await supabase
+    .from('c2gen_sessions').select('email').eq('token', adminToken)
+    .gt('expires_at', new Date().toISOString()).single();
+  return data?.email === 'admin';
+}
 
 // ── 핸들러 ──
 
@@ -501,7 +537,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               frame: eq.equipped_frame || null,
             };
           }
-        } catch {}
+        } catch (_e) { /* ignore */ }
 
         // 업적 요약
         let achievementSummary = { unlocked: 0, total: 0 };
@@ -509,7 +545,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const { data: achUnlocked } = await supabase.from('c2gen_user_achievements').select('id').eq('email', email).eq('unlocked', true);
           const { data: achTotal } = await supabase.from('c2gen_achievements').select('id');
           achievementSummary = { unlocked: achUnlocked?.length ?? 0, total: achTotal?.length ?? 0 };
-        } catch {}
+        } catch (_e) { /* ignore */ }
 
         return res.json({
           breakdown,
@@ -626,7 +662,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .lte('start_at', now)
             .gte('end_at', now);
           activeEventsCount = evts?.length ?? 0;
-        } catch {}
+        } catch (_e) { /* ignore */ }
 
         return res.json({
           // Supabase count returns in headers, use length as fallback
@@ -1154,7 +1190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 remaining: sub.character_limit - sub.character_count,
               };
             }
-          } catch {}
+          } catch (_e) { /* ignore */ }
         }
 
         // Gemini

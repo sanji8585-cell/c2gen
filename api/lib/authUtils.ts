@@ -2,7 +2,7 @@
  * 공유 유틸리티 (auth, gamification, user API에서 공통 사용)
  */
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 // ── Supabase 클라이언트 ──
 
@@ -118,5 +118,5 @@ export async function logUsage(
       cost_usd: cost,
       created_at: new Date().toISOString(),
     });
-  } catch {};
+  } catch (_e) { /* ignore */ }
 }

@@ -1,5 +1,28 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSupabase, getKSTDateStr, validateAdminSession } from './lib/authUtils';
+import { createClient } from '@supabase/supabase-js';
+
+// ── Shared utilities (inlined for Vercel serverless compatibility) ──
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
+  return createClient(url, key);
+}
+
+function getKSTDateStr(offsetDays = 0): string {
+  const now = new Date(Date.now() + offsetDays * 86400000);
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
+async function validateAdminSession(supabase: ReturnType<typeof getSupabase>, adminToken: string): Promise<boolean> {
+  if (!adminToken) return false;
+  const { data } = await supabase
+    .from('c2gen_sessions').select('email').eq('token', adminToken)
+    .gt('expires_at', new Date().toISOString()).single();
+  return data?.email === 'admin';
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -171,10 +194,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (eqData?.equipped_badges?.length > 0) equippedItemIds.push(...eqData.equipped_badges);
 
         // 인벤토리 아이템 ID 수집
-        const invItemIds = [...new Set((invData || []).map((i: any) => i.item_id))];
+        const invItemIds = Array.from(new Set((invData || []).map((i: any) => i.item_id)));
 
         // 모든 필요한 gacha_pool ID를 합쳐서 한 번에 조회
-        const allGachaIds = [...new Set([...equippedItemIds, ...invItemIds])];
+        const allGachaIds = Array.from(new Set([...equippedItemIds, ...invItemIds]));
 
         // 퀘스트 처리 준비
         let todayQuests = questResult;
@@ -1187,7 +1210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             equippedTitle = eq.equipped_title || '';
             equippedTitleEmoji = eq.equipped_title_emoji || '';
           }
-        } catch {}
+        } catch (_e) { /* ignore */ }
 
         // profile 매핑 (프론트엔드 기대 형식)
         const profile = usr ? {

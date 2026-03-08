@@ -193,7 +193,7 @@ async function logError(action: string, errorMessage: string, options?: {
       request_context: options?.context,
       created_at: new Date().toISOString(),
     });
-  } catch {}
+  } catch (_e) { /* ignore */ }
 }
 
 // ── 크레딧 차감 ─────────────────────────────
@@ -260,7 +260,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             responseMimeType: 'application/json',
           },
         });
-        return res.json(JSON.parse(cleanJsonResponse(response.text)));
+        return res.json(JSON.parse(cleanJsonResponse(response.text ?? '')));
       }
 
       // ── 스크립트 생성 (단일 청크) ──
@@ -482,7 +482,7 @@ JSON array only. Example: ["chunk1", "chunk2"]`;
           config: { responseMimeType: 'application/json' },
         });
 
-        const chunks = JSON.parse(cleanJsonResponse(response.text));
+        const chunks = JSON.parse(cleanJsonResponse(response.text ?? ''));
         const reconstructed = chunks.join('');
 
         if (reconstructed !== narration) {
@@ -530,7 +530,7 @@ Return ONLY the motion prompt, no explanation.`;
           contents: prompt,
           config: { responseMimeType: 'application/json' },
         });
-        return res.json(JSON.parse(cleanJsonResponse(response.text)));
+        return res.json(JSON.parse(cleanJsonResponse(response.text ?? '')));
       }
 
       // ── 썸네일 이미지 생성 ──
