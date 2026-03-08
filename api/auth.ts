@@ -1,61 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-
-// ── Supabase 클라이언트 ──
-
-function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
-  return createClient(url, key);
-}
-
-// ── 비밀번호 해싱 (PBKDF2, Node.js 내장) ──
-
-function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
-}
-
-function generateSalt(): string {
-  return crypto.randomBytes(32).toString('hex');
-}
-
-function verifyPassword(password: string, hash: string, salt: string): boolean {
-  const computed = hashPassword(password, salt);
-  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
-}
-
-// ── KST 날짜 헬퍼 (UTC+9) ──
-function getKSTDateStr(offsetDays = 0): string {
-  const now = new Date(Date.now() + offsetDays * 86400000);
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10);
-}
-
-// ── 타입 ──
-
-interface SessionData {
-  email: string;
-  name: string;
-}
-
-// ── 세션 TTL ──
-const SESSION_TTL = 7 * 24 * 60 * 60; // 7일 (초)
-const ADMIN_SESSION_TTL = 4 * 60 * 60; // 4시간 (초)
-
-// ── 관리자 세션 검증 헬퍼 ──
-
-async function validateAdminSession(supabase: ReturnType<typeof getSupabase>, adminToken: string): Promise<boolean> {
-  if (!adminToken) return false;
-  const { data } = await supabase
-    .from('c2gen_sessions')
-    .select('email')
-    .eq('token', adminToken)
-    .gt('expires_at', new Date().toISOString())
-    .single();
-  return data?.email === 'admin';
-}
+import {
+  getSupabase, hashPassword, generateSalt, verifyPassword,
+  getKSTDateStr, validateAdminSession,
+  SESSION_TTL, ADMIN_SESSION_TTL,
+  type SessionData,
+} from './lib/authUtils';
 
 // ── 핸들러 ──
 
