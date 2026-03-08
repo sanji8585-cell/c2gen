@@ -619,6 +619,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const [autoZoomPattern, setAutoZoomPattern] = useState('');
   const [showMobileSettings, setShowMobileSettings] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [showMobileSaveMenu, setShowMobileSaveMenu] = useState(false);
   const [expandedCardPrompt, setExpandedCardPrompt] = useState<number | null>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
@@ -675,6 +677,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
       setTimeout(() => setConfirmDeleteIndex(prev => prev === idx ? null : prev), 3000);
     }
   }, []);
+
+  const handleSaveProject = useCallback(async () => {
+    if (!onSaveProject || savingProject) return;
+    setSavingProject(true);
+    setSaveSuccess(false);
+    try {
+      await onSaveProject();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 1500);
+    } catch {} finally {
+      setSavingProject(false);
+    }
+  }, [onSaveProject, savingProject]);
 
   if (data.length === 0) return null;
 
@@ -763,11 +778,21 @@ const ResultTable: React.FC<ResultTableProps> = ({
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
             </button>
             {onSaveProject && (
-              <button onClick={onSaveProject}
-                className="h-10 w-10 rounded-lg flex items-center justify-center border"
-                style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
-                title={t('result.saveProject', '프로젝트 저장')}>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+              <button onClick={handleSaveProject} disabled={savingProject}
+                className={`h-10 px-2.5 rounded-lg text-[10px] font-bold flex items-center gap-1 border ${
+                  saveSuccess ? 'bg-green-500/20 border-green-500/40 text-green-400'
+                  : savingProject ? 'opacity-60 cursor-wait border-brand-500/40'
+                  : ''
+                }`}
+                style={saveSuccess || savingProject ? undefined : { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                {savingProject ? (
+                  <div className="w-4 h-4 border-2 border-brand-400 border-t-transparent animate-spin rounded-full" />
+                ) : saveSuccess ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                )}
+                {savingProject ? '저장중' : saveSuccess ? '완료' : '저장'}
               </button>
             )}
             <button onClick={() => setShowMobileSettings(true)}
@@ -1111,11 +1136,21 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
           {/* 프로젝트 저장 */}
           {onSaveProject && (
-            <button onClick={onSaveProject}
-              className="h-8 w-8 rounded-lg transition-all flex items-center justify-center hover:bg-[var(--bg-hover)]"
-              style={{ color: 'var(--text-secondary)' }}
-              title={t('result.saveProject', '프로젝트 저장')}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+            <button onClick={handleSaveProject} disabled={savingProject}
+              className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
+                saveSuccess ? 'bg-green-500/20 border-green-500/40 text-green-400'
+                : savingProject ? 'opacity-60 cursor-wait border-brand-500/40'
+                : 'hover:bg-[var(--bg-hover)] border-[var(--border-subtle)]'
+              }`}
+              style={saveSuccess || savingProject ? undefined : { backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>
+              {savingProject ? (
+                <div className="w-3.5 h-3.5 border-2 border-brand-400 border-t-transparent animate-spin rounded-full" />
+              ) : saveSuccess ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+              )}
+              {savingProject ? '저장 중...' : saveSuccess ? '저장 완료' : '프로젝트 저장'}
             </button>
           )}
 
