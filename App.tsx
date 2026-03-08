@@ -783,7 +783,7 @@ const AppContent: React.FC<{
 
     try {
       const runAudio = async () => {
-          const TTS_CONCURRENCY = 8; // 동시 TTS 생성 수
+          const TTS_CONCURRENCY = 5; // 동시 TTS 생성 수 (ElevenLabs 동시 요청 제한)
           const MAX_TTS_RETRIES = 2;
           let completedCount = 0;
 
