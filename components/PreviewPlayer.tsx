@@ -458,9 +458,10 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
 
         // 첫 프레임 렌더
         renderStaticFrame(0, prepared);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setLoadError(e.message || '에셋 로딩 실패');
+          const msg = e instanceof Error ? e.message : String(e);
+          setLoadError(msg || '에셋 로딩 실패');
           setIsLoading(false);
         }
       }

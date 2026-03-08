@@ -84,8 +84,9 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
       }
 
       setMessage({ type: 'error', text: t('creditShop.paymentPrepareFailed', '결제 준비에 실패했습니다.') });
-    } catch (e: any) {
-      setMessage({ type: 'error', text: e.message || t('creditShop.paymentError', '결제 오류가 발생했습니다.') });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setMessage({ type: 'error', text: msg || t('creditShop.paymentError', '결제 오류가 발생했습니다.') });
     } finally {
       setProcessing(false);
     }

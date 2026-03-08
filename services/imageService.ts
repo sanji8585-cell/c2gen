@@ -165,8 +165,9 @@ async function generateWithOpenAI(scene: ScriptScene, options?: { isPreview?: bo
       });
 
       return result?.imageData || null;
-    } catch (e: any) {
-      console.error(`[Image Service] OpenAI attempt ${attempt + 1} 실패:`, e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[Image Service] OpenAI attempt ${attempt + 1} 실패:`, msg);
       if (attempt === MAX_RETRIES) throw e;
     }
   }
@@ -186,10 +187,6 @@ export async function generateImage(
   const modelId = getSelectedImageModel();
   const hasCharacterRef = referenceImages.character && referenceImages.character.length > 0;
   const hasStyleRef = referenceImages.style && referenceImages.style.length > 0;
-
-  console.log(`[Image Service] 모델: ${modelId}${options?.isPreview ? ' (미리보기)' : ''}`);
-  console.log(`[Image Service] 캐릭터 참조: ${hasCharacterRef ? referenceImages.character.length + '개' : '없음'}`);
-  console.log(`[Image Service] 스타일 참조: ${hasStyleRef ? referenceImages.style.length + '개' : '없음'}`);
 
   // GPT Image-1 (참조 이미지 미지원)
   if (modelId === 'gpt-image-1') {

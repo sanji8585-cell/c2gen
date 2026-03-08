@@ -258,8 +258,9 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
         };
         setProjects(prev => [saved, ...prev]);
         setNewProjectName('');
-      } catch (e: any) {
-        alert(`저장 실패: ${e.message}`);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        alert(`저장 실패: ${msg}`);
       }
     } else {
       // 비로그인: localStorage 폴백
@@ -372,8 +373,9 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
           ...d.preset.settings,
         };
         setProjects(prev => prev.map(p => p.id === project.id ? updated : p));
-      } catch (e: any) {
-        alert(`업데이트 실패: ${e.message}`);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        alert(`업데이트 실패: ${msg}`);
       }
     } else {
       const updatedProject: ProjectSettings = {

@@ -49,10 +49,10 @@ const retryGeminiRequest = async <T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await requestFn();
-    } catch (error: any) {
+    } catch (error: unknown) {
       lastError = error;
-      const errorMsg = error.message || JSON.stringify(error);
-      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || error.status === 429;
+      const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || (error as any).status === 429;
       if (isQuotaError && attempt < maxRetries) {
         await wait(baseDelay * attempt);
         continue;
@@ -143,7 +143,6 @@ export const generateScriptChunked = async (
   }
 
   const chunks = splitTextIntoChunks(sourceContext, chunkSize);
-  console.log(`[Chunked Script] ${chunks.length}개 청크로 분할됨 (${sourceContext.length}자)`);
 
   const allScenes: ScriptScene[] = [];
 
@@ -163,8 +162,9 @@ export const generateScriptChunked = async (
       );
       const offset = allScenes.length;
       allScenes.push(...chunkScenes.map((scene, idx) => ({ ...scene, sceneNumber: offset + idx + 1 })));
-    } catch (error: any) {
-      console.error(`[Chunked Script] 청크 ${i + 1} 실패:`, error.message);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`[Chunked Script] 청크 ${i + 1} 실패:`, msg);
       onProgress?.(`청크 ${i + 1} 처리 실패, 계속 진행 중...`);
     }
     if (i < chunks.length - 1) await wait(1500);

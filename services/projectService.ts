@@ -178,9 +178,7 @@ export async function saveProject(
     }
   });
 
-  console.log(`[Project] Storage 업로드 시작: ${uploadTasks.length}개 파일 (${CONCURRENCY_LIMIT}개 병렬)`);
   await withConcurrency(uploadTasks, CONCURRENCY_LIMIT);
-  console.log(`[Project] Storage 업로드 완료`);
 
   // DB에 저장할 경량 에셋 (base64 제거, URL로 대체)
   const lightAssets = assets.map((asset, i) => {
@@ -208,8 +206,6 @@ export async function saveProject(
 
   // 단일 API 호출로 저장 (경량 데이터만)
   await callProjectsAPI('save', { meta, assets: lightAssets });
-
-  console.log(`[Project] 클라우드 저장 완료: ${meta.name} (${assets.length}씬, Storage v2)`);
 
   return {
     ...meta,
@@ -272,9 +268,7 @@ export async function getProjectById(id: string): Promise<SavedProject | null> {
       });
 
       if (downloadTasks.length > 0) {
-        console.log(`[Project] Storage에서 ${downloadTasks.length}개 파일 다운로드 중...`);
         await withConcurrency(downloadTasks, CONCURRENCY_LIMIT);
-        console.log(`[Project] 다운로드 완료`);
       }
 
       project.assets = assets;
@@ -321,7 +315,6 @@ export async function getProjectById(id: string): Promise<SavedProject | null> {
 export async function deleteProject(id: string): Promise<boolean> {
   try {
     await callProjectsAPI('delete', { projectId: id });
-    console.log(`[Project] 클라우드 삭제 완료: ${id}`);
     return true;
   } catch (e) {
     console.error('[Project] 프로젝트 삭제 실패:', e);
@@ -335,7 +328,6 @@ export async function deleteProject(id: string): Promise<boolean> {
 export async function renameProject(id: string, newName: string): Promise<boolean> {
   try {
     await callProjectsAPI('rename', { projectId: id, newName });
-    console.log(`[Project] 이름 변경 완료: ${newName}`);
     return true;
   } catch (e) {
     console.error('[Project] 프로젝트 이름 변경 실패:', e);

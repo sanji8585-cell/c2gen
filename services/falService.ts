@@ -95,7 +95,6 @@ export async function generateVideoFromImage(
 
   try {
     // Step 1: 이미지 업로드 (fal.ai 스토리지에 실제 업로드)
-    console.log('[FAL] 이미지 업로드 중...');
     const uploadResult = await callFalProxy('uploadImage', { imageBase64 });
     const imageUrl = uploadResult.url;
     if (!imageUrl) {
@@ -104,7 +103,6 @@ export async function generateVideoFromImage(
     }
 
     // Step 2: 비디오 생성 제출 (비동기 큐)
-    console.log('[FAL] PixVerse v5.5 영상 생성 제출...');
     const submitResult = await callFalProxy('submitVideo', {
       imageUrl,
       motionPrompt,
@@ -119,8 +117,6 @@ export async function generateVideoFromImage(
       console.error('[FAL] 비디오 제출 실패');
       return null;
     }
-    console.log('[FAL] 요청 ID:', requestId);
-
     // Step 3: 완료까지 폴링 (연속 실패 시 조기 종료)
     const POLL_INTERVAL = 2000;
     const MAX_POLLS = 90;          // 최대 3분 (2초 × 90)
@@ -147,10 +143,8 @@ export async function generateVideoFromImage(
 
       consecutiveFails = 0; // 성공 시 리셋
       const statusData = await pollRes.json();
-      console.log(`[FAL] 폴링 ${i + 1}/${MAX_POLLS}: ${statusData.status}`);
 
       if (statusData.status === 'COMPLETED' && statusData.result?.video?.url) {
-        console.log('[FAL] 영상 생성 완료:', statusData.result.video.url);
         return statusData.result.video.url;
       }
 
@@ -162,8 +156,9 @@ export async function generateVideoFromImage(
 
     console.error('[FAL] 타임아웃 (3분 초과)');
     return null;
-  } catch (error: any) {
-    console.error('[FAL] 영상 생성 실패:', error.message);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[FAL] 영상 생성 실패:', msg);
     return null;
   } finally {
     releaseVideoSlot();

@@ -132,8 +132,9 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, contentSummar
 
       setBaseImage(imageData);
       if (!showTitle || !title.trim()) setFinalImage(imageData);
-    } catch (e: any) {
-      setError(e.message || t('thumbnail.errorGenerateFailed'));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg || t('thumbnail.errorGenerateFailed'));
     } finally {
       setLoading(false);
     }

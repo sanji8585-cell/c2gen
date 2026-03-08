@@ -244,8 +244,9 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
           }
         }
       });
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -372,8 +373,9 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       await deletePlaygroundPost(postId);
       setPosts(prev => prev.filter(p => p.id !== postId));
       if (detailData?.post.id === postId) setDetailData(null);
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(msg);
     }
   }, [detailData, t]);
 
@@ -386,8 +388,9 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       setReportPostId(null);
       setReportReason('');
       alert(t('playground.reportSuccess'));
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(msg);
     } finally {
       setReporting(false);
     }
@@ -537,9 +540,11 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
             body: JSON.stringify({ action: 'game-recordAction', token: tkn, actionType: 'share_project', count: 1 }) }).catch(() => {});
         }
       } catch {}
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[Playground Share Error]', e);
-      setShareError(`[${e.name}] ${e.message}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      const name = e instanceof Error ? e.name : 'Error';
+      setShareError(`[${name}] ${msg}`);
       setShareProgress('');
     } finally {
       setSharing(false);

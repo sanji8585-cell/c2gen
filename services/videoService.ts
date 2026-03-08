@@ -65,7 +65,6 @@ function createSubtitleChunks(
 
   // AI 의미 단위 청크가 있으면 우선 사용
   if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
-    console.log(`[Video] AI 의미 단위 자막 사용: ${subtitleData.meaningChunks.length}개 청크`);
     return subtitleData.meaningChunks.map(chunk => ({
       text: chunk.text,
       startTime: chunk.startTime,
@@ -74,7 +73,6 @@ function createSubtitleChunks(
   }
 
   // 폴백: 기존 단어 수 기반 분리
-  console.log('[Video] 기본 단어 수 기반 자막 사용');
   const chunks: SubtitleChunk[] = [];
   const words = subtitleData.words;
   const wordsPerChunk = config.wordsPerLine * config.maxLines;
@@ -420,11 +418,6 @@ export const generateVideo = async (
 
   // 자막 데이터 유무 체크
   const hasSubtitles = enableSubtitles && validAssets.some(a => a.subtitleData !== null);
-  console.log(`[Video] 총 ${assets.length}개 씬 중 ${validAssets.length}개 렌더링, 자막: ${enableSubtitles ? (hasSubtitles ? '활성화' : '데이터 없음') : '비활성화'}`);
-  if (enableSubtitles) {
-    console.log(`[Video] 자막 설정: ${config.wordsPerLine}단어/줄, 최대 ${config.maxLines}줄`);
-  }
-
   onProgress("에셋 메모리 사전 로딩 중 (1/3)...");
 
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -452,7 +445,6 @@ export const generateVideo = async (
           console.error(`[Video] 씬 ${i + 1}: 이미지 크기가 0 - 로드 실패`);
           reject(new Error('Image has zero dimensions'));
         } else {
-          console.log(`[Video] 씬 ${i + 1}: 이미지 로드 완료 (${img.width}x${img.height})`);
           resolve();
         }
       };
@@ -514,7 +506,6 @@ export const generateVideo = async (
         });
 
         isAnimated = true;
-        console.log(`[Video] 씬 ${i + 1}: 애니메이션 영상 로드 완료 (${video.duration.toFixed(1)}s)`);
       } catch (e) {
         console.warn(`[Video] 씬 ${i + 1}: 애니메이션 로드 실패, 정적 이미지 사용`);
         video = null;
@@ -552,9 +543,6 @@ export const generateVideo = async (
     } else if (asset.audioDuration && asset.audioDuration > 0) {
       // 오디오 URL도 없지만 duration 정보가 있으면 사용
       duration = asset.audioDuration;
-      console.log(`[Video] 씬 ${i + 1} 오디오 없음, audioDuration ${duration.toFixed(1)}초 사용`);
-    } else {
-      console.log(`[Video] 씬 ${i + 1} 오디오 없음, 기본 ${DEFAULT_DURATION}초 사용`);
     }
 
     // 사용자 지정 재생 시간 우선 적용
@@ -564,9 +552,6 @@ export const generateVideo = async (
 
     // 자막 청크 미리 계산 (자막 비활성화시 빈 배열)
     const subtitleChunks = enableSubtitles ? createSubtitleChunks(asset.subtitleData, config) : [];
-    if (subtitleChunks.length > 0) {
-      console.log(`[Video] 씬 ${i + 1}: ${subtitleChunks.length}개 자막 청크 생성`);
-    }
 
     const startTime = timelinePointer;
     const endTime = startTime + duration;
@@ -595,7 +580,6 @@ export const generateVideo = async (
     try {
       onProgress("BGM 로딩 중...");
       bgmBuffer = await decodeAudio(options.bgmData, audioCtx);
-      console.log(`[Video] BGM 로드 완료: ${bgmBuffer.duration.toFixed(1)}s → 전체 ${totalDuration.toFixed(1)}s에 루프 재생`);
     } catch (e) {
       console.warn('[Video] BGM 로드 실패, 건너뜀:', e);
     }
@@ -604,7 +588,6 @@ export const generateVideo = async (
   // 2. 캔버스 및 미디어 레코더 설정 (해상도 티어 적용)
   const dims = resDims;
   const actualBitrate = options?.bitrateOverride ?? resConfig.bitrate;
-  console.log(`[Video] 해상도: ${resolution} (${dims.width}x${dims.height}), 비트레이트: ${actualBitrate / 1_000_000}Mbps`);
   const canvas = document.createElement('canvas');
   canvas.width = dims.width;
   canvas.height = dims.height;
@@ -712,10 +695,7 @@ export const generateVideo = async (
             bgmGain.gain.linearRampToValueAtTime(baseVolume, duckEnd + RAMP_TIME);
           }
         });
-        console.log(`[Video] BGM 덕킹: 나레이션 중 ${Math.round(duckingAmount * 100)}%, 램프 ${RAMP_TIME}s`);
       }
-
-      console.log(`[Video] BGM 믹싱: 볼륨 ${Math.round(baseVolume * 100)}%`);
     }
 
     // 애니메이션 영상 재생 스케줄링 (네이티브 play로 부드러운 프레임 출력)

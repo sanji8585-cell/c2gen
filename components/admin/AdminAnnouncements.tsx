@@ -44,7 +44,6 @@ const AdminAnnouncements: React.FC<Props> = ({ adminToken, onToast }) => {
         loadAnnouncements();
       } else {
         onToast('error', data.message || data.error || '등록에 실패했습니다.');
-        if (data.sql) console.log('테이블 생성 SQL:', data.sql);
       }
     } catch {
       onToast('error', '서버 연결에 실패했습니다.');

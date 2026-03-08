@@ -474,8 +474,6 @@ const AppContent: React.FC<{
 
       // 참조 이미지 존재 여부 계산
       const hasRefImages = (refImgs.character?.length || 0) + (refImgs.style?.length || 0) > 0;
-      console.log(`[App] 참조 이미지 - 캐릭터: ${refImgs.character?.length || 0}개, 스타일: ${refImgs.style?.length || 0}개`);
-
       // 언어 설정 읽기
       const language = (localStorage.getItem(CONFIG.STORAGE_KEYS.LANGUAGE) as Language) || 'ko';
 
@@ -523,7 +521,6 @@ const AppContent: React.FC<{
       let scriptScenes: ScriptScene[];
       if (inputLength > CHUNK_THRESHOLD) {
         // 긴 대본: 청크 분할 처리 (10,000자 이상 대응)
-        console.log(`[App] 긴 대본 감지: ${inputLength.toLocaleString()}자 → 청크 분할 처리`);
         setProgressMessage(String(t('progress.longScript', { count: inputLength.toLocaleString() } as any)));
         scriptScenes = await generateScriptChunked(
           targetTopic,
@@ -550,10 +547,11 @@ const AppContent: React.FC<{
       setStep(GenerationStep.SCRIPT_REVIEW);
       setProgressMessage(t('progress.scriptDone', { count: initialAssets.length }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!isAbortedRef.current) {
+        const msg = error instanceof Error ? error.message : String(error);
         setStep(GenerationStep.ERROR);
-        setProgressMessage(`오류: ${error.message}`);
+        setProgressMessage(`오류: ${msg}`);
       }
     } finally {
       isProcessingRef.current = false;
@@ -592,7 +590,6 @@ const AppContent: React.FC<{
 
                   try {
                       if (attempt > 0) {
-                          console.log(`[TTS] 씬 ${i + 1} 재시도 중... (${attempt}/${MAX_TTS_RETRIES})`);
                           await wait(1500);
                       }
 
@@ -615,13 +612,13 @@ const AppContent: React.FC<{
                         addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
                         success = true;
                         completedCount++;
-                        console.log(`[TTS] 씬 ${i + 1} 음성 생성 완료 (${completedCount}/${initialAssets.length})`);
                       } else {
                         throw new Error('ElevenLabs 응답 없음');
                       }
-                  } catch (e: any) {
-                      console.error(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, e.message);
-                      if (e.message?.includes('429') || e.message?.includes('rate')) {
+                  } catch (e: unknown) {
+                      const msg = e instanceof Error ? e.message : String(e);
+                      console.error(`[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`, msg);
+                      if (msg.includes('429') || msg.includes('rate')) {
                           await wait(3000);
                       }
                   }
@@ -629,7 +626,6 @@ const AppContent: React.FC<{
 
               if (!success && !isAbortedRef.current) {
                   try {
-                      console.log(`[TTS] 씬 ${i + 1} Gemini 폴백 시도...`);
                       const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
                       updateAssetAt(i, { audioData: fallbackAudio });
                       completedCount++;
@@ -682,11 +678,12 @@ const AppContent: React.FC<{
                       } else {
                           throw new Error('이미지 데이터가 비어있습니다');
                       }
-                  } catch (e: any) {
+                  } catch (e: unknown) {
                       lastError = e;
-                      console.error(`씬 ${i + 1} 이미지 생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
+                      const msg = e instanceof Error ? e.message : String(e);
+                      console.error(`씬 ${i + 1} 이미지 생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, msg);
 
-                      if (e.message?.includes("API key not valid") || e.status === 400) {
+                      if (msg.includes("API key not valid") || (e as any).status === 400) {
                           setNeedsKey(true);
                           break;
                       }
@@ -721,8 +718,6 @@ const AppContent: React.FC<{
           if (isAbortedRef.current) return;
 
           const matchedTrack = BGM_LIBRARY.find(t => t.mood === moodResult.mood) || BGM_LIBRARY[0];
-          console.log(`[AutoBGM] 분위기: ${moodResult.mood} → ${matchedTrack.name}`);
-
           // 1차: public/bgm/ 폴더 파일 시도, 2차: Web Audio API로 자동 생성
           let base64: string | null = null;
           try {
@@ -738,7 +733,6 @@ const AppContent: React.FC<{
           } catch { /* 파일 없으면 자동 생성으로 폴백 */ }
 
           if (!base64) {
-            console.log(`[AutoBGM] 파일 없음, Web Audio API로 생성 중...`);
             base64 = await generateAmbientBgm(moodResult.mood as BgmMood);
           }
 
@@ -897,10 +891,11 @@ const AppContent: React.FC<{
 
       // 자동 저장 비활성화 — 사용자가 "프로젝트 저장" 버튼으로 수동 저장
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!isAbortedRef.current) {
+        const msg = error instanceof Error ? error.message : String(error);
         setStep(GenerationStep.ERROR);
-        setProgressMessage(`오류: ${error.message}`);
+        setProgressMessage(`오류: ${msg}`);
       }
     } finally {
       isProcessingRef.current = false;
@@ -941,9 +936,10 @@ const AppContent: React.FC<{
       setGeneratedData(newAssets);
       setStep(GenerationStep.SCRIPT_REVIEW);
       setProgressMessage(t('progress.scriptRegenDone', { count: newAssets.length }));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       setStep(GenerationStep.ERROR);
-      setProgressMessage(`스크립트 재생성 오류: ${error.message}`);
+      setProgressMessage(`스크립트 재생성 오류: ${msg}`);
     } finally {
       isProcessingRef.current = false;
     }
@@ -982,11 +978,12 @@ const AppContent: React.FC<{
         } else if (!img) {
           throw new Error('이미지 데이터가 비어있습니다');
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         lastError = e;
-        console.error(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, e.message);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`, msg);
 
-        if (e.message?.includes("API key not valid") || e.status === 400) {
+        if (msg.includes("API key not valid") || (e as any).status === 400) {
           setNeedsKey(true);
           break;
         }
@@ -1040,9 +1037,10 @@ const AppContent: React.FC<{
       } else {
         setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error('영상 변환 실패:', e);
-      setProgressMessage(`씬 ${idx + 1} 오류: ${e.message}`);
+      setProgressMessage(`씬 ${idx + 1} 오류: ${msg}`);
     } finally {
       // Set에서 현재 인덱스 제거
       setAnimatingIndices(prev => {
@@ -1079,8 +1077,9 @@ const AppContent: React.FC<{
         saveAs(result.videoBlob, `c2gen_${suffix}_${resSuffix}_${timestamp}.mp4`);
         setProgressMessage(`✨ ${t('progress.renderComplete')} (${enableSubtitles ? '자막 O' : '자막 X'}, ${resSuffix.toUpperCase()})`);
       }
-    } catch (error: any) {
-      setProgressMessage(`${t('progress.renderFailed')}: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      setProgressMessage(`${t('progress.renderFailed')}: ${msg}`);
     } finally {
       setIsVideoGenerating(false);
     }
@@ -1116,9 +1115,10 @@ const AppContent: React.FC<{
         addCost('tts', chars * PRICING.TTS.perCharacter, chars);
         setProgressMessage(`씬 ${idx + 1} 음성 재생성 완료!`);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       updateAssetAt(idx, { status: 'error' });
-      setProgressMessage(`씬 ${idx + 1} 음성 재생성 실패: ${e.message}`);
+      setProgressMessage(`씬 ${idx + 1} 음성 재생성 실패: ${msg}`);
     }
   }, []);
 
@@ -1273,8 +1273,9 @@ const AppContent: React.FC<{
     try {
       await pmImportProject(project);
       setProgressMessage(`"${project.name}" 프로젝트 가져오기 완료`);
-    } catch (e: any) {
-      setProgressMessage(`프로젝트 가져오기 실패: ${e.message}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setProgressMessage(`프로젝트 가져오기 실패: ${msg}`);
     }
   };
 
@@ -1681,8 +1682,9 @@ const AppContent: React.FC<{
               try {
                 await pmSaveProject(currentTopic, assetsRef.current, costRef.current);
                 setToastMessage(t('progress.projectSaved', { name: currentTopic })); setTimeout(() => setToastMessage(null), 3000);
-              } catch (e: any) {
-                setToastMessage(t('progress.projectSaveFailed', { error: e.message })); setTimeout(() => setToastMessage(null), 3000);
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                setToastMessage(t('progress.projectSaveFailed', { error: msg })); setTimeout(() => setToastMessage(null), 3000);
               }
             }}
         />

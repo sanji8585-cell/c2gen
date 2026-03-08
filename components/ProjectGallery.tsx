@@ -65,8 +65,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
       }
       await onImport?.(project);
       onRefresh();
-    } catch (e: any) {
-      setImportError(e.message || '가져오기 실패');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setImportError(msg || '가져오기 실패');
     }
     e.target.value = '';
   };

@@ -8,14 +8,14 @@
   ],
   "functions": {
     "api/gemini.ts": { "maxDuration": 60 },
-    "api/elevenlabs.ts": { "maxDuration": 30 },
-    "api/fal.ts": { "maxDuration": 30 },
-    "api/fal-poll.ts": { "maxDuration": 10 },
+    "api/elevenlabs.ts": { "maxDuration": 60 },
+    "api/fal.ts": { "maxDuration": 120 },
+    "api/fal-poll.ts": { "maxDuration": 30 },
     "api/openai.ts": { "maxDuration": 60 },
     "api/auth.ts": { "maxDuration": 60 },
     "api/gamification.ts": { "maxDuration": 60 },
-    "api/payments.ts": { "maxDuration": 15 },
-    "api/projects.ts": { "maxDuration": 15 },
+    "api/payments.ts": { "maxDuration": 30 },
+    "api/projects.ts": { "maxDuration": 30 },
     "api/playground.ts": { "maxDuration": 10 },
     "api/user.ts": { "maxDuration": 30 }
   }
