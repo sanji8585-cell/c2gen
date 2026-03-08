@@ -753,7 +753,10 @@ const InputSection: React.FC<InputSectionProps> = ({ onGenerate, step }) => {
     if (activeTab === 'auto') {
       if (topic.trim()) onGenerate(topic, refImages, null);
     } else {
-      if (manualScript.trim()) onGenerate("Manual Script Input", refImages, manualScript);
+      if (manualScript.trim()) {
+        const autoTopic = manualScript.trim().split('\n')[0].slice(0, 50).trim() || '직접 입력 대본';
+        onGenerate(autoTopic, refImages, manualScript);
+      }
     }
   }, [isDisabled, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, onGenerate]);
 
