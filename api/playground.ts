@@ -186,25 +186,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             : last.created_at;
         }
 
-        // 로그인 유저의 좋아요/북마크 여부 조회
-        let likedPostIds: string[] = [];
-        let bookmarkedPostIds: string[] = [];
-        if (email && resultPosts.length > 0) {
-          const postIds = resultPosts.map((p: any) => p.id);
-          const [likesRes, bookmarksRes] = await Promise.all([
-            supabase.from('playground_likes').select('post_id').eq('email', email).in('post_id', postIds),
-            supabase.from('playground_bookmarks').select('post_id').eq('email', email).in('post_id', postIds),
-          ]);
-          likedPostIds = (likesRes.data || []).map((l: any) => l.post_id);
-          bookmarkedPostIds = (bookmarksRes.data || []).map((b: any) => b.post_id);
-        }
-
-        // 작성자 장착 아이템 + 레벨 배치 조회
+        // 좋아요/북마크 + 장착 아이템 + 레벨 모두 병렬 조회
         const uniqueEmails = [...new Set(resultPosts.map((p: any) => p.email))] as string[];
-        const [equippedMap, levelMap] = await Promise.all([
+        const postIds = resultPosts.map((p: any) => p.id);
+
+        const parallelQueries: Promise<any>[] = [
           resolveEquippedItems(supabase, uniqueEmails),
           resolveLevels(supabase, uniqueEmails),
-        ]);
+        ];
+        if (email && postIds.length > 0) {
+          parallelQueries.push(
+            Promise.resolve(supabase.from('playground_likes').select('post_id').eq('email', email).in('post_id', postIds)),
+            Promise.resolve(supabase.from('playground_bookmarks').select('post_id').eq('email', email).in('post_id', postIds)),
+          );
+        }
+
+        const results = await Promise.all(parallelQueries);
+        const equippedMap = results[0];
+        const levelMap = results[1];
+        let likedPostIds: string[] = [];
+        let bookmarkedPostIds: string[] = [];
+        if (email && postIds.length > 0) {
+          likedPostIds = (results[2]?.data || []).map((l: any) => l.post_id);
+          bookmarkedPostIds = (results[3]?.data || []).map((b: any) => b.post_id);
+        }
+
         const enrichedPosts = resultPosts.map((p: any) => ({
           ...p,
           equipped: equippedMap[p.email] || { title: null, badges: [], frame: null },
@@ -334,6 +340,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await supabase.from('playground_posts')
             .update({ like_count: newCount })
             .eq('id', postId);
+          // 알림: 게시물 작성자에게 좋아요 알림 (자기 자신 제외)
+          const { data: likedPost } = await supabase.from('playground_posts').select('email, topic').eq('id', postId).single();
+          if (likedPost && likedPost.email !== email) {
+            Promise.resolve(supabase.from('playground_notifications').insert({
+              recipient_email: likedPost.email,
+              actor_email: email,
+              actor_name: session?.name || 'Unknown',
+              type: 'like',
+              post_id: postId,
+              message: `${session?.name || 'Unknown'}님이 "${(likedPost.topic || '').slice(0, 30)}" 게시물에 좋아요`,
+            })).catch(() => {});
+          }
           return res.json({ liked: true, likeCount: newCount });
         }
       }
@@ -552,6 +570,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 장착 아이템 조회
         const eqMap = await resolveEquippedItems(supabase, [email]);
 
+        // 알림: 게시물 작성자 또는 부모 댓글 작성자에게 알림
+        const actorName = user?.name || 'Unknown';
+        if (parentId) {
+          // 답글 -> 부모 댓글 작성자에게 알림
+          const { data: parentComment } = await supabase.from('playground_comments').select('email').eq('id', parentId).single();
+          if (parentComment && parentComment.email !== email) {
+            Promise.resolve(supabase.from('playground_notifications').insert({
+              recipient_email: parentComment.email,
+              actor_email: email, actor_name: actorName, type: 'reply',
+              post_id: postId, comment_id: inserted.id,
+              message: `${actorName}님이 답글: "${trimmed.slice(0, 40)}"`,
+            })).catch(() => {});
+          }
+        } else {
+          // 댓글 -> 게시물 작성자에게 알림
+          const { data: commentedPost } = await supabase.from('playground_posts').select('email').eq('id', postId).single();
+          if (commentedPost && commentedPost.email !== email) {
+            Promise.resolve(supabase.from('playground_notifications').insert({
+              recipient_email: commentedPost.email,
+              actor_email: email, actor_name: actorName, type: 'comment',
+              post_id: postId, comment_id: inserted.id,
+              message: `${actorName}님이 댓글: "${trimmed.slice(0, 40)}"`,
+            })).catch(() => {});
+          }
+        }
+
         return res.json({
           success: true,
           comment: { ...inserted, equipped: eqMap[email] || { title: null, badges: [], frame: null } },
@@ -735,6 +779,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ post: { ...post, author_level: authorLevel }, assets, liked, bookmarked, sceneGap, equipped });
       }
 
+      // ── 알림 목록 조회 ──
+      case 'notifications': {
+        const { limit: notifLimit = 30 } = params;
+        const lim = Math.min(Number(notifLimit) || 30, 50);
+
+        const [notifRes, countRes] = await Promise.all([
+          supabase.from('playground_notifications')
+            .select('id, actor_email, actor_name, type, post_id, comment_id, message, read, created_at')
+            .eq('recipient_email', email)
+            .order('created_at', { ascending: false })
+            .limit(lim),
+          supabase.from('playground_notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('recipient_email', email)
+            .eq('read', false),
+        ]);
+
+        return res.json({
+          notifications: notifRes.data || [],
+          unreadCount: countRes.count || 0,
+        });
+      }
+
+      // ── 알림 읽음 처리 ──
+      case 'markNotificationsRead': {
+        const { ids } = params;
+        if (ids && Array.isArray(ids) && ids.length > 0) {
+          await supabase.from('playground_notifications')
+            .update({ read: true })
+            .in('id', ids)
+            .eq('recipient_email', email);
+        } else {
+          await supabase.from('playground_notifications')
+            .update({ read: true })
+            .eq('recipient_email', email)
+            .eq('read', false);
+        }
+        return res.json({ success: true });
+      }
+
       // ══════════════════════════════════════
       // ── 관리자 전용 (Admin Actions) ──
       // ══════════════════════════════════════
@@ -752,6 +836,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { count: totalComments } = await supabase.from('playground_comments').select('*', { count: 'exact', head: true });
         const { count: totalReports } = await supabase.from('playground_reports').select('*', { count: 'exact', head: true });
 
+        // 추가 통계: 북마크, 조회수, 알림
+        const [bmRes, viewRes, notifRes] = await Promise.all([
+          supabase.from('playground_bookmarks').select('*', { count: 'exact', head: true }),
+          supabase.from('playground_posts').select('view_count'),
+          supabase.from('playground_notifications').select('*', { count: 'exact', head: true }),
+        ]);
+        const totalBookmarks = bmRes.count || 0;
+        const totalViews = (viewRes.data || []).reduce((s: number, p: any) => s + (p.view_count || 0), 0);
+        const totalNotifications = notifRes.count || 0;
+
         return res.json({
           success: true,
           totalPosts: totalPosts || 0,
@@ -760,6 +854,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           totalLikes,
           totalComments: totalComments || 0,
           totalReports: totalReports || 0,
+          totalBookmarks,
+          totalViews,
+          totalNotifications,
         });
       }
 
@@ -842,6 +939,107 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!postId) return res.status(400).json({ error: 'postId 필요' });
 
         await supabase.from('playground_posts').update({ flagged: !!flagged }).eq('id', postId);
+        return res.json({ success: true });
+      }
+
+      // ── 신고 목록 조회 ──
+      case 'admin-viewReports': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdmin(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { page = 0, limit: rlimit = 20, reasonFilter } = params;
+        const lim = Math.min(Number(rlimit) || 20, 50);
+        const offset = (Number(page) || 0) * lim;
+
+        let query = supabase.from('playground_reports')
+          .select('id, post_id, email, reason, created_at', { count: 'exact' });
+        if (reasonFilter) query = query.eq('reason', reasonFilter);
+        query = query.order('created_at', { ascending: false }).range(offset, offset + lim - 1);
+
+        const { data: reports, count } = await query;
+
+        // 게시물 정보 조인
+        const postIds = [...new Set((reports || []).map((r: any) => r.post_id))];
+        let postMap: Record<string, any> = {};
+        if (postIds.length > 0) {
+          const { data: posts } = await supabase.from('playground_posts')
+            .select('id, topic, author_name, email, flagged')
+            .in('id', postIds);
+          for (const p of (posts || [])) postMap[p.id] = p;
+        }
+
+        const enriched = (reports || []).map((r: any) => ({
+          ...r,
+          post_topic: postMap[r.post_id]?.topic || '삭제됨',
+          post_author: postMap[r.post_id]?.author_name || '-',
+          post_flagged: postMap[r.post_id]?.flagged || false,
+        }));
+
+        return res.json({ success: true, reports: enriched, total: count || 0 });
+      }
+
+      // ── 댓글 목록 조회 ──
+      case 'admin-listComments': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdmin(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { page = 0, limit: climit = 20, search: csearch } = params;
+        const lim = Math.min(Number(climit) || 20, 50);
+        const offset = (Number(page) || 0) * lim;
+
+        let query = supabase.from('playground_comments')
+          .select('id, post_id, email, author_name, content, like_count, parent_id, created_at', { count: 'exact' });
+        if (csearch) query = query.or(`content.ilike.%${csearch}%,author_name.ilike.%${csearch}%,email.ilike.%${csearch}%`);
+        query = query.order('created_at', { ascending: false }).range(offset, offset + lim - 1);
+
+        const { data: comments, count } = await query;
+
+        // 게시물 제목 조인
+        const cPostIds = [...new Set((comments || []).map((c: any) => c.post_id))];
+        let cPostMap: Record<string, string> = {};
+        if (cPostIds.length > 0) {
+          const { data: posts } = await supabase.from('playground_posts').select('id, topic').in('id', cPostIds);
+          for (const p of (posts || [])) cPostMap[p.id] = p.topic || '제목 없음';
+        }
+
+        const enrichedComments = (comments || []).map((c: any) => ({
+          ...c,
+          post_topic: cPostMap[c.post_id] || '삭제됨',
+        }));
+
+        return res.json({ success: true, comments: enrichedComments, total: count || 0 });
+      }
+
+      // ── 관리자 댓글 삭제 ──
+      case 'admin-deleteComment': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdmin(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { commentId } = params;
+        if (!commentId) return res.status(400).json({ error: 'commentId 필요' });
+
+        const { data: comment } = await supabase.from('playground_comments').select('post_id, parent_id').eq('id', commentId).single();
+        if (!comment) return res.status(404).json({ error: '댓글 없음' });
+
+        // 답글 삭제 (부모 댓글인 경우)
+        if (!comment.parent_id) {
+          const { data: childIds } = await supabase.from('playground_comments').select('id').eq('parent_id', commentId);
+          if (childIds && childIds.length > 0) {
+            const ids = childIds.map((c: any) => c.id);
+            await supabase.from('playground_comment_likes').delete().in('comment_id', ids);
+            await supabase.from('playground_comments').delete().in('id', ids);
+          }
+        }
+
+        await supabase.from('playground_comment_likes').delete().eq('comment_id', commentId);
+        await supabase.from('playground_comments').delete().eq('id', commentId);
+
+        // comment_count 감소
+        const { data: post } = await supabase.from('playground_posts').select('comment_count').eq('id', comment.post_id).single();
+        if (post) {
+          await supabase.from('playground_posts').update({ comment_count: Math.max(0, (post.comment_count || 0) - 1) }).eq('id', comment.post_id);
+        }
+
         return res.json({ success: true });
       }
 

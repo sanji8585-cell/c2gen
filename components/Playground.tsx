@@ -15,8 +15,11 @@ import {
   reportPost,
   incrementView,
   getAuthorProfile,
+  getNotifications,
+  markNotificationsRead,
   type PlaygroundPost,
   type PlaygroundComment,
+  type PlaygroundNotification,
   type PostDetailResponse,
   type CommentsResponse,
   type PlaygroundEquippedItem,
@@ -111,6 +114,11 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
   // 현재 유저 email
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
+  // 알림
+  const [notifications, setNotifications] = useState<PlaygroundNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+
   // 무한 스크롤 sentinel
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -139,8 +147,30 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       .catch(() => {});
   }, [isAuthenticated]);
 
-  // 피드 캐시 키
+  // 알림 로드
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const loadNotifs = () => {
+      getNotifications().then(data => {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      }).catch(() => {});
+    };
+    loadNotifs();
+    const interval = setInterval(loadNotifs, 60000); // 1분마다 폴링
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  // 피드 캐시 키 (localStorage - 세션 간 유지)
   const feedCacheKey = `pg_feed_${sort}`;
+
+  // 캐시 저장 (thumbnail 제외해서 용량 절약)
+  const saveFeedCache = (posts: PlaygroundPost[], cursor: string | null) => {
+    try {
+      const lite = posts.map(p => ({ ...p, thumbnail: null }));
+      localStorage.setItem(feedCacheKey, JSON.stringify({ posts: lite, nextCursor: cursor, ts: Date.now() }));
+    } catch {}
+  };
 
   // 피드 로드 (stale-while-revalidate)
   const loadFeed = useCallback(async (resetCursor = true) => {
@@ -149,19 +179,19 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
         // 캐시에서 즉시 복원 (필터 없는 기본 피드만)
         if (!activeSearch && !activeTag && !authorFilter && feedFilter === 'all') {
           try {
-            const cached = sessionStorage.getItem(feedCacheKey);
+            const cached = localStorage.getItem(feedCacheKey);
             if (cached) {
               const { posts: cachedPosts, nextCursor: cachedCursor, ts } = JSON.parse(cached);
-              // 5분 이내 캐시만 사용
-              if (Date.now() - ts < 300000 && cachedPosts.length > 0) {
+              // 10분 이내 캐시 사용
+              if (Date.now() - ts < 600000 && cachedPosts.length > 0) {
                 setPosts(cachedPosts);
                 setNextCursor(cachedCursor);
                 setLoading(false);
-                // 백그라운드 갱신 (await 하지 않음)
+                // 백그라운드 갱신
                 getPlaygroundFeed({ sort }).then(result => {
                   setPosts(result.posts);
                   setNextCursor(result.nextCursor);
-                  sessionStorage.setItem(feedCacheKey, JSON.stringify({ posts: result.posts, nextCursor: result.nextCursor, ts: Date.now() }));
+                  saveFeedCache(result.posts, result.nextCursor);
                 }).catch(() => {});
                 return;
               }
@@ -194,9 +224,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
         setPosts(newPosts);
         // 기본 피드 캐시 저장
         if (!activeSearch && !activeTag && !authorFilter && feedFilter === 'all') {
-          try {
-            sessionStorage.setItem(feedCacheKey, JSON.stringify({ posts: newPosts, nextCursor: result.nextCursor, ts: Date.now() }));
-          } catch {}
+          saveFeedCache(newPosts, result.nextCursor);
         }
       } else {
         setPosts(prev => [...prev, ...newPosts]);
@@ -614,16 +642,16 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-      {/* 소개 */}
-      <div className="mb-4">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-6">
+      {/* 소개 - 모바일 숨김 */}
+      <div className="mb-3 sm:mb-4 hidden sm:block">
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
           {t('playground.description')}
         </p>
       </div>
 
       {/* 검색 바 */}
-      <div className="mb-4">
+      <div className="mb-3 sm:mb-4">
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -633,7 +661,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
             value={searchQuery}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder={t('playground.searchPlaceholder')}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2"
+            className="w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-xl text-sm border focus:outline-none focus:ring-2"
             style={{
               backgroundColor: 'var(--bg-elevated)',
               borderColor: 'var(--border-default)',
@@ -676,11 +704,11 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       )}
 
       {/* 상단 바 */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+      <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
+        <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ backgroundColor: 'var(--bg-elevated)' }}>
           {(['latest', 'popular'] as const).map(s => (
             <button key={s} onClick={() => { setSort(s); if (feedFilter !== 'all') setFeedFilter('all'); }}
-              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+              className="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
               style={{
                 backgroundColor: sort === s && feedFilter === 'all' ? 'var(--brand-500)' : 'transparent',
                 color: sort === s && feedFilter === 'all' ? '#fff' : 'var(--text-secondary)',
@@ -691,7 +719,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
           ))}
           {isAuthenticated && (
             <button onClick={() => setFeedFilter(feedFilter === 'bookmarked' ? 'all' : 'bookmarked')}
-              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+              className="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
               style={{
                 backgroundColor: feedFilter === 'bookmarked' ? 'var(--brand-500)' : 'transparent',
                 color: feedFilter === 'bookmarked' ? '#fff' : 'var(--text-secondary)',
@@ -702,21 +730,85 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
           )}
         </div>
 
-        {isAuthenticated ? (
-          <button onClick={() => setShowShareModal(true)}
-            className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}
-          >
-            {t('playground.shareProject')}
-          </button>
-        ) : (
-          <button onClick={onShowAuthModal}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
-            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
-          >
-            {t('common.login')}
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* 알림 벨 */}
+          {isAuthenticated && (
+            <div className="relative">
+              <button onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications && unreadCount > 0) { markNotificationsRead().then(() => setUnreadCount(0)).catch(() => {}); } }}
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+                style={{ backgroundColor: 'var(--bg-elevated)' }}>
+                <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5" style={{ color: unreadCount > 0 ? 'var(--brand-400)' : 'var(--text-muted)' }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {/* 알림 드롭다운 */}
+              {showNotifications && (
+                <>
+                  <div className="fixed inset-0 z-30 sm:bg-transparent bg-black/40" onClick={() => setShowNotifications(false)} />
+                  {/* 모바일: 하단 시트 / 데스크톱: 드롭다운 */}
+                  <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-11 z-40 sm:w-80 max-h-[60vh] sm:max-h-96 overflow-y-auto rounded-t-2xl sm:rounded-xl border shadow-xl"
+                    style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', scrollbarWidth: 'thin' }}>
+                    <div className="sticky top-0 px-4 sm:px-3 py-3 sm:py-2.5 border-b flex items-center justify-between" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-subtle)' }}>
+                      <p className="text-sm sm:text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{t('playground.notificationsTitle')}</p>
+                      <button className="sm:hidden p-1" onClick={() => setShowNotifications(false)} style={{ color: 'var(--text-muted)' }}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="py-8 text-center">
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('playground.noNotifications')}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {notifications.map(n => (
+                          <button key={n.id}
+                            onClick={() => { setShowNotifications(false); if (n.post_id) { handleOpenDetail(n.post_id); updateUrlWithPost(n.post_id); } }}
+                            className="w-full flex items-start gap-2.5 px-4 sm:px-3 py-3 sm:py-2.5 text-left transition-all hover:bg-white/5"
+                            style={{ backgroundColor: n.read ? 'transparent' : 'rgba(99,102,241,0.05)' }}>
+                            <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full flex items-center justify-center flex-shrink-0 text-sm"
+                              style={{ backgroundColor: n.type === 'like' ? 'rgba(239,68,68,0.15)' : n.type === 'comment' ? 'rgba(99,102,241,0.15)' : 'rgba(34,197,94,0.15)' }}>
+                              {n.type === 'like' ? '\u2764\uFE0F' : n.type === 'comment' ? '\uD83D\uDCAC' : '\u21A9\uFE0F'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs sm:text-[11px] leading-snug" style={{ color: 'var(--text-secondary)' }}>{n.message}</p>
+                              <p className="text-[10px] sm:text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{timeAgo(n.created_at, t)}</p>
+                            </div>
+                            {!n.read && <div className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0 mt-1.5" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {isAuthenticated ? (
+            <button onClick={() => setShowShareModal(true)}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] whitespace-nowrap"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}
+            >
+              <span className="hidden sm:inline">{t('playground.shareProject')}</span>
+              <span className="sm:hidden flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                {t('playground.share')}
+              </span>
+            </button>
+          ) : (
+            <button onClick={onShowAuthModal}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
+              style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
+            >
+              {t('common.login')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 에러 */}
@@ -752,7 +844,7 @@ const Playground: React.FC<PlaygroundProps> = ({ isAuthenticated, onShowAuthModa
       {/* 피드 그리드 */}
       {!loading && posts.length > 0 && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {posts.map(post => (
               <PostCard
                 key={post.id}
@@ -897,6 +989,88 @@ const PostCard: React.FC<{
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [longPressPreview, setLongPressPreview] = useState(false);
   const [likeBounce, setLikeBounce] = useState(false);
+  const [doubleTapHeart, setDoubleTapHeart] = useState(false);
+  const lastTapRef = useRef(0);
+  const [inViewport, setInViewport] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // 스크롤 자동재생: IntersectionObserver
+  useEffect(() => {
+    if (!post.videoUrl || !cardRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInViewport(entry.isIntersecting),
+      { threshold: 0.5 }
+    );
+    observer.observe(cardRef.current);
+    return () => observer.disconnect();
+  }, [post.videoUrl]);
+
+  // 자동재생/정지
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (inViewport && !hovering && !longPressPreview) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    } else if (!inViewport && !hovering && !longPressPreview) {
+      videoRef.current.pause();
+    }
+  }, [inViewport, hovering, longPressPreview]);
+
+  // 더블탭 좋아요
+  const handleDoubleTap = () => {
+    if (!post.liked) {
+      onLike(); // 좋아요가 아닌 경우에만 좋아요 추가 (인스타 방식)
+    }
+    setDoubleTapHeart(true);
+    setTimeout(() => setDoubleTapHeart(false), 800);
+  };
+
+  const touchHandledRef = useRef(false);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleThumbnailClick = (e: React.MouseEvent) => {
+    // 터치로 이미 처리된 경우 무시 (모바일에서 touch + click 이중 발생 방지)
+    if (touchHandledRef.current) {
+      touchHandledRef.current = false;
+      return;
+    }
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      e.stopPropagation();
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+      handleDoubleTap();
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+      singleTapTimer.current = setTimeout(() => {
+        if (lastTapRef.current !== 0) {
+          onClick();
+          lastTapRef.current = 0;
+        }
+      }, 300);
+    }
+  };
+
+  // 모바일 더블탭 감지
+  const handleTouchTap = (e: React.TouchEvent) => {
+    touchHandledRef.current = true; // click 이벤트 무시용 플래그
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      e.preventDefault();
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+      handleDoubleTap();
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+      // 싱글 탭: 300ms 후 상세 페이지 이동
+      singleTapTimer.current = setTimeout(() => {
+        if (lastTapRef.current !== 0) {
+          onClick();
+          lastTapRef.current = 0;
+        }
+      }, 300);
+    }
+  };
 
   const handleMouseEnter = () => {
     if (!post.videoUrl) return;
@@ -928,15 +1102,18 @@ const PostCard: React.FC<{
 
   return (
     <div
+      ref={cardRef}
       className="rounded-xl border overflow-hidden transition-all hover:shadow-lg hover:scale-[1.01] cursor-pointer relative group"
       style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}
     >
       {/* 썸네일 + 호버 프리뷰 */}
-      <div className="relative" style={{ aspectRatio: '16/9' }} onClick={onClick}
+      <div className="relative" style={{ aspectRatio: '16/9' }}
+        onClick={handleThumbnailClick}
+        onTouchEnd={handleTouchTap}
         onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
-        onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchEnd}
+        onTouchStart={handleTouchStart} onTouchCancel={handleTouchEnd}
       >
-        {post.videoUrl && (hovering || longPressPreview) ? (
+        {post.videoUrl && (hovering || longPressPreview || inViewport) ? (
           <video ref={videoRef} src={post.videoUrl} muted playsInline loop preload="none" className="w-full h-full object-cover" />
         ) : post.thumbnail ? (
           <img src={`data:image/jpeg;base64,${post.thumbnail}`} alt={post.topic} className="w-full h-full object-cover" />
@@ -948,11 +1125,22 @@ const PostCard: React.FC<{
           </div>
         )}
         {/* 재생 아이콘 */}
-        {post.videoUrl && !hovering && !longPressPreview && (
+        {post.videoUrl && !hovering && !longPressPreview && !inViewport && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
               <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
             </div>
+          </div>
+        )}
+        {/* 더블탭 하트 애니메이션 */}
+        {doubleTapHeart && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            <svg className="w-20 h-20 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="#ef4444" stroke="white" strokeWidth={0.5}
+              style={{
+                animation: 'doubleTapHeart 0.8s ease-out forwards',
+              }}>
+              <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+            </svg>
           </div>
         )}
         {/* 상단 뱃지들 */}

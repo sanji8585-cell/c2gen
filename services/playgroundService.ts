@@ -244,3 +244,25 @@ export async function getAuthorProfile(authorEmail: string): Promise<AuthorProfi
   const data = await callPlaygroundAPI('author-posts', { authorEmail });
   return data.author;
 }
+
+// ── 알림 ──
+
+export interface PlaygroundNotification {
+  id: string;
+  actor_email: string;
+  actor_name: string;
+  type: 'like' | 'comment' | 'reply';
+  post_id: string | null;
+  comment_id: string | null;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+export async function getNotifications(): Promise<{ notifications: PlaygroundNotification[]; unreadCount: number }> {
+  return callPlaygroundAPI('notifications');
+}
+
+export async function markNotificationsRead(ids?: string[]): Promise<void> {
+  await callPlaygroundAPI('markNotificationsRead', { ids });
+}

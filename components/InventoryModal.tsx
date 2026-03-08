@@ -79,30 +79,48 @@ const EquippedSlot: React.FC<{
   label: string;
   item: { id: string; name: string; emoji: string } | null;
   isDark: boolean;
-}> = ({ label, item, isDark }) => (
+  compact?: boolean;
+}> = ({ label, item, isDark, compact }) => (
   <div
-    className="flex flex-col items-center gap-1 min-w-[72px]"
+    className={compact
+      ? "flex items-center gap-1.5 flex-1 min-w-0"
+      : "flex flex-col items-center gap-1 min-w-[72px]"
+    }
     style={{
-      padding: '8px',
-      borderRadius: '10px',
+      padding: compact ? '5px 8px' : '8px',
+      borderRadius: compact ? '8px' : '10px',
       backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
       border: item
         ? '2px solid #f59e0b'
         : `1px dashed ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
     }}
   >
-    <span className="text-[10px] font-medium opacity-50 uppercase tracking-wider">{label}</span>
-    {item ? (
+    {compact ? (
       <>
-        <span className="text-2xl leading-none">{item.emoji}</span>
-        <span className="text-[11px] font-medium text-center leading-tight truncate max-w-[64px]">
-          {item.name}
-        </span>
+        <span className="text-lg leading-none shrink-0">{item ? item.emoji : '-'}</span>
+        <div className="min-w-0 overflow-hidden">
+          <span className="text-[9px] font-medium opacity-50 uppercase block">{label}</span>
+          <span className="text-[10px] font-medium truncate block" style={{ opacity: item ? 1 : 0.3 }}>
+            {item ? item.name : '없음'}
+          </span>
+        </div>
       </>
     ) : (
       <>
-        <span className="text-2xl leading-none opacity-20">-</span>
-        <span className="text-[11px] opacity-30">비어있음</span>
+        <span className="text-[10px] font-medium opacity-50 uppercase tracking-wider">{label}</span>
+        {item ? (
+          <>
+            <span className="text-2xl leading-none">{item.emoji}</span>
+            <span className="text-[11px] font-medium text-center leading-tight truncate max-w-[64px]">
+              {item.name}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-2xl leading-none opacity-20">-</span>
+            <span className="text-[11px] opacity-30">비어있음</span>
+          </>
+        )}
       </>
     )}
   </div>
@@ -392,7 +410,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
 
   // 뽑기 탭 렌더링
   const renderGachaTab = () => (
-    <div className="flex flex-col items-center gap-6 py-8">
+    <div className="flex flex-col items-center gap-4 sm:gap-6 py-4 sm:py-8">
       {/* 뽑기 비주얼 */}
       <div
         className="relative w-32 h-32 rounded-2xl flex items-center justify-center"
@@ -559,14 +577,14 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4"
       style={{ backgroundColor: bgOverlay, backdropFilter: 'blur(8px)' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
         style={{
           backgroundColor: bgSurface,
           color: textPrimary,
@@ -575,7 +593,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
       >
         {/* ── 헤더 ── */}
         <div
-          className="flex items-center justify-between px-5 py-4 shrink-0"
+          className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 shrink-0"
           style={{ borderBottom: `1px solid ${borderColor}` }}
         >
           <div className="flex items-center gap-2.5">
@@ -605,7 +623,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
 
         {/* ── 현재 장착 중인 아이템 ── */}
         <div
-          className="px-5 py-3 shrink-0"
+          className="px-4 sm:px-5 py-3 shrink-0"
           style={{ borderBottom: `1px solid ${borderColor}` }}
         >
           <div className="flex items-center gap-2 mb-2">
@@ -613,18 +631,27 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
               장착 중
             </span>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {/* 프레임 미리보기 */}
-            <div className="flex flex-col items-center gap-1 min-w-[72px]" style={{ padding: 8, borderRadius: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', border: equipped.frame ? '2px solid #f59e0b' : `1px dashed ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}` }}>
-              <span className="text-[10px] font-medium opacity-50 uppercase tracking-wider">{t('game.frame')}</span>
-              <AvatarFrame name="ME" size={36} rarity={equipped.frame?.rarity} frameName={equipped.frame?.name} />
-              <span className="text-[11px] font-medium text-center leading-tight truncate max-w-[64px]">{equipped.frame?.name || <span className="opacity-30">비어있음</span>}</span>
-            </div>
+          {/* 데스크톱: 가로 나열 */}
+          <div className="hidden sm:flex items-center gap-2 pb-1">
+            <EquippedSlot label={t('game.frame')} item={equipped.frame ? { id: equipped.frame.id || '', name: equipped.frame.name, emoji: equipped.frame.emoji || '' } : null} isDark={isDark} />
             <EquippedSlot label={t('game.title')} item={equipped.title} isDark={isDark} />
-            {/* 뱃지 슬롯들 (최대 3개 표시) */}
             {[0, 1, 2].map((idx) => (
               <EquippedSlot
                 key={`badge-slot-${idx}`}
+                label={`${t('game.badge')}${idx + 1}`}
+                item={equipped.badges[idx] || null}
+                isDark={isDark}
+              />
+            ))}
+          </div>
+          {/* 모바일: 컴팩트 그리드 */}
+          <div className="grid grid-cols-2 gap-1.5 sm:hidden">
+            <EquippedSlot compact label={t('game.frame')} item={equipped.frame ? { id: equipped.frame.id || '', name: equipped.frame.name, emoji: equipped.frame.emoji || '' } : null} isDark={isDark} />
+            <EquippedSlot compact label={t('game.title')} item={equipped.title} isDark={isDark} />
+            {[0, 1, 2].map((idx) => (
+              <EquippedSlot
+                compact
+                key={`badge-slot-m-${idx}`}
                 label={`${t('game.badge')}${idx + 1}`}
                 item={equipped.badges[idx] || null}
                 isDark={isDark}
@@ -658,7 +685,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
               <button
                 key={tabKey}
                 onClick={() => setActiveTab(tabKey)}
-                className="relative flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-150"
+                className="relative flex items-center justify-center gap-1.5 px-3 sm:px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-150 flex-1 sm:flex-initial"
                 style={{
                   color: isActive ? '#8b5cf6' : textSecondary,
                   backgroundColor: isActive
@@ -680,7 +707,7 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
                 }}
               >
                 <span>{TAB_ICONS[tabKey]}</span>
-                <span>{t(TAB_LABEL_KEYS[tabKey])}</span>
+                <span className="hidden sm:inline">{t(TAB_LABEL_KEYS[tabKey])}</span>
                 {count > 0 && (
                   <span
                     className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none"
@@ -700,13 +727,13 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
         </div>
 
         {/* ── 탭 콘텐츠 ── */}
-        <div className="flex-1 overflow-y-auto px-5 py-4" style={{ minHeight: 0 }}>
+        <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-3 sm:py-4" style={{ minHeight: 0 }}>
           {activeTab === 'gacha' ? (
             renderGachaTab()
           ) : sortedItems.length === 0 ? (
             renderEmptyState(activeTab)
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
               {sortedItems.map((item) => renderItemCard(item))}
             </div>
           )}

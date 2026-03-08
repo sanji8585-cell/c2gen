@@ -21,7 +21,7 @@ interface UserProfileProps {
   };
 }
 
-type Tab = 'info' | 'game' | 'usage' | 'payments' | 'security' | 'referral';
+type Tab = 'info' | 'game' | 'usage' | 'payments' | 'security' | 'inquiry' | 'referral';
 
 interface ProfileData {
   email: string;
@@ -92,6 +92,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
   // 놀이터 통계
   const [playgroundStats, setPlaygroundStats] = useState<{ postCount: number; totalLikes: number } | null>(null);
 
+  // 1:1 문의
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [inquiryLoading, setInquiryLoading] = useState(false);
+  const [inquiryUnread, setInquiryUnread] = useState(0);
+  const [showInquiryForm, setShowInquiryForm] = useState(false);
+  const [inquiryCategory, setInquiryCategory] = useState('general');
+  const [inquirySubject, setInquirySubject] = useState('');
+  const [inquiryContent, setInquiryContent] = useState('');
+  const [submittingInquiry, setSubmittingInquiry] = useState(false);
+  const [expandedInquiry, setExpandedInquiry] = useState<string | null>(null);
+
   const token = localStorage.getItem('c2gen_session_token');
 
   const fetchProfile = useCallback(async () => {
@@ -161,10 +172,26 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
       .catch(() => {});
   }, [profile?.email, token]);
 
+  const fetchInquiries = useCallback(async () => {
+    if (!token) return;
+    setInquiryLoading(true);
+    try {
+      const r = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getMyInquiries', token }),
+      });
+      const d = await r.json();
+      if (d.success) { setInquiries(d.inquiries || []); setInquiryUnread(d.unreadCount || 0); }
+    } catch { /* ignore */ }
+    setInquiryLoading(false);
+  }, [token]);
+
   useEffect(() => {
     if (activeTab === 'usage') fetchHistory();
     if (activeTab === 'payments') fetchPayments();
-  }, [activeTab, fetchHistory, fetchPayments]);
+    if (activeTab === 'inquiry') fetchInquiries();
+  }, [activeTab, fetchHistory, fetchPayments, fetchInquiries]);
 
   const handleSaveName = async () => {
     if (!token || !newName.trim() || newName.trim() === profile?.name) return;
@@ -350,6 +377,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
             { id: 'usage' as Tab, label: t('profile.usage') },
             { id: 'payments' as Tab, label: t('profile.payments') },
             { id: 'security' as Tab, label: t('profile.security') },
+            { id: 'inquiry' as Tab, label: t('profile.inquiry', '1:1 문의') },
             { id: 'referral' as Tab, label: t('profile.referral') },
           ]).map(tab => (
             <button
@@ -874,6 +902,135 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose, currentCredits, curr
                   >
                     {changingPassword ? t('profile.changing') : t('profile.changePassword')}
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* === 1:1 문의 탭 === */}
+          {activeTab === 'inquiry' && (
+            <div>
+              {/* 새 문의 작성 토글 */}
+              {!showInquiryForm ? (
+                <button
+                  onClick={() => setShowInquiryForm(true)}
+                  className="w-full mb-4 py-2.5 rounded-lg text-xs font-bold transition-all"
+                  style={{ backgroundColor: 'rgba(99,102,241,0.12)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}
+                >
+                  + {t('profile.newInquiry', '새 문의 작성')}
+                </button>
+              ) : (
+                <div className="mb-4 p-3 rounded-xl border space-y-2.5" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)', borderColor: 'var(--border-default)' }}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{t('profile.newInquiry', '새 문의 작성')}</p>
+                    <button onClick={() => setShowInquiryForm(false)} className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('common.cancel')}</button>
+                  </div>
+                  <select value={inquiryCategory} onChange={e => setInquiryCategory(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg border text-xs"
+                    style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}>
+                    <option value="general">{t('profile.inqGeneral', '기타')}</option>
+                    <option value="bug">{t('profile.inqBug', '버그 신고')}</option>
+                    <option value="payment">{t('profile.inqPayment', '결제 문의')}</option>
+                    <option value="account">{t('profile.inqAccount', '계정 문의')}</option>
+                    <option value="playground">{t('profile.inqPlayground', '놀이터 문의')}</option>
+                  </select>
+                  <input type="text" value={inquirySubject} onChange={e => setInquirySubject(e.target.value)}
+                    placeholder={t('profile.inqSubjectPlaceholder', '제목을 입력하세요')} maxLength={100}
+                    className="w-full px-3 py-1.5 rounded-lg border text-xs"
+                    style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }} />
+                  <textarea value={inquiryContent} onChange={e => setInquiryContent(e.target.value)}
+                    placeholder={t('profile.inqContentPlaceholder', '내용을 입력하세요 (최대 1000자)')} maxLength={1000} rows={4}
+                    className="w-full px-3 py-1.5 rounded-lg border text-xs resize-none"
+                    style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }} />
+                  <button
+                    onClick={async () => {
+                      if (!inquirySubject.trim() || !inquiryContent.trim()) { setMessage({ type: 'error', text: t('profile.inqFillAll', '제목과 내용을 입력해주세요.') }); return; }
+                      setSubmittingInquiry(true);
+                      try {
+                        const r = await fetch('/api/auth', {
+                          method: 'POST', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'submitInquiry', token, category: inquiryCategory, subject: inquirySubject.trim(), content: inquiryContent.trim() }),
+                        });
+                        const d = await r.json();
+                        if (d.success) {
+                          setMessage({ type: 'success', text: t('profile.inqSubmitted', '문의가 접수되었습니다.') });
+                          setShowInquiryForm(false); setInquirySubject(''); setInquiryContent(''); setInquiryCategory('general');
+                          fetchInquiries();
+                        } else { setMessage({ type: 'error', text: d.error || t('profile.inqFailed', '문의 접수 실패') }); }
+                      } catch { setMessage({ type: 'error', text: t('auth.serverError') }); }
+                      setSubmittingInquiry(false);
+                    }}
+                    disabled={submittingInquiry || !inquirySubject.trim() || !inquiryContent.trim()}
+                    className="w-full py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-40"
+                    style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}
+                  >
+                    {submittingInquiry ? '...' : t('profile.inqSubmit', '문의 접수')}
+                  </button>
+                </div>
+              )}
+
+              {/* 문의 목록 */}
+              {inquiryLoading ? (
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</div>
+              ) : inquiries.length === 0 ? (
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>{t('profile.noInquiries', '문의 내역이 없습니다.')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {inquiries.map((inq: any) => {
+                    const isExpanded = expandedInquiry === inq.id;
+                    const statusStyle = inq.status === 'open'
+                      ? { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', label: t('profile.inqOpen', '대기중') }
+                      : inq.status === 'replied'
+                      ? { bg: 'rgba(34,197,94,0.15)', color: '#22c55e', label: t('profile.inqReplied', '답변완료') }
+                      : { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8', label: t('profile.inqClosed', '종료') };
+                    return (
+                      <div key={inq.id} className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+                        <button
+                          onClick={() => {
+                            setExpandedInquiry(isExpanded ? null : inq.id);
+                            if (!isExpanded && inq.status === 'replied' && !inq.read_by_user) {
+                              fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'markInquiryRead', token, inquiryId: inq.id }) }).catch(() => {});
+                              setInquiries(prev => prev.map(i => i.id === inq.id ? { ...i, read_by_user: true } : i));
+                              setInquiryUnread(prev => Math.max(0, prev - 1));
+                            }
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors"
+                          style={{ backgroundColor: isExpanded ? 'color-mix(in srgb, var(--bg-elevated) 50%, transparent)' : 'transparent' }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}>{statusStyle.label}</span>
+                              {inq.status === 'replied' && !inq.read_by_user && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                            </div>
+                            <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{inq.subject}</p>
+                          </div>
+                          <span className="text-[10px] shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(inq.created_at).toLocaleDateString('ko-KR')}
+                          </span>
+                        </button>
+                        {isExpanded && (
+                          <div className="px-3 pb-3 space-y-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                            <div className="pt-2">
+                              <p className="text-[10px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>{t('profile.inqMyContent', '내 문의')}</p>
+                              <p className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{inq.content}</p>
+                            </div>
+                            {inq.admin_reply ? (
+                              <div className="p-2.5 rounded-lg" style={{ backgroundColor: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-[10px] font-bold" style={{ color: '#22c55e' }}>{t('profile.inqAdminReply', '관리자 답변')}</p>
+                                  {inq.admin_replied_at && <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{new Date(inq.admin_replied_at).toLocaleDateString('ko-KR')}</p>}
+                                </div>
+                                <p className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{inq.admin_reply}</p>
+                              </div>
+                            ) : (
+                              <p className="text-[10px] py-2 text-center" style={{ color: 'var(--text-muted)' }}>{t('profile.inqWaiting', '답변을 기다리고 있습니다...')}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

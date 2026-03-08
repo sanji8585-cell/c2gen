@@ -252,30 +252,33 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
   // 프로젝트 목록
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4 sm:mb-8 gap-2">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors shrink-0"
           style={{ backgroundColor: 'var(--bg-elevated)' }}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          {t('common.close')}
+          <span className="text-xs sm:text-sm">{t('common.close')}</span>
         </button>
 
-        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{t('gallery.title')}</h2>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <h2 className="text-sm sm:text-xl font-bold truncate" style={{ color: 'var(--text-primary)' }}>{t('gallery.title')}</h2>
+          <span className="text-[10px] sm:text-sm shrink-0" style={{ color: 'var(--text-muted)' }}>{projects.length}</span>
+        </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{projects.length}개 프로젝트</span>
+        <div className="flex items-center shrink-0">
           {/* JSON 가져오기 버튼 */}
-          <label className="flex items-center gap-2 px-3 py-2 bg-blue-800/50 hover:bg-blue-700/50 border border-blue-700/50 text-blue-300 text-xs font-bold rounded-lg cursor-pointer transition-colors">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <label className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-blue-800/50 hover:bg-blue-700/50 border border-blue-700/50 text-blue-300 text-[10px] sm:text-xs font-bold rounded-lg cursor-pointer transition-colors">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            {t('gallery.importProject')}
+            <span className="hidden sm:inline">{t('gallery.importProject')}</span>
+            <span className="sm:hidden">JSON</span>
             <input type="file" accept=".json,application/json" className="hidden" onChange={handleImportFile} />
           </label>
         </div>
@@ -303,7 +306,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
           {projects.map(project => (
             <div
               key={project.id}

@@ -1835,15 +1835,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }));
 
         // ── 인벤토리 ──
+        // equipped_badges 배열 기반으로 실제 장착 여부 결정 (is_equipped 컬럼과 불일치 방지)
+        const equippedBadgeSet = new Set<string>(eqData?.equipped_badges || []);
+        const equippedTitleId = eqData?.equipped_title || null;
+        const equippedFrameId = eqData?.equipped_frame || null;
+
         const inventory = { titles: [] as any[], badges: [] as any[], frames: [] as any[], consumables: [] as any[] };
         for (const inv of (invData || [])) {
           const def = gachaDefMap[inv.item_id];
           if (!def) continue;
+          // is_equipped를 equipped 테이블 기준으로 보정
+          let actualEquipped = inv.is_equipped;
+          if (def.item_type === 'badge') actualEquipped = equippedBadgeSet.has(inv.item_id);
+          else if (def.item_type === 'title') actualEquipped = inv.item_id === equippedTitleId;
+          else if (def.item_type === 'avatar_frame') actualEquipped = inv.item_id === equippedFrameId;
           const item = {
             inventoryId: inv.id, itemId: inv.item_id,
             name: def.name, emoji: def.emoji, itemType: def.item_type,
             rarity: def.rarity, quantity: inv.quantity,
-            isEquipped: inv.is_equipped, isActive: inv.is_active,
+            isEquipped: actualEquipped, isActive: inv.is_active,
             activeUntil: inv.active_until, obtainedVia: inv.obtained_via,
             effectValue: def.effect_value,
           };
@@ -3222,6 +3232,133 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!session) return res.status(401).json({ error: 'Invalid session' });
 
         await supabase.from('c2gen_favorite_voices').delete().eq('email', session.email).eq('voice_id', voiceId);
+        return res.json({ success: true });
+      }
+
+      // ══════════════════════════════════════
+      // ── 1:1 문의 시스템 ──
+      // ══════════════════════════════════════
+
+      case 'submitInquiry': {
+        if (!token) return res.status(401).json({ error: '로그인 필요' });
+        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        const { category = 'general', subject, content: inquiryContent } = params;
+        if (!subject?.trim() || !inquiryContent?.trim()) return res.status(400).json({ error: '제목과 내용을 입력해주세요.' });
+        if (subject.trim().length > 100) return res.status(400).json({ error: '제목은 100자 이내' });
+        if (inquiryContent.trim().length > 1000) return res.status(400).json({ error: '내용은 1000자 이내' });
+
+        const { data: user } = await supabase.from('c2gen_users').select('name').eq('email', session.email).single();
+
+        const { data: inquiry, error: insErr } = await supabase.from('c2gen_inquiries').insert({
+          email: session.email,
+          author_name: user?.name || 'Unknown',
+          category: ['bug', 'payment', 'account', 'playground', 'general'].includes(category) ? category : 'general',
+          subject: subject.trim(),
+          content: inquiryContent.trim(),
+        }).select().single();
+
+        if (insErr) return res.status(500).json({ error: insErr.message });
+        return res.json({ success: true, inquiry });
+      }
+
+      case 'getMyInquiries': {
+        if (!token) return res.status(401).json({ error: '로그인 필요' });
+        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        const { data: inquiries } = await supabase.from('c2gen_inquiries')
+          .select('id, category, subject, content, status, admin_reply, admin_replied_at, read_by_user, created_at')
+          .eq('email', session.email)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        const unreadCount = (inquiries || []).filter(i => i.status === 'replied' && !i.read_by_user).length;
+        return res.json({ success: true, inquiries: inquiries || [], unreadCount });
+      }
+
+      case 'markInquiryRead': {
+        if (!token) return res.status(401).json({ error: '로그인 필요' });
+        const { data: session } = await supabase.from('c2gen_sessions').select('email').eq('token', token).gt('expires_at', new Date().toISOString()).single();
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+        const { inquiryId } = params;
+        if (!inquiryId) return res.status(400).json({ error: 'inquiryId 필요' });
+
+        await supabase.from('c2gen_inquiries')
+          .update({ read_by_user: true })
+          .eq('id', inquiryId)
+          .eq('email', session.email);
+        return res.json({ success: true });
+      }
+
+      case 'admin-inquiryStats': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const [totalRes, openRes, repliedRes, closedRes] = await Promise.all([
+          supabase.from('c2gen_inquiries').select('*', { count: 'exact', head: true }),
+          supabase.from('c2gen_inquiries').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+          supabase.from('c2gen_inquiries').select('*', { count: 'exact', head: true }).eq('status', 'replied'),
+          supabase.from('c2gen_inquiries').select('*', { count: 'exact', head: true }).eq('status', 'closed'),
+        ]);
+
+        return res.json({
+          success: true,
+          total: totalRes.count || 0,
+          open: openRes.count || 0,
+          replied: repliedRes.count || 0,
+          closed: closedRes.count || 0,
+        });
+      }
+
+      case 'admin-listInquiries': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { page = 0, limit: ilimit = 20, status: iStatus, category: iCategory, search: iSearch } = params;
+        const lim = Math.min(Number(ilimit) || 20, 50);
+        const offset = (Number(page) || 0) * lim;
+
+        let query = supabase.from('c2gen_inquiries')
+          .select('id, email, author_name, category, subject, content, status, admin_reply, admin_replied_at, created_at', { count: 'exact' });
+
+        if (iStatus && iStatus !== 'all') query = query.eq('status', iStatus);
+        if (iCategory && iCategory !== 'all') query = query.eq('category', iCategory);
+        if (iSearch) query = query.or(`subject.ilike.%${iSearch}%,content.ilike.%${iSearch}%,email.ilike.%${iSearch}%`);
+
+        query = query.order('created_at', { ascending: false }).range(offset, offset + lim - 1);
+        const { data: inquiries, count } = await query;
+
+        return res.json({ success: true, inquiries: inquiries || [], total: count || 0 });
+      }
+
+      case 'admin-replyInquiry': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { inquiryId, reply } = params;
+        if (!inquiryId || !reply?.trim()) return res.status(400).json({ error: '답변을 입력해주세요.' });
+
+        await supabase.from('c2gen_inquiries').update({
+          admin_reply: reply.trim(),
+          admin_replied_at: new Date().toISOString(),
+          status: 'replied',
+          read_by_user: false,
+        }).eq('id', inquiryId);
+
+        return res.json({ success: true });
+      }
+
+      case 'admin-closeInquiry': {
+        const adminToken = params.adminToken || params.token || token;
+        if (!(await validateAdminSession(supabase, adminToken))) return res.status(403).json({ error: '관리자 권한 필요' });
+
+        const { inquiryId } = params;
+        if (!inquiryId) return res.status(400).json({ error: 'inquiryId 필요' });
+
+        await supabase.from('c2gen_inquiries').update({ status: 'closed' }).eq('id', inquiryId);
         return res.json({ success: true });
       }
 

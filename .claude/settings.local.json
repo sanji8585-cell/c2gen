@@ -15,7 +15,19 @@
       "Bash(npx vercel --prod)",
       "Bash(npm install i18next react-i18next)",
       "Bash(\"c:/Users/최천둥/Desktop/c2gen/tmp_used_keys.txt\")",
-      "Bash(node \"c:/Users/최천둥/Desktop/c2gen/tmp_compare.cjs\")"
+      "Bash(node \"c:/Users/최천둥/Desktop/c2gen/tmp_compare.cjs\")",
+      "Bash(printf '%s\\\\n' /c/Users/*/Desktop/c2gen)",
+      "Bash(grep -A30 \"case ''gemini-generate-image''\" ./api/gemini.ts)",
+      "Bash(grep -r \"[\\\\u4E00-\\\\u9FFF가-힣ㄱ-ㅎㅏ-ㅣ]\" components/*.tsx services/*.ts)",
+      "Bash(wc -l locales/*.ts)",
+      "Bash(wc -l api/*.ts)",
+      "Bash(sort -k5 -h)",
+      "Bash(grep -c \"catch\\\\|try\" api/*.ts)",
+      "Bash(grep -n \"addEventListener\" App.tsx components/*.tsx services/*.ts)",
+      "Bash(grep -n \"removeEventListener\" App.tsx components/*.tsx services/*.ts)",
+      "Bash(grep -n \"dangerouslySetInnerHTML\\\\|innerHTML\" App.tsx components/*.tsx)",
+      "Bash(wc -l components/*.tsx)",
+      "Bash(grep -r \"#[0-9a-f]\\\\{3,6\\\\}\" components/ThumbnailGenerator.tsx components/Header.tsx)"
     ]
   }
 }
