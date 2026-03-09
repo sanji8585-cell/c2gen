@@ -75,9 +75,10 @@ const AppRouter: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = ({ i
     return <AuthGate onSuccess={auth.handleAuthSuccess} onAdminSuccess={auth.handleAdminSuccess} mode="page" initialTab="admin" />;
   }
 
-  // 로그인 상태에서 / 접속 → /app 리다이렉트
+  // 로그인 상태에서 / 접속 → /app 리다이렉트 (쿼리 파라미터 유지)
   if (!isAppPath && auth.isAuthenticated) {
-    window.history.replaceState(null, '', '/app');
+    const search = window.location.search;
+    window.history.replaceState(null, '', '/app' + search);
   }
 
   // 비로그인 + / 경로 → 랜딩페이지
