@@ -43,6 +43,7 @@ interface PreparedScene {
   isAnimated: boolean;             // 애니메이션 씬 여부
   audioBuffer: AudioBuffer | null;
   subtitleChunks: SubtitleChunk[];  // 미리 계산된 자막 청크들
+  speakerColor: string | undefined; // V2.0: 화자별 자막 색상
   zoomEffect: ZoomEffect;          // 줌/팬 효과
   transition: TransitionType;      // 이 씬→다음 씬 전환 효과
   startTime: number;
@@ -154,7 +155,8 @@ function renderSubtitle(
   canvas: HTMLCanvasElement,
   chunks: SubtitleChunk[],
   sceneElapsed: number,
-  config: SubtitleConfig
+  config: SubtitleConfig,
+  speakerColor?: string
 ) {
   const currentChunk = getCurrentChunk(chunks, sceneElapsed);
   if (!currentChunk) return;
@@ -213,8 +215,8 @@ function renderSubtitle(
     ctx.lineWidth = 4;
     ctx.strokeText(line, canvas.width / 2, textY, textMaxWidth);
 
-    // 흰색 텍스트
-    ctx.fillStyle = config.textColor;
+    // V2.0: 화자별 자막 색상 (speakerColor 우선)
+    ctx.fillStyle = speakerColor || config.textColor;
     ctx.fillText(line, canvas.width / 2, textY, textMaxWidth);
   });
 }
@@ -562,6 +564,7 @@ export const generateVideo = async (
       isAnimated,
       audioBuffer,
       subtitleChunks,
+      speakerColor: asset.speakerColor,
       zoomEffect: (asset.zoomEffect || 'zoomIn') as ZoomEffect,
       transition: (asset.transition || 'none') as TransitionType,
       startTime,
@@ -797,7 +800,7 @@ export const generateVideo = async (
 
         // 자막 렌더링 (갭 구간에는 표시 안 함)
         if (activeScene) {
-          renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config);
+          renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config, activeScene.speakerColor);
         }
 
         // 자막 타이밍 기록

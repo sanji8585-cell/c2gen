@@ -9,7 +9,7 @@ import {
   getMoodAnalysisPrompt,
   getThumbnailPrompt,
 } from '../services/prompts.js';
-import { GEMINI_STYLE_CATEGORIES, VIDEO_DIMENSIONS, type VideoOrientation } from '../config.js';
+import { GEMINI_STYLE_CATEGORIES, GEMINI_VOICE_MAP, VIDEO_DIMENSIONS, type VideoOrientation } from '../config.js';
 
 // ── 유틸리티 (서버 전용) ─────────────────────────────
 
@@ -416,12 +416,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ── Gemini TTS ──
       case 'generateAudio': {
         const { text } = params;
+        // V2.0: 언어/성별 기반 음성 자동 선택
+        const voiceName = (() => {
+          const lang = params.language || 'ko';
+          const gender = params.gender || 'female';
+          return GEMINI_VOICE_MAP[lang]?.[gender] || GEMINI_VOICE_MAP.ko.female;
+        })();
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-preview-tts',
           contents: { parts: [{ text }] },
           config: {
             responseModalities: [Modality.AUDIO],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           },
         });
         const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
