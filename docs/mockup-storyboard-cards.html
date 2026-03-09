@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스토리보드 카드 레이아웃 목업</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg-base: #020617;
+    --bg-surface: #0f172a;
+    --bg-elevated: #1e293b;
+    --bg-hover: #334155;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
+    --border-default: #1e293b;
+    --border-subtle: #334155;
+  }
+  body { background: var(--bg-base); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .scene-card { transition: box-shadow 0.2s, border-color 0.2s; }
+  .scene-card:hover { box-shadow: 0 4px 24px rgba(0,0,0,0.3); border-color: rgba(96,165,250,0.3) !important; }
+  .scene-card:hover .hover-overlay { opacity: 1; }
+  .scene-card:hover .drag-handle { opacity: 0.6; }
+  .scene-card:hover .quick-actions { opacity: 1; }
+  .hover-overlay { opacity: 0; transition: opacity 0.2s; }
+  .drag-handle { opacity: 0; transition: opacity 0.2s; cursor: grab; }
+  .quick-actions { opacity: 0; transition: opacity 0.2s; }
+  .prompt-toggle { cursor: pointer; }
+  .prompt-toggle:hover { color: #60a5fa; }
+  .zoom-btn, .trans-btn { width: 28px; height: 24px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); font-size: 11px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+  .zoom-btn:hover, .trans-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .zoom-btn.active, .trans-btn.active { background: rgba(96,165,250,0.15); border-color: rgba(96,165,250,0.4); color: #60a5fa; }
+  .toolbar-btn { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .toolbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .toolbar-btn.primary { background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); color: #34d399; }
+  .toolbar-btn.accent { background: rgba(96,165,250,0.15); border-color: rgba(96,165,250,0.3); color: #60a5fa; }
+  .badge { font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .audio-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .audio-btn:hover { background: rgba(96,165,250,0.15); color: #60a5fa; border-color: rgba(96,165,250,0.3); }
+</style>
+</head>
+<body>
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- ===== 툴바 ===== -->
+  <div class="rounded-2xl border p-3 mb-4 flex items-center justify-between flex-wrap gap-2" style="background: var(--bg-surface); border-color: var(--border-default);">
+    <div class="flex items-center gap-2">
+      <button class="toolbar-btn" style="width:32px; padding:0;" title="Undo">
+        <svg class="w-4 h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+      </button>
+      <button class="toolbar-btn" style="width:32px; padding:0;" title="Redo">
+        <svg class="w-4 h-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/></svg>
+      </button>
+      <div style="width:1px; height:20px; background:var(--border-subtle);"></div>
+      <button class="toolbar-btn primary" style="padding:0 20px; gap:8px;">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        미리보기
+      </button>
+    </div>
+    <div class="flex items-center gap-2">
+      <button class="toolbar-btn">🎞 자동줌</button>
+      <button class="toolbar-btn" onclick="document.getElementById('bgm-panel').classList.toggle('hidden')" style="background:rgba(168,85,247,0.12); border-color:rgba(168,85,247,0.3); color:#c084fc;">🎵 BGM 25%</button>
+      <button class="toolbar-btn" onclick="document.getElementById('subtitle-panel').classList.toggle('hidden')" style="background:rgba(96,165,250,0.12); border-color:rgba(96,165,250,0.3); color:#60a5fa;">📝 자막설정</button>
+      <div style="width:1px; height:20px; background:var(--border-subtle);"></div>
+      <select class="toolbar-btn" style="appearance:none; padding-right:24px; background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>'); background-repeat:no-repeat; background-position:right 8px center;">
+        <option>720P</option>
+      </select>
+      <div style="width:1px; height:20px; background:var(--border-subtle);"></div>
+      <button class="toolbar-btn primary" style="background:rgba(16,185,129,0.2); border-color:rgba(16,185,129,0.4); color:#34d399;">💾 프로젝트 저장</button>
+      <button class="toolbar-btn accent">⬇ 내보내기</button>
+    </div>
+  </div>
+
+  <!-- ===== BGM 볼륨/덕킹 패널 ===== -->
+  <div id="bgm-panel" class="rounded-2xl border p-4 mb-3" style="background: var(--bg-surface); border-color: rgba(168,85,247,0.25);">
+    <div class="flex items-center gap-6 flex-wrap">
+      <!-- 볼륨 -->
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-bold" style="color:#c084fc;">🎵 BGM 볼륨</span>
+        <input type="range" min="0" max="100" value="25" class="w-32 accent-purple-500" style="height:4px;">
+        <span class="text-xs font-bold w-8 text-right" style="color:#c084fc;">25%</span>
+      </div>
+
+      <!-- 구분선 -->
+      <div style="width:1px; height:24px; background:var(--border-subtle);"></div>
+
+      <!-- 덕킹 토글 -->
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <div class="relative" style="width:36px; height:20px; border-radius:10px; background:rgba(168,85,247,0.6);">
+            <div style="position:absolute; top:2px; left:18px; width:16px; height:16px; border-radius:50%; background:white; transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+          </div>
+          <span class="text-xs font-bold" style="color:#c084fc;">오토 덕킹</span>
+        </label>
+        <span class="text-[10px]" style="color:var(--text-secondary);">나레이션 구간 BGM 자동 감소</span>
+      </div>
+
+      <!-- 덕킹 양 -->
+      <div class="flex items-center gap-3">
+        <span class="text-[10px] font-semibold" style="color:var(--text-secondary);">감소량</span>
+        <input type="range" min="10" max="90" value="30" class="w-20 accent-purple-500" style="height:4px;">
+        <span class="text-xs font-bold w-8 text-right" style="color:#c084fc;">30%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 자막 설정 패널 ===== -->
+  <div id="subtitle-panel" class="hidden rounded-2xl border p-4 mb-3" style="background: var(--bg-surface); border-color: rgba(96,165,250,0.25);">
+    <!-- 1행: 위치 + 크기 + 배경 + 색상 -->
+    <div class="flex items-start gap-6 flex-wrap mb-4">
+      <!-- 자막 위치 -->
+      <div>
+        <span class="text-[10px] font-bold block mb-2" style="color:var(--text-secondary);">위치</span>
+        <div class="flex gap-1.5">
+          <button class="px-3 py-1.5 rounded-lg text-[11px] font-bold border" style="background:var(--bg-elevated); border-color:var(--border-subtle); color:var(--text-secondary);">상단</button>
+          <button class="px-3 py-1.5 rounded-lg text-[11px] font-bold border" style="background:var(--bg-elevated); border-color:var(--border-subtle); color:var(--text-secondary);">중앙</button>
+          <button class="px-3 py-1.5 rounded-lg text-[11px] font-bold border" style="background:rgba(96,165,250,0.15); border-color:rgba(96,165,250,0.4); color:#60a5fa;">하단</button>
+        </div>
+      </div>
+
+      <!-- 구분선 -->
+      <div style="width:1px; height:48px; background:var(--border-subtle); margin-top:8px;"></div>
+
+      <!-- 글자 크기 -->
+      <div>
+        <span class="text-[10px] font-bold block mb-2" style="color:var(--text-secondary);">글자 크기</span>
+        <div class="flex items-center gap-2">
+          <input type="range" min="20" max="72" step="2" value="36" class="w-24 accent-blue-500" style="height:4px;">
+          <span class="text-xs font-bold" style="color:#60a5fa;">36px</span>
+        </div>
+      </div>
+
+      <!-- 구분선 -->
+      <div style="width:1px; height:48px; background:var(--border-subtle); margin-top:8px;"></div>
+
+      <!-- 배경 투명도 -->
+      <div>
+        <span class="text-[10px] font-bold block mb-2" style="color:var(--text-secondary);">배경 투명도</span>
+        <div class="flex items-center gap-2">
+          <input type="range" min="0" max="100" step="5" value="60" class="w-24 accent-blue-500" style="height:4px;">
+          <span class="text-xs font-bold" style="color:#60a5fa;">60%</span>
+        </div>
+      </div>
+
+      <!-- 구분선 -->
+      <div style="width:1px; height:48px; background:var(--border-subtle); margin-top:8px;"></div>
+
+      <!-- 글자 색상 -->
+      <div>
+        <span class="text-[10px] font-bold block mb-2" style="color:var(--text-secondary);">색상</span>
+        <div class="flex items-center gap-2">
+          <button class="w-6 h-6 rounded-full border-2 border-blue-400" style="background:white;"></button>
+          <button class="w-6 h-6 rounded-full border-2 border-transparent" style="background:#fbbf24;"></button>
+          <button class="w-6 h-6 rounded-full border-2 border-transparent" style="background:#22d3ee;"></button>
+          <button class="w-6 h-6 rounded-full border-2 border-transparent" style="background:#fb923c;"></button>
+        </div>
+      </div>
+
+      <!-- 구분선 -->
+      <div style="width:1px; height:48px; background:var(--border-subtle); margin-top:8px;"></div>
+
+      <!-- 실시간 미리보기 -->
+      <div>
+        <span class="text-[10px] font-bold block mb-2" style="color:var(--text-secondary);">미리보기</span>
+        <div class="relative rounded-lg overflow-hidden" style="width:160px; height:40px; background:#111;">
+          <div class="absolute bottom-0 left-0 right-0 text-center py-1" style="background:rgba(0,0,0,0.6);">
+            <span style="font-size:11px; font-weight:700; color:white; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">자막 미리보기 텍스트</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2행: 씬 간격 + 기본 트랜지션 -->
+    <div class="flex items-center gap-6 flex-wrap pt-3" style="border-top: 1px solid var(--border-default);">
+      <div class="flex items-center gap-3">
+        <span class="text-[10px] font-bold" style="color:var(--text-secondary);">씬 간격</span>
+        <input type="range" min="0" max="1.5" step="0.1" value="0.3" class="w-24 accent-blue-500" style="height:4px;">
+        <span class="text-xs font-bold" style="color:#60a5fa;">0.3s</span>
+      </div>
+
+      <div style="width:1px; height:20px; background:var(--border-subtle);"></div>
+
+      <div class="flex items-center gap-3">
+        <span class="text-[10px] font-bold" style="color:var(--text-secondary);">기본 전환효과</span>
+        <select class="h-7 px-2 rounded-lg text-[11px] font-semibold border cursor-pointer" style="background:var(--bg-elevated); border-color:var(--border-subtle); color:var(--text-primary); outline:none;">
+          <option>디졸브</option>
+          <option>페이드</option>
+          <option>왼쪽 슬라이드</option>
+          <option>오른쪽 슬라이드</option>
+          <option>없음</option>
+        </select>
+        <button class="px-3 py-1 rounded-lg text-[10px] font-bold" style="background:rgba(96,165,250,0.1); color:#60a5fa; border:1px solid rgba(96,165,250,0.25);">
+          전체 씬 적용
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 씬 카드 리스트 ===== -->
+  <div class="space-y-3">
+
+    <!-- 씬 1 — 완료 상태 -->
+    <div class="scene-card rounded-2xl border overflow-hidden" style="background: var(--bg-surface); border-color: var(--border-default);">
+      <!-- 헤더 -->
+      <div class="flex items-center justify-between px-4 py-2.5" style="border-bottom: 1px solid var(--border-default);">
+        <div class="flex items-center gap-3">
+          <div class="drag-handle text-xs" style="color: var(--text-muted);">⠿</div>
+          <span class="font-mono text-xs font-bold" style="color: var(--text-muted);">#01</span>
+          <div class="status-dot" style="background: #22c55e;"></div>
+          <span class="badge" style="background:rgba(16,185,129,0.1); color:#34d399; border:1px solid rgba(16,185,129,0.2);">STANDARD</span>
+          <span class="badge" style="background:rgba(34,197,94,0.1); color:#4ade80; border:1px solid rgba(34,197,94,0.2);">POSITIVE</span>
+        </div>
+        <div class="quick-actions flex items-center gap-1">
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">✏️</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">📋</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">➕</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px; color:#f87171;">🗑</button>
+        </div>
+      </div>
+
+      <!-- 바디: 이미지 + 콘텐츠 -->
+      <div class="flex">
+        <!-- 이미지 영역 -->
+        <div class="relative flex-shrink-0" style="width: 280px; height: 158px;">
+          <img src="https://picsum.photos/seed/scene1/560/316" alt="Scene 1" class="w-full h-full object-cover">
+          <!-- 호버 오버레이 -->
+          <div class="hover-overlay absolute inset-0 bg-black/60 flex items-center justify-center gap-3">
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all flex items-center gap-1.5">
+              🔄 재생성
+            </button>
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all flex items-center gap-1.5">
+              📤 업로드
+            </button>
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 transition-all flex items-center gap-1.5">
+              🎬 영상
+            </button>
+          </div>
+          <!-- 시간 뱃지 -->
+          <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold" style="background:rgba(0,0,0,0.7); color:white;">
+            ⏱ 4.5s
+          </div>
+        </div>
+
+        <!-- 콘텐츠 영역 -->
+        <div class="flex-1 min-w-0 flex flex-col p-4 gap-3">
+          <!-- 나레이션 -->
+          <p class="text-sm leading-relaxed" style="color: var(--text-primary); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+            청년창업 및 지방 기업 소득세 100% 감면 전략에 대해 알아보겠습니다. 정부의 새로운 세금 정책은 청년 창업가들에게 큰 기회를 제공합니다.
+          </p>
+
+          <!-- 하단 컨트롤 -->
+          <div class="flex items-center gap-3 mt-auto">
+            <!-- TTS 오디오 -->
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg" style="background:var(--bg-elevated); border:1px solid var(--border-subtle);">
+              <button class="audio-btn" style="width:26px; height:26px; border:none; background:none;" title="재생">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <span class="text-[10px] font-bold" style="color:#34d399;">4.5s</span>
+              <button class="w-5 h-5 rounded flex items-center justify-center hover:bg-white/10" title="TTS 재생성" style="color:var(--text-muted);">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+              <button class="w-5 h-5 rounded flex items-center justify-center hover:bg-white/10" title="음소거" style="color:var(--text-muted);">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+              </button>
+            </div>
+
+            <!-- 줌 효과 -->
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">줌</span>
+              <button class="zoom-btn active" title="줌인">↗</button>
+              <button class="zoom-btn" title="줌아웃">↙</button>
+              <button class="zoom-btn" title="왼쪽패닝">←</button>
+              <button class="zoom-btn" title="오른쪽패닝">→</button>
+              <button class="zoom-btn" title="정적">•</button>
+            </div>
+
+            <!-- 구분선 -->
+            <div style="width:1px; height:18px; background:var(--border-subtle);"></div>
+
+            <!-- 트랜지션 -->
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">전환</span>
+              <button class="trans-btn active" title="디졸브">⟷</button>
+              <button class="trans-btn" title="페이드">■</button>
+              <button class="trans-btn" title="왼쪽슬라이드">◁</button>
+              <button class="trans-btn" title="오른쪽슬라이드">▷</button>
+              <button class="trans-btn" title="없음">•</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 접힌 프롬프트 -->
+      <div class="prompt-toggle px-4 py-2 text-xs flex items-center gap-2" style="border-top: 1px solid var(--border-default); color: var(--text-muted);" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.arrow').textContent = this.nextElementSibling.classList.contains('hidden') ? '▸' : '▾';">
+        <span class="arrow">▸</span>
+        <span>비주얼 프롬프트</span>
+        <span style="color:var(--text-muted); font-size:10px; opacity:0.6;">A young male entrepreneur and a middle-aged female local bus...</span>
+      </div>
+      <div class="hidden px-4 py-3" style="border-top: 1px solid var(--border-default); background: rgba(15,23,42,0.5);">
+        <p class="text-xs font-mono leading-relaxed" style="color: var(--text-secondary);">
+          A young male entrepreneur and a middle-aged female local business owner shaking hands, both smiling brightly. Behind them, a large, glowing sign displays '100% TAX EXEMPTION' in bold letters. In the background, a modern cityscape represents startup companies, and a quaint, traditional street represents local businesses. A prominent green arrow points downwards at a stylized tax document.
+        </p>
+      </div>
+    </div>
+
+    <!-- 씬 2 — 완료 -->
+    <div class="scene-card rounded-2xl border overflow-hidden" style="background: var(--bg-surface); border-color: var(--border-default);">
+      <div class="flex items-center justify-between px-4 py-2.5" style="border-bottom: 1px solid var(--border-default);">
+        <div class="flex items-center gap-3">
+          <div class="drag-handle text-xs" style="color: var(--text-muted);">⠿</div>
+          <span class="font-mono text-xs font-bold" style="color: var(--text-muted);">#02</span>
+          <div class="status-dot" style="background: #22c55e;"></div>
+          <span class="badge" style="background:rgba(16,185,129,0.1); color:#34d399; border:1px solid rgba(16,185,129,0.2);">STANDARD</span>
+          <span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.2);">NEGATIVE</span>
+        </div>
+        <div class="quick-actions flex items-center gap-1">
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">✏️</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">📋</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">➕</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px; color:#f87171;">🗑</button>
+        </div>
+      </div>
+      <div class="flex">
+        <div class="relative flex-shrink-0" style="width: 280px; height: 158px;">
+          <img src="https://picsum.photos/seed/scene2/560/316" alt="Scene 2" class="w-full h-full object-cover">
+          <div class="hover-overlay absolute inset-0 bg-black/60 flex items-center justify-center gap-3">
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all">🔄 재생성</button>
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all">📤 업로드</button>
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 transition-all">🎬 영상</button>
+          </div>
+          <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold" style="background:rgba(0,0,0,0.7); color:white;">⏱ 5.2s</div>
+        </div>
+        <div class="flex-1 min-w-0 flex flex-col p-4 gap-3">
+          <p class="text-sm leading-relaxed" style="color: var(--text-primary); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+            청년들은 높은 창업 비용과 세금 부담으로 어려움을 겪고 있습니다. 초기 자본금 마련부터 매출 발생 전 고정 비용까지, 많은 장벽이 존재합니다.
+          </p>
+          <div class="flex items-center gap-3 mt-auto">
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg" style="background:var(--bg-elevated); border:1px solid var(--border-subtle);">
+              <button class="audio-btn" style="width:26px; height:26px; border:none; background:none;" title="재생">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <span class="text-[10px] font-bold" style="color:#34d399;">5.2s</span>
+              <button class="w-5 h-5 rounded flex items-center justify-center hover:bg-white/10" title="TTS 재생성" style="color:var(--text-muted);">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+              <button class="w-5 h-5 rounded flex items-center justify-center hover:bg-white/10" title="음소거" style="color:var(--text-muted);">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+              </button>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">줌</span>
+              <button class="zoom-btn" title="줌인">↗</button>
+              <button class="zoom-btn active" title="줌아웃">↙</button>
+              <button class="zoom-btn">←</button>
+              <button class="zoom-btn">→</button>
+              <button class="zoom-btn">•</button>
+            </div>
+            <div style="width:1px; height:18px; background:var(--border-subtle);"></div>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">전환</span>
+              <button class="trans-btn active">⟷</button>
+              <button class="trans-btn">■</button>
+              <button class="trans-btn">◁</button>
+              <button class="trans-btn">▷</button>
+              <button class="trans-btn">•</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="prompt-toggle px-4 py-2 text-xs flex items-center gap-2" style="border-top: 1px solid var(--border-default); color: var(--text-muted);" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.arrow').textContent = this.nextElementSibling.classList.contains('hidden') ? '▸' : '▾';">
+        <span class="arrow">▸</span>
+        <span>비주얼 프롬프트</span>
+        <span style="font-size:10px; opacity:0.6;">A young person, looking stressed and overwhelmed, sitting at a desk...</span>
+      </div>
+      <div class="hidden px-4 py-3" style="border-top: 1px solid var(--border-default); background: rgba(15,23,42,0.5);">
+        <p class="text-xs font-mono leading-relaxed" style="color: var(--text-secondary);">A young person, looking stressed and overwhelmed, sitting at a desk piled high with stacks of bills, invoices, and complex tax forms. The desk is piled high. The lighting is dim, and the colors are muted, emphasizing difficulty.</p>
+      </div>
+    </div>
+
+    <!-- 씬 3 — 생성 중 -->
+    <div class="scene-card rounded-2xl border overflow-hidden" style="background: var(--bg-surface); border-color: var(--border-default);">
+      <div class="flex items-center justify-between px-4 py-2.5" style="border-bottom: 1px solid var(--border-default);">
+        <div class="flex items-center gap-3">
+          <div class="drag-handle text-xs" style="color: var(--text-muted);">⠿</div>
+          <span class="font-mono text-xs font-bold" style="color: var(--text-muted);">#03</span>
+          <div class="status-dot" style="background: #60a5fa; animation: pulse 1.5s infinite;"></div>
+          <span class="badge" style="background:rgba(96,165,250,0.1); color:#60a5fa; border:1px solid rgba(96,165,250,0.2);">STANDARD</span>
+          <span class="badge" style="background:rgba(34,197,94,0.1); color:#4ade80; border:1px solid rgba(34,197,94,0.2);">POSITIVE</span>
+        </div>
+        <div class="quick-actions flex items-center gap-1">
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">✏️</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">📋</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">➕</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px; color:#f87171;">🗑</button>
+        </div>
+      </div>
+      <div class="flex">
+        <div class="relative flex-shrink-0 flex items-center justify-center" style="width: 280px; height: 158px; background: var(--bg-elevated);">
+          <!-- 스켈레톤 로딩 -->
+          <div style="position:absolute;inset:0;background:linear-gradient(90deg, transparent 0%, rgba(96,165,250,0.05) 50%, transparent 100%); animation: shimmer 2s infinite;"></div>
+          <div class="text-center">
+            <div class="w-6 h-6 border-2 border-blue-400 border-t-transparent animate-spin rounded-full mx-auto mb-2"></div>
+            <span class="text-[10px] font-bold" style="color:#60a5fa;">이미지 생성중...</span>
+          </div>
+        </div>
+        <div class="flex-1 min-w-0 flex flex-col p-4 gap-3">
+          <p class="text-sm leading-relaxed" style="color: var(--text-primary); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+            이에 정부는 청년 창업가와 지방 기업의 성장을 지원하기 위해 파격적인 소득세 100% 감면을 발표했습니다. 이 정책의 핵심 내용을 살펴보겠습니다.
+          </p>
+          <div class="flex items-center gap-3 mt-auto">
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg" style="background:var(--bg-elevated); border:1px solid var(--border-subtle); opacity:0.4;">
+              <button class="audio-btn" style="width:26px; height:26px; border:none; background:none;" disabled>
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <span class="text-[10px] font-bold" style="color:var(--text-muted);">TTS 대기</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">줌</span>
+              <button class="zoom-btn">↗</button>
+              <button class="zoom-btn">↙</button>
+              <button class="zoom-btn">←</button>
+              <button class="zoom-btn">→</button>
+              <button class="zoom-btn active">•</button>
+            </div>
+            <div style="width:1px; height:18px; background:var(--border-subtle);"></div>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">전환</span>
+              <button class="trans-btn active">⟷</button>
+              <button class="trans-btn">■</button>
+              <button class="trans-btn">◁</button>
+              <button class="trans-btn">▷</button>
+              <button class="trans-btn">•</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-2 text-xs" style="border-top: 1px solid var(--border-default); color: var(--text-muted);">
+        <span>▸ 비주얼 프롬프트</span>
+      </div>
+    </div>
+
+    <!-- 씬 4 — 편집 모드 (확장) -->
+    <div class="scene-card rounded-2xl border overflow-hidden" style="background: var(--bg-surface); border-color: rgba(96,165,250,0.4); box-shadow: 0 0 20px rgba(96,165,250,0.08);">
+      <div class="flex items-center justify-between px-4 py-2.5" style="border-bottom: 1px solid rgba(96,165,250,0.2);">
+        <div class="flex items-center gap-3">
+          <div class="text-xs" style="color: var(--text-muted); opacity:0.6;">⠿</div>
+          <span class="font-mono text-xs font-bold" style="color: #60a5fa;">#04 편집중</span>
+          <div class="status-dot" style="background: #22c55e;"></div>
+          <span class="badge" style="background:rgba(245,158,11,0.1); color:#fbbf24; border:1px solid rgba(245,158,11,0.2);">NO_CHAR</span>
+          <span class="badge" style="background:rgba(34,197,94,0.1); color:#4ade80; border:1px solid rgba(34,197,94,0.2);">POSITIVE</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="px-3 py-1.5 rounded-lg text-xs font-bold bg-green-600 text-white">✓ 저장</button>
+          <button class="px-3 py-1.5 rounded-lg text-xs font-bold" style="background:var(--bg-elevated); color:var(--text-secondary);">✗ 취소</button>
+        </div>
+      </div>
+      <div class="flex">
+        <div class="relative flex-shrink-0" style="width: 280px; height: 158px;">
+          <img src="https://picsum.photos/seed/scene4/560/316" alt="Scene 4" class="w-full h-full object-cover">
+          <div class="hover-overlay absolute inset-0 bg-black/60 flex items-center justify-center gap-3">
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white">🔄 재생성</button>
+            <button class="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white">📤 업로드</button>
+          </div>
+          <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold" style="background:rgba(0,0,0,0.7); color:white;">⏱ 3.8s</div>
+        </div>
+        <div class="flex-1 min-w-0 flex flex-col p-4 gap-3">
+          <!-- 편집 textarea -->
+          <textarea rows="3" class="w-full text-sm rounded-lg p-3 border resize-y" style="background:var(--bg-elevated); border-color:var(--border-subtle); color:var(--text-primary); outline:none; line-height:1.6;">이 전략은 특정 조건을 충족하는 청년 창업 기업과 지방 중소기업에 적용되며, 실제 납부할 소득 0으로 만듭니다.</textarea>
+          <textarea rows="3" class="w-full text-xs rounded-lg p-3 border resize-y font-mono" style="background:var(--bg-elevated); border-color:var(--border-subtle); color:var(--text-secondary); outline:none; line-height:1.6;" placeholder="Visual Prompt">A clean, clear infographic on the left side, a tall, vibrant red bar chart labeled 'Before: Income Tax' displays a significant monetary value...</textarea>
+          <div class="flex items-center gap-3 mt-auto flex-wrap">
+            <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg" style="background:var(--bg-elevated); border:1px solid var(--border-subtle);">
+              <button class="audio-btn" style="width:26px; height:26px; border:none; background:none;" title="재생">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <span class="text-[10px] font-bold" style="color:#34d399;">3.8s</span>
+              <button class="w-5 h-5 rounded flex items-center justify-center hover:bg-white/10" title="TTS 재생성" style="color:var(--text-muted);">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+              <button class="w-5 h-5 rounded flex items-center justify-center hover:bg-white/10" title="음소거" style="color:var(--text-muted);">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">길이</span>
+              <input type="number" value="3.8" step="0.5" min="1" max="60" class="w-14 h-7 text-center text-xs rounded-md border" style="background:var(--bg-elevated); border-color:var(--border-subtle); color:var(--text-primary); outline:none;">
+              <span class="text-[9px]" style="color:var(--text-muted);">초</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">줌</span>
+              <button class="zoom-btn">↗</button>
+              <button class="zoom-btn">↙</button>
+              <button class="zoom-btn">←</button>
+              <button class="zoom-btn">→</button>
+              <button class="zoom-btn active">•</button>
+            </div>
+            <div style="width:1px; height:18px; background:var(--border-subtle);"></div>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] font-bold" style="color:var(--text-muted);">전환</span>
+              <button class="trans-btn active">⟷</button>
+              <button class="trans-btn">■</button>
+              <button class="trans-btn">◁</button>
+              <button class="trans-btn">▷</button>
+              <button class="trans-btn">•</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 씬 5 — 에러 상태 -->
+    <div class="scene-card rounded-2xl border overflow-hidden" style="background: var(--bg-surface); border-color: rgba(239,68,68,0.3);">
+      <div class="flex items-center justify-between px-4 py-2.5" style="border-bottom: 1px solid rgba(239,68,68,0.2);">
+        <div class="flex items-center gap-3">
+          <div class="drag-handle text-xs" style="color: var(--text-muted);">⠿</div>
+          <span class="font-mono text-xs font-bold" style="color: var(--text-muted);">#05</span>
+          <div class="status-dot" style="background: #ef4444;"></div>
+          <span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.2);">ERROR</span>
+        </div>
+        <div class="quick-actions flex items-center gap-1" style="opacity:1;">
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">✏️</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">📋</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px;">➕</button>
+          <button class="toolbar-btn" style="height:28px; padding:0 8px; font-size:11px; color:#f87171;">🗑</button>
+        </div>
+      </div>
+      <div class="flex">
+        <div class="relative flex-shrink-0 flex items-center justify-center" style="width: 280px; height: 158px; background: rgba(239,68,68,0.05); border-right: 2px dashed rgba(239,68,68,0.3);">
+          <div class="text-center">
+            <svg class="w-8 h-8 text-red-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div class="flex items-center justify-center gap-2">
+              <button class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30">🔄 재생성</button>
+              <button class="px-3 py-1.5 rounded-lg text-[10px] font-bold" style="background:var(--bg-elevated); color:var(--text-secondary); border:1px solid var(--border-subtle);">📤 업로드</button>
+            </div>
+          </div>
+        </div>
+        <div class="flex-1 min-w-0 flex flex-col p-4 gap-3">
+          <p class="text-sm leading-relaxed" style="color: var(--text-primary);">
+            이 정책의 가장 큰 장점은 창업 초기 5년간 소득세 부담이 완전히 사라진다는 점입니다. 이를 통해 기업은 성장에 집중할 수 있습니다.
+          </p>
+          <div class="px-3 py-2 rounded-lg text-xs" style="background:rgba(239,68,68,0.08); color:#fca5a5; border:1px solid rgba(239,68,68,0.15);">
+            ⚠ 이미지 생성 실패: Safety filter triggered. 프롬프트를 수정 후 재생성하세요.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 씬 추가 버튼 -->
+  <button class="w-full mt-3 py-3 rounded-2xl border-2 border-dashed text-sm font-bold transition-all hover:border-blue-500/40 hover:text-blue-400" style="border-color: var(--border-subtle); color: var(--text-muted); background: transparent;">
+    + 씬 추가
+  </button>
+</div>
+
+<style>
+  @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+</style>
+</body>
+</html>
