@@ -9,6 +9,7 @@ import PreviewPlayer from './PreviewPlayer';
 import LazyImage from './shared/LazyImage';
 import { decodeAudio } from './shared/audioUtils';
 import AudioPlayer from './shared/AudioPlayer';
+import DirectiveDebugPanel from './DirectiveDebugPanel';
 
 // base64 이미지 MIME 타입 감지 (PNG는 iVBOR로 시작)
 const getImageMime = (b64: string) => b64.startsWith('iVBOR') ? 'image/png' : 'image/jpeg';
@@ -251,9 +252,10 @@ const TableRow: React.FC<TableRowProps> = memo(({
 
       {/* 생성 결과물 + 재생시간 */}
       <td className="py-5 px-6 align-top">
-        {/* 이미지/영상 */}
+        {/* 이미지/영상 + 사이드 버튼 */}
+        <div className="flex items-stretch gap-1 mx-auto" style={{ width: isPortrait ? 'auto' : 'auto' }}>
         <div
-          className="relative mx-auto rounded-xl overflow-hidden border shadow-inner group/img"
+          className="relative flex-shrink-0 rounded-xl overflow-hidden border shadow-inner group/img"
           style={isPortrait
             ? { width: '64px', height: '114px', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-default)' }
             : { width: '192px', height: '108px', backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-default)' }
@@ -281,43 +283,15 @@ const TableRow: React.FC<TableRowProps> = memo(({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <span className="text-[7px] text-red-400 font-black uppercase">{t('result.failed')}</span>
-              <div className="flex flex-col gap-1 px-1">
-                <button onClick={() => onRegenerateImage?.(index)} className="px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-white text-[8px] font-black transition-all">{t('result.regenerate')}</button>
-                <button onClick={() => imageUploadRef.current?.click()} className="px-1.5 py-0.5 rounded hover:bg-[var(--bg-hover)] text-[8px] font-black transition-all" style={{ backgroundColor: 'var(--text-muted)', color: 'var(--text-primary)' }}>{t('result.upload')}</button>
-              </div>
             </div>
           ) : row.videoData ? (
             <>
               <video src={row.videoData} className="w-full h-full object-cover" autoPlay loop muted playsInline />
               <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-cyan-500/80 text-[6px] font-black text-white uppercase">{t('common.video')}</div>
-              <div className={`absolute inset-0 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center ${isPortrait ? 'flex-col gap-1' : 'gap-1.5'}`} style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 80%, transparent)' }}>
-                <button onClick={() => onRegenerateImage?.(index)} className={`rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title={t('result.regenerateImage')}>
-                  <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                </button>
-                <button onClick={() => imageUploadRef.current?.click()} className={`rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title={t('result.uploadImage')}>
-                  <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                </button>
-                <button onClick={() => onGenerateAnimation?.(index)} className={`rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-500/30 text-cyan-400 transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title={t('result.regenerateVideo')}>
-                  <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </button>
-              </div>
             </>
           ) : row.imageData ? (
-            <>
-              <LazyImage src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`} alt="Scene"
-                className="w-full h-full object-cover scene-img-hover" />
-              <div className={`absolute inset-0 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center ${isPortrait ? 'flex-col gap-1' : 'gap-1.5'}`} style={{ backgroundColor: 'color-mix(in srgb, var(--bg-base) 80%, transparent)' }}>
-                <button onClick={() => onRegenerateImage?.(index)} className={`rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title={t('result.regenerateImage')}>
-                  <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                </button>
-                <button onClick={() => imageUploadRef.current?.click()} className={`rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title={t('result.uploadImage')}>
-                  <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                </button>
-                <button onClick={() => onGenerateAnimation?.(index)} className={`rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-500/30 text-cyan-400 transition-all ${isPortrait ? 'p-1' : 'p-2'}`} title={t('result.convertVideo')}>
-                  <svg className={isPortrait ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </button>
-              </div>
-            </>
+            <LazyImage src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`} alt="Scene"
+              className="w-full h-full object-cover scene-img-hover" />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 m-1">
               <button onClick={() => onRegenerateImage?.(index)}
@@ -329,6 +303,33 @@ const TableRow: React.FC<TableRowProps> = memo(({
                 title={t('result.clickToUpload')}>{t('result.upload', '업로드')}</button>
             </div>
           )}
+        </div>
+
+        {/* 사이드 버튼 바 (이미지 옆 세로) */}
+        {(row.imageData || row.videoData || row.status === 'error') && (
+          <div className={`flex flex-col justify-center gap-1 ${isAnimating || row.status === 'generating' ? 'opacity-30 pointer-events-none' : ''}`}>
+            <button onClick={() => onRegenerateImage?.(index)}
+              className="w-7 h-7 rounded-md flex items-center justify-center border transition-all hover:bg-white/10 hover:text-white"
+              style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}
+              title={t('result.regenerateImage')}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
+            <button onClick={() => imageUploadRef.current?.click()}
+              className="w-7 h-7 rounded-md flex items-center justify-center border transition-all hover:bg-white/10 hover:text-white"
+              style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}
+              title={t('result.uploadImage')}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            </button>
+            {row.imageData && (
+              <button onClick={() => onGenerateAnimation?.(index)}
+                className={`w-7 h-7 rounded-md flex items-center justify-center border transition-all ${row.videoData ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25 hover:bg-cyan-500/20' : 'hover:bg-white/10 hover:text-white'}`}
+                style={row.videoData ? undefined : { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}
+                title={row.videoData ? t('result.regenerateVideo') : t('result.convertVideo')}>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </button>
+            )}
+          </div>
+        )}
         </div>
 
         {/* 오류 메시지 (생성 실패 시) */}
@@ -1367,6 +1368,9 @@ const ResultTable = React.memo<ResultTableProps>(({
           </button>
         </div>
       </div>
+
+      {/* V2.0 디렉티브 검증 패널 */}
+      <DirectiveDebugPanel assets={data} />
     </div>
     </>
   );

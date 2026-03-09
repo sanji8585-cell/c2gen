@@ -199,7 +199,7 @@ function optimizeReferenceImages(refImages: ReferenceImages): ReferenceImages {
 export const generateImageForScene = async (
   scene: ScriptScene,
   referenceImages: ReferenceImages,
-  options?: { isPreview?: boolean }
+  options?: { isPreview?: boolean; prevSceneImage?: string }
 ): Promise<string | null> => {
   const { styleId, customStylePrompt } = getGeminiStyleInfo();
   const orientation = getVideoOrientation();
@@ -218,6 +218,7 @@ export const generateImageForScene = async (
       orientation,
       isPreview: options?.isPreview || undefined,
       suppressKorean: suppressKorean || undefined,
+      prevSceneImage: options?.prevSceneImage || undefined,
     }), 2, 3000
   );
   return result?.imageData || null;

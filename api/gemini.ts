@@ -323,6 +323,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ── 이미지 생성 ──
       case 'generateImage': {
         const { scene, referenceImages, styleId, customStylePrompt, orientation, isPreview, suppressKorean } = params;
+        const prevSceneImage = params.prevSceneImage; // V2.0 일관성 모드: 이전 씬 이미지
         const hasCharacterRef = referenceImages?.character?.length > 0;
         const hasStyleRef = referenceImages?.style?.length > 0;
         const geminiStylePrompt = hasStyleRef ? undefined : resolveStylePrompt(styleId, customStylePrompt);
@@ -340,6 +341,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const sanitizedPrompt = sanitizeAttempt === 0 ? basePrompt : sanitizePrompt(basePrompt, sanitizeAttempt - 1);
           try {
             const parts: any[] = [];
+
+            // V2.0: 이전 씬 이미지 참조 (일관성 모드)
+            if (prevSceneImage) {
+              const prevImageData = prevSceneImage.startsWith('data:')
+                ? prevSceneImage.split(',')[1]
+                : prevSceneImage;
+              parts.push({
+                inlineData: { mimeType: 'image/png', data: prevImageData },
+              });
+              parts.push({ text: '\n[CONTINUITY REFERENCE] Maintain the same background, environment, and visual style as the reference image above. Only change the foreground content/characters as described.' });
+            }
 
             if (hasCharacterRef) {
               const charDesc = getStrengthDescription(characterStrength);

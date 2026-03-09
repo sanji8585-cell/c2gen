@@ -607,6 +607,12 @@ const AppContent: React.FC<{
     }
   }, [handleGenerate]);
 
+  // ── Engine V2.0: 고급 대본 전용 에셋 생성 ──
+  // Sprint 4: 일관성 모드 시 의존 그래프 기반 이미지 순차 생성
+  // 현재는 handleApproveScript에 위임 (Sprint 4에서 순차 로직 추가 예정)
+  // Note: handleApproveScript는 이미 assetsRef를 사용하므로 디렉티브 정보가 포함됨
+  // prevSceneImage 파라미터는 API/서비스 레이어에 준비 완료 — 향후 순차 렌더링 시 활용
+
   // ── AI Assist: 의도 → 고급 대본 생성 ──
   const [isAiAssisting, setIsAiAssisting] = useState(false);
   const [aiAssistResult, setAiAssistResult] = useState<string | null>(null);
