@@ -776,7 +776,7 @@ const AppContent: React.FC<{
                             matchedSpeakerName = matched.name;
                             matchedSpeakerColor = matched.color;
                           }
-                          console.log(`[TTS] 씬 ${i + 1}: SPEAKER="${speakerDirective}" → matched=${matched?.name || 'NONE'} voiceId=${voiceIdForScene || 'DEFAULT'}`);
+                          console.log(`[TTS] 씬 ${i + 1}: SPEAKER="${speakerDirective}" → matched=${matched?.name || 'NONE'} voiceId=${voiceIdForScene || 'DEFAULT'} speed=${matched?.speed ?? 'default'} stability=${matched?.stability ?? 'default'}`);
                         } catch (e) { console.warn('[TTS] Voice lookup error:', e); }
                       }
 
@@ -791,6 +791,7 @@ const AppContent: React.FC<{
                           if (m?.stability !== undefined) speakerStability = m.stability;
                         } catch {}
                       }
+                      console.log(`[TTS] 씬 ${i + 1} 최종: speed=${speakerSpeed} stability=${speakerStability}`);
                       const elResult = await generateAudioWithElevenLabs(
                         assetsRef.current[i].narration,
                         undefined, voiceIdForScene, undefined,
