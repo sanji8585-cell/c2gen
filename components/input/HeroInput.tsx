@@ -62,6 +62,9 @@ const HeroInput: React.FC<HeroInputProps> = ({
   const [advSettings, setAdvSettings] = useState<AdvancedSettings>({
     format: 'auto', speakerCount: 'auto', mood: 'auto', sceneConnection: 'auto',
   });
+  const [renderMode, setRenderMode] = useState<'parallel' | 'consistency'>(() => {
+    return (localStorage.getItem('tubegen_render_mode') as 'parallel' | 'consistency') || 'parallel';
+  });
 
   const isDisabled = step !== GenerationStep.IDLE && step !== GenerationStep.ERROR && step !== GenerationStep.COMPLETED;
   const isProcessing = step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS;
@@ -348,6 +351,29 @@ const HeroInput: React.FC<HeroInputProps> = ({
               >
                 {isAiAssisting ? '✨ AI가 대본 작성 중...' : '✨ AI가 대본 완성해주기'}
               </button>
+            </div>
+            {/* 렌더링 모드 선택 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>이미지 모드</span>
+              <div style={{ display: 'flex', gap: 2, background: 'var(--bg-elevated)', borderRadius: 6, padding: 2 }}>
+                {[
+                  { value: 'parallel', label: '⚡ 빠른 생성' },
+                  { value: 'consistency', label: '🔗 일관성' },
+                ].map(opt => (
+                  <button key={opt.value} type="button"
+                    onClick={() => {
+                      localStorage.setItem('tubegen_render_mode', opt.value);
+                      setRenderMode(opt.value as 'parallel' | 'consistency');
+                    }}
+                    style={{
+                      padding: '4px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                      fontSize: 11, fontWeight: 500, transition: 'all 0.15s',
+                      background: renderMode === opt.value ? 'linear-gradient(135deg, #60a5fa, #818cf8)' : 'transparent',
+                      color: renderMode === opt.value ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >{opt.label}</button>
+                ))}
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <span style={{ fontSize: 20, opacity: 0.6, flexShrink: 0, marginTop: 2 }}>🎬</span>

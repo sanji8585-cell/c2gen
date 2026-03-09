@@ -16,7 +16,7 @@ import { generateImage, getSelectedImageModel } from './services/imageService';
 import { generateAudioWithElevenLabs, generateMusicWithElevenLabs } from './services/elevenLabsService';
 import { generateVideo } from './services/videoService';
 import { generateVideoFromImage } from './services/falService';
-import { parseDirectives } from './services/directiveParser';
+import { parseDirectives, propagateSceneContext } from './services/directiveParser';
 // projectService는 useProjectManagement 훅으로 이동
 import { useGameState } from './hooks/useGameState';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -591,8 +591,19 @@ const AppContent: React.FC<{
           },
         };
       });
-      assetsRef.current = updated;
-      setGeneratedData([...updated]);
+      // Sprint 3: 연결 디렉티브 처리 (프롬프트 레벨 일관성)
+      const renderMode = localStorage.getItem('tubegen_render_mode') || 'parallel';
+      const hasConnectionDirectives = updated.some(a =>
+        a.analysis?.directives?.KEEP_PREV || a.analysis?.directives?.SAME_PLACE || a.analysis?.directives?.TIME_PASS
+      );
+      if (renderMode === 'consistency' || hasConnectionDirectives) {
+        const propagated = propagateSceneContext(updated);
+        assetsRef.current = propagated as typeof assetsRef.current;
+        setGeneratedData([...propagated] as typeof assetsRef.current);
+      } else {
+        assetsRef.current = updated;
+        setGeneratedData([...updated]);
+      }
     }
   }, [handleGenerate]);
 

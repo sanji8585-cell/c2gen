@@ -88,3 +88,50 @@ export function parseDirectives(narration: string): ParseResult {
 
   return { cleanNarration, directives, rawDirectives };
 }
+
+/**
+ * 연결 디렉티브(KEEP_PREV, SAME_PLACE, TIME_PASS)를 처리하여
+ * 이전 씬의 배경 정보를 현재 씬의 visualPrompt에 전파
+ */
+export function propagateSceneContext(scenes: Array<{ visualPrompt: string; analysis?: { directives?: SceneDirectives }; [key: string]: any }>): typeof scenes {
+  let prevBackground = '';
+
+  return scenes.map((scene, idx) => {
+    const directives = scene.analysis?.directives;
+
+    // 현재 씬에 BACKGROUND 디렉티브가 있으면 배경 정보 업데이트
+    if (directives?.BACKGROUND) {
+      prevBackground = directives.BACKGROUND;
+    } else if (idx === 0 || (!directives?.KEEP_PREV && !directives?.SAME_PLACE && !directives?.TIME_PASS)) {
+      // 첫 씬이거나 연결 디렉티브 없으면 visualPrompt에서 배경 추출 시도
+      // 간단한 휴리스틱: visualPrompt 전체를 배경 컨텍스트로 보존
+      prevBackground = scene.visualPrompt || '';
+    }
+
+    if (idx === 0) return scene;
+
+    // 연결 디렉티브 처리
+    if (directives?.KEEP_PREV && prevBackground) {
+      return {
+        ...scene,
+        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same setting as previous scene: ${prevBackground}`,
+      };
+    }
+
+    if (directives?.SAME_PLACE && prevBackground) {
+      return {
+        ...scene,
+        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same location: ${prevBackground}`,
+      };
+    }
+
+    if (directives?.TIME_PASS && prevBackground) {
+      return {
+        ...scene,
+        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same location but different time/lighting: ${prevBackground}. Show passage of time with changed lighting and atmosphere.`,
+      };
+    }
+
+    return scene;
+  });
+}
