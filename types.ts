@@ -36,6 +36,8 @@ export interface CharacterVoice {
   voiceId: string;
   color: string;
   gender?: 'male' | 'female';
+  speed?: number;      // 음성 속도 (0.5~2.0, 기본 1.0)
+  stability?: number;  // 음성 안정성 (0~1.0, 기본 0.6)
 }
 
 export interface SceneAnalysis {

@@ -780,10 +780,21 @@ const AppContent: React.FC<{
                         } catch (e) { console.warn('[TTS] Voice lookup error:', e); }
                       }
 
+                      // V2.0: 화자별 speed/stability 적용 (설정 없으면 전역 기본값)
+                      let speakerSpeed = elSpeed;
+                      let speakerStability = elStability;
+                      if (speakerDirective) {
+                        try {
+                          const cv = JSON.parse(localStorage.getItem('tubegen_character_voices') || '[]');
+                          const m = cv.find((v: any) => v.name === speakerDirective || speakerDirective.includes(v.name) || v.name.includes(speakerDirective));
+                          if (m?.speed !== undefined) speakerSpeed = m.speed;
+                          if (m?.stability !== undefined) speakerStability = m.stability;
+                        } catch {}
+                      }
                       const elResult = await generateAudioWithElevenLabs(
                         assetsRef.current[i].narration,
                         undefined, voiceIdForScene, undefined,
-                        { speed: elSpeed, stability: elStability }
+                        { speed: speakerSpeed, stability: speakerStability }
                       );
                       if (isAbortedRef.current) break;
 

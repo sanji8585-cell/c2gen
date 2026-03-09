@@ -150,7 +150,8 @@ const CharacterVoiceManager: React.FC<CharacterVoiceManagerProps> = ({ compact =
 
       {/* Voice list */}
       {voices.map((voice, idx) => (
-        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <React.Fragment key={idx}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           {/* Color */}
           <input type="color" value={voice.color} onChange={e => updateVoice(idx, 'color', e.target.value)}
             style={{ width: 24, height: 24, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0 }} />
@@ -242,6 +243,24 @@ const CharacterVoiceManager: React.FC<CharacterVoiceManagerProps> = ({ compact =
             background: 'transparent', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer',
           }}>×</button>
         </div>
+        {/* Speed / Stability per speaker */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 6, marginLeft: 30, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 28 }}>속도</span>
+            <input type="range" min="0.5" max="2.0" step="0.1" value={voice.speed ?? 1.0}
+              onChange={e => setVoices(voices.map((v, i) => i === idx ? { ...v, speed: parseFloat(e.target.value) } : v))}
+              style={{ width: 60, accentColor: voice.color }} />
+            <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: 24 }}>{(voice.speed ?? 1.0).toFixed(1)}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 28 }}>안정</span>
+            <input type="range" min="0" max="1.0" step="0.05" value={voice.stability ?? 0.6}
+              onChange={e => setVoices(voices.map((v, i) => i === idx ? { ...v, stability: parseFloat(e.target.value) } : v))}
+              style={{ width: 60, accentColor: voice.color }} />
+            <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'monospace', minWidth: 24 }}>{(voice.stability ?? 0.6).toFixed(2)}</span>
+          </div>
+        </div>
+        </React.Fragment>
       ))}
 
       {/* Voice ID 미설정 경고 */}
