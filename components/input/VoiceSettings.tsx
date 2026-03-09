@@ -370,16 +370,16 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
         onClick={() => setShowElevenLabsSettings(!showElevenLabsSettings)}
         className="w-full flex items-center justify-between text-left"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 md:w-8 md:h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
           </div>
-          <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>🎤 나레이션 음성 설정</h3>
+          <h3 className="font-bold text-xs md:text-sm whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>🎤 나레이션 음성 설정</h3>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
+          <div className="hidden md:flex items-center gap-1.5 flex-wrap justify-end">
             <span style={{
               fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
               background: 'rgba(96,165,250,0.12)', color: '#93c5fd',
@@ -399,7 +399,11 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
               }}>{elSpeed.toFixed(2)}x</span>
             )}
           </div>
-          <svg className={`w-5 h-5 transition-transform flex-shrink-0 ${showElevenLabsSettings ? 'rotate-180' : ''}`} style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          {/* 모바일: 간략 태그 */}
+          <span className="md:hidden text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            {getSelectedVoiceInfo().name}
+          </span>
+          <svg className={`w-4 h-4 md:w-5 md:h-5 transition-transform flex-shrink-0 ${showElevenLabsSettings ? 'rotate-180' : ''}`} style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
