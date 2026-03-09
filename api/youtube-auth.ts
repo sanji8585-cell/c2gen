@@ -138,8 +138,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const supabase = getSupabase();
-    const sessionToken = req.headers['x-session-token'] as string;
-    const email = await getSessionEmail(supabase, sessionToken);
+    const token = params.token;
+    const email = await getSessionEmail(supabase, token);
 
     switch (action) {
 
@@ -161,7 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             scope: scopes.join(' '),
             access_type: 'offline',
             prompt: 'consent',
-            state: sessionToken,
+            state: token,
           }).toString();
 
         return res.json({ authUrl });

@@ -48,7 +48,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, contentSummar
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
 
   const language = (localStorage.getItem(CONFIG.STORAGE_KEYS.LANGUAGE) as Language) || 'ko';
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const currentTextStyle = TEXT_STYLE_PRESETS.find(s => s.id === textStyleId) || TEXT_STYLE_PRESETS[0];
 
@@ -245,7 +245,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, contentSummar
                       style={{
                         backgroundColor: aiStyle === id ? 'var(--brand-500)' : 'var(--bg-elevated)',
                         color: aiStyle === id ? '#fff' : 'var(--text-secondary)',
-                        ringColor: 'var(--brand-400)',
+                        outlineColor: 'var(--brand-400)',
                       }}
                     >
                       {s.nameKo}
@@ -495,7 +495,7 @@ const ThumbnailGenerator: React.FC<Props> = ({ topic, sceneImages, contentSummar
                         width: '80px',
                         height: `${Math.round(80 / aspectRatio)}px`,
                         borderColor: activeHistoryId === item.id ? 'var(--brand-400)' : 'transparent',
-                        ringColor: 'var(--brand-400)',
+                        outlineColor: 'var(--brand-400)',
                       }}
                     >
                       <img src={`data:image/jpeg;base64,${item.imageData}`} alt={item.styleName} className="w-full h-full object-cover" />

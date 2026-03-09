@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Campaign, CampaignStatus } from '../types';
+import type { Campaign, CampaignStatus, TopicStrategy, CampaignSchedule, VideoEngineMode } from '../types';
 import { listCampaigns, createCampaign, updateCampaign, deleteCampaign } from '../services/campaignService';
 import ApprovalQueue from './ApprovalQueue';
 
@@ -15,15 +15,28 @@ const STATUS_STYLES: Record<CampaignStatus, { bg: string; text: string; label: s
   completed: { bg: 'bg-gray-500/20', text: 'text-gray-400', label: '완료' },
 };
 
-const EMPTY_FORM = {
+const EMPTY_FORM: {
+  name: string;
+  description: string;
+  channel_id: string;
+  brand_preset_id: string;
+  topic_strategy: TopicStrategy;
+  schedule: CampaignSchedule;
+  target_platforms: string[];
+  video_engine_mode: VideoEngineMode;
+  auto_approve: boolean;
+  max_daily_count: number;
+  budget_limit_daily: number;
+  budget_limit_monthly: number;
+} = {
   name: '',
   description: '',
   channel_id: '',
   brand_preset_id: '',
-  topic_strategy: { mode: 'keyword_pool' as const, keyword_pool: [] as string[] },
-  schedule: { frequency: 'daily' as const, days: [] as string[], time: '09:00', timezone: 'Asia/Seoul', generation_lead_time: 2 },
-  target_platforms: [] as string[],
-  video_engine_mode: 'standard' as const,
+  topic_strategy: { mode: 'keyword_pool', keyword_pool: [] },
+  schedule: { frequency: 'daily', days: [], time: '09:00', timezone: 'Asia/Seoul', generation_lead_time: 2 },
+  target_platforms: [],
+  video_engine_mode: 'standard',
   auto_approve: false,
   max_daily_count: 3,
   budget_limit_daily: 500,

@@ -141,16 +141,17 @@ const EMOTION_MAPPINGS: Record<EmotionType, {
   visual_cue: string;
   bgm_shift: string;
   subtitle_style: string;
+  tts_pace: 'fast' | 'normal' | 'slow';
 }> = {
-  curiosity: { visual_cue: 'quick_zoom_text', bgm_shift: 'mystery_buildup', subtitle_style: 'big_bold_question' },
-  tension: { visual_cue: 'slow_pan_dark', bgm_shift: 'dark_bass', subtitle_style: 'red_highlight' },
-  surprise: { visual_cue: 'cut_flash', bgm_shift: 'impact_hit', subtitle_style: 'shake_exclaim' },
-  empathy: { visual_cue: 'slow_dissolve', bgm_shift: 'gentle_piano', subtitle_style: 'soft_font' },
-  warmth: { visual_cue: 'warm_dissolve', bgm_shift: 'warm_acoustic', subtitle_style: 'pastel_bg' },
-  lingering: { visual_cue: 'slow_fadeout', bgm_shift: 'fadeout', subtitle_style: 'small_font' },
-  excitement: { visual_cue: 'fast_montage', bgm_shift: 'upbeat_pop', subtitle_style: 'bold_colors' },
-  calm: { visual_cue: 'gentle_pan', bgm_shift: 'ambient_pad', subtitle_style: 'clean_minimal' },
-  fear: { visual_cue: 'dark_vignette', bgm_shift: 'suspense_strings', subtitle_style: 'dark_red' },
+  curiosity: { visual_cue: 'quick_zoom_text', bgm_shift: 'mystery_buildup', subtitle_style: 'big_bold_question', tts_pace: 'normal' },
+  tension: { visual_cue: 'slow_pan_dark', bgm_shift: 'dark_bass', subtitle_style: 'red_highlight', tts_pace: 'slow' },
+  surprise: { visual_cue: 'cut_flash', bgm_shift: 'impact_hit', subtitle_style: 'shake_exclaim', tts_pace: 'fast' },
+  empathy: { visual_cue: 'slow_dissolve', bgm_shift: 'gentle_piano', subtitle_style: 'soft_font', tts_pace: 'slow' },
+  warmth: { visual_cue: 'warm_dissolve', bgm_shift: 'warm_acoustic', subtitle_style: 'pastel_bg', tts_pace: 'normal' },
+  lingering: { visual_cue: 'slow_fadeout', bgm_shift: 'fadeout', subtitle_style: 'small_font', tts_pace: 'slow' },
+  excitement: { visual_cue: 'fast_montage', bgm_shift: 'upbeat_pop', subtitle_style: 'bold_colors', tts_pace: 'fast' },
+  calm: { visual_cue: 'gentle_pan', bgm_shift: 'ambient_pad', subtitle_style: 'clean_minimal', tts_pace: 'slow' },
+  fear: { visual_cue: 'dark_vignette', bgm_shift: 'suspense_strings', subtitle_style: 'dark_red', tts_pace: 'normal' },
 };
 
 // ─── 4. Functions ───────────────────────────────────────────────────────────
@@ -200,6 +201,7 @@ export function generateEmotionCurve(
       intensity,
       visual_cue: mapping.visual_cue,
       bgm_shift: mapping.bgm_shift,
+      tts_pace: mapping.tts_pace,
       subtitle_style: mapping.subtitle_style,
       label: pt.label,
     };
@@ -240,6 +242,7 @@ export function applyEmotionToScenes(
       intensity: nearest.intensity,
       visual_cue: nearest.visual_cue,
       bgm_shift: nearest.bgm_shift,
+      tts_pace: nearest.tts_pace,
       subtitle_style: nearest.subtitle_style,
     };
 

@@ -56,7 +56,7 @@ export function generateMetadata(
   let thumbnailText = topic;
   if (emotionCurve?.curve_points?.length) {
     const peak = emotionCurve.curve_points.reduce((max, p) => p.intensity > max.intensity ? p : max);
-    const peakScene = scenes[Math.floor((peak.time / emotionCurve.total_duration) * scenes.length)];
+    const peakScene = scenes[Math.floor((peak.time_seconds / emotionCurve.total_duration) * scenes.length)];
     if (peakScene) {
       thumbnailText = peakScene.narration.slice(0, 20) + '?!';
     }

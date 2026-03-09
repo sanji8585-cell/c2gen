@@ -382,7 +382,7 @@ export type EmotionType =
 export type PlatformVariant = 'youtube_shorts' | 'tiktok' | 'youtube_long';
 
 export interface EmotionCurvePoint {
-  time: number;
+  time_seconds: number;
   emotion: EmotionType;
   intensity: number;      // 0~1
   label: string;
@@ -405,6 +405,7 @@ export interface SceneEmotionMeta {
   visual_cue: string;
   bgm_shift: string;
   tts_pace: 'fast' | 'normal' | 'slow';
+  subtitle_style?: string;
 }
 
 // ══════════════════════════════════════════

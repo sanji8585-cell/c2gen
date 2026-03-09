@@ -33,7 +33,7 @@ const AdminActivityLogs: React.FC<Props> = ({ adminToken }) => {
   const [actionFilter, setActionFilter] = useState('');
 
   // 자동 새로고침
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const fetchLogs = useCallback(async (p = 0) => {
     setLoading(true);

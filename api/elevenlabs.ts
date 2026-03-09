@@ -377,41 +377,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const variants: Array<{ voice_id: string; preview_url: string; name: string }> = [];
         const sampleText = sample_text || '안녕하세요, 저는 새로 만들어진 캐릭터 음성입니다. 이 음성이 마음에 드시나요?';
 
-        for (let i = 0; i < 3; i++) {
-          try {
-            const designRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice/design?output_format=mp3_22050_32', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'xi-api-key': apiKey,
-              },
-              body: JSON.stringify({
-                voice_description: `${description}. ${sampleText}`,
-              }),
-            });
+        // Call design endpoint with model_id + text to get JSON previews
+        try {
+          const designRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice/design', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'xi-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              voice_description: description,
+              text: sampleText,
+              model_id: 'eleven_multilingual_ttv_v2',
+            }),
+          });
 
-            if (!designRes.ok) {
-              const errText = await designRes.text();
-              console.error(`[designVoice] Variant ${i + 1} failed:`, designRes.status, errText);
-              continue;
+          if (!designRes.ok) {
+            const errText = await designRes.text();
+            console.error('[designVoice] API failed:', designRes.status, errText);
+          } else {
+            const designData = await designRes.json();
+            if (designData.previews && Array.isArray(designData.previews)) {
+              designData.previews.forEach((preview: any, i: number) => {
+                variants.push({
+                  voice_id: preview.generated_voice_id || `preview_${i}`,
+                  preview_url: preview.audio_base_64 ? `data:audio/mpeg;base64,${preview.audio_base_64}` : '',
+                  name: `변형 ${String.fromCharCode(65 + i)}`,
+                });
+              });
             }
-
-            // /v1/text-to-voice/design returns binary audio (audio/mpeg)
-            const audioBuffer = await designRes.arrayBuffer();
-            const audioBase64 = Buffer.from(audioBuffer).toString('base64');
-            const generatedVoiceId = designRes.headers.get('generated_voice_id') || `preview_${i}_${Date.now()}`;
-
-            variants.push({
-              voice_id: generatedVoiceId,
-              preview_url: `data:audio/mpeg;base64,${audioBase64}`,
-              name: `변형 ${String.fromCharCode(65 + i)}`,
-            });
-
-            // Delay between variants
-            if (i < 2) await new Promise(r => setTimeout(r, 1000));
-          } catch (err: any) {
-            console.error(`[designVoice] Variant ${i + 1} error:`, err.message);
           }
+        } catch (err: any) {
+          console.error('[designVoice] error:', err.message);
         }
 
         logUsage(req, 'voice_design', 0.10);
@@ -430,7 +427,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'generated_voice_id and voice_name are required' });
         }
 
-        const saveRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice/create-voice-from-preview', {
+        const saveRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

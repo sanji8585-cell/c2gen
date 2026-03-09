@@ -400,7 +400,7 @@ export const generateBrandBgm = async (
   bgmPreferences: { genre: string; mood: string; tempo_range: { min: number; max: number }; custom_prompt?: string },
   durationMs: number = 30000,
   apiKey?: string
-): Promise<{ audio_base64: string | null; creditBalance?: number }> => {
+): Promise<{ audio_base64: string | null; creditBalance?: number; error?: string }> => {
   // Build prompt from preferences
   const parts: string[] = [];
   if (bgmPreferences.genre) parts.push(bgmPreferences.genre);

@@ -21,16 +21,18 @@ async function apiCall(action: string, params: Record<string, unknown> = {}) {
 
 export async function listCampaigns(): Promise<Campaign[]> {
   const data = await apiCall('campaign-list');
-  return data.campaigns;
+  return data.campaigns || [];
 }
 
 export async function createCampaign(campaignData: Partial<Campaign>): Promise<Campaign> {
   const data = await apiCall('campaign-create', campaignData);
+  if (!data.campaign) throw new Error('Failed to create campaign: no campaign returned');
   return data.campaign;
 }
 
 export async function updateCampaign(id: string, updates: Partial<Campaign>): Promise<Campaign> {
   const data = await apiCall('campaign-update', { id, ...updates });
+  if (!data.campaign) throw new Error('Failed to update campaign: no campaign returned');
   return data.campaign;
 }
 
@@ -40,5 +42,7 @@ export async function deleteCampaign(id: string): Promise<void> {
 
 export async function getCampaign(id: string): Promise<Campaign & { pending_count: number }> {
   const data = await apiCall('campaign-get', { id });
-  return data.campaign;
+  const campaign = data.campaign;
+  if (!campaign) throw new Error('Campaign not found');
+  return { ...campaign, pending_count: data.pendingCount ?? 0 };
 }

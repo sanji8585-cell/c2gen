@@ -124,13 +124,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const email = await getSessionEmail(supabase, token);
         if (!email) return res.status(401).json({ error: 'Invalid session' });
 
-        const { brand_preset_id, name, type } = params;
-        if (!brand_preset_id || !name || !type) {
-          return res.status(400).json({ error: 'brand_preset_id, name, and type are required' });
+        const { brand_preset_id, name, image_type } = params;
+        if (!brand_preset_id || !name || !image_type) {
+          return res.status(400).json({ error: 'brand_preset_id, name, and image_type are required' });
         }
 
-        if (!['mascot', 'photo', 'sketch'].includes(type)) {
-          return res.status(400).json({ error: 'type must be mascot, photo, or sketch' });
+        if (!['mascot', 'photo', 'sketch'].includes(image_type)) {
+          return res.status(400).json({ error: 'image_type must be mascot, photo, or sketch' });
         }
 
         const owned = await verifyPresetOwnership(supabase, brand_preset_id, email);
@@ -139,7 +139,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const insertData: Record<string, unknown> = {
           brand_preset_id,
           name,
-          type,
+          image_type,
         };
 
         // Optional fields
@@ -177,7 +177,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const updateData: Record<string, unknown> = {};
         const updatableFields = [
-          'name', 'type', 'char_role', 'species', 'personality',
+          'name', 'image_type', 'char_role', 'species', 'personality',
           'appearance_description', 'distinction_tags', 'speech_style',
           'voice_id', 'original_upload_url', 'reference_sheet', 'style_analysis',
         ];
@@ -268,7 +268,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Style analysis for mascot type
         let styleAnalysis: Record<string, unknown> | null = null;
-        if (character.type === 'mascot' && originalImagePart) {
+        if (character.image_type === 'mascot' && originalImagePart) {
           try {
             const analyzeResponse = await ai.models.generateContent({
               model: 'gemini-2.5-flash-preview-05-20',
@@ -293,12 +293,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Build type-specific prompt prefix
         let typePrefix = '';
-        if (character.type === 'mascot') {
+        if (character.image_type === 'mascot') {
           const styleDesc = styleAnalysis
             ? `Maintain exact art style: ${(styleAnalysis as Record<string, string>).line_weight || ''}, ${(styleAnalysis as Record<string, string>).color_mode || ''}, ${(styleAnalysis as Record<string, string>).shading || ''} shading.`
             : 'Maintain the exact same art style as the original.';
           typePrefix = `[MASCOT CHARACTER]\n${styleDesc}\n`;
-        } else if (character.type === 'photo') {
+        } else if (character.image_type === 'photo') {
           // Get brand preset art_style
           const { data: preset } = await supabase
             .from('c2gen_brand_presets')
@@ -307,7 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .single();
           const artStyle = preset?.art_style || 'illustration';
           typePrefix = `[PHOTO CHARACTER - STYLE CONVERSION]\nConvert this photo-based character into ${artStyle} art style.\n`;
-        } else if (character.type === 'sketch') {
+        } else if (character.image_type === 'sketch') {
           typePrefix = `[SKETCH CHARACTER - ENHANCEMENT]\nConvert and enhance this sketch into a fully detailed, clean illustration.\n`;
         }
 

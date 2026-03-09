@@ -64,18 +64,18 @@ const AdminInquiries: React.FC<Props> = ({ adminToken, onToast }) => {
   const limit = 15;
 
   const loadStats = useCallback(async () => {
-    const data = await authFetch({ action: 'admin-inquiryStats', token: adminToken });
-    if (data.success) setStats(data);
+    const { ok, data } = await authFetch({ action: 'admin-inquiryStats', token: adminToken });
+    if (ok) setStats(data);
   }, [adminToken]);
 
   const loadInquiries = useCallback(async () => {
     setLoading(true);
-    const data = await authFetch({
+    const { ok, data } = await authFetch({
       action: 'admin-listInquiries', token: adminToken,
       page, limit, status: statusFilter, category: categoryFilter,
       search: search || undefined,
     });
-    if (data.success) { setInquiries(data.inquiries); setTotal(data.total); }
+    if (ok) { setInquiries(data.inquiries); setTotal(data.total); }
     setLoading(false);
   }, [adminToken, page, statusFilter, categoryFilter, search]);
 
@@ -85,8 +85,8 @@ const AdminInquiries: React.FC<Props> = ({ adminToken, onToast }) => {
   const handleReply = async (inquiryId: string) => {
     if (!replyText.trim()) return;
     setReplying(true);
-    const data = await authFetch({ action: 'admin-replyInquiry', token: adminToken, inquiryId, reply: replyText.trim() });
-    if (data.success) {
+    const { ok, data } = await authFetch({ action: 'admin-replyInquiry', token: adminToken, inquiryId, reply: replyText.trim() });
+    if (ok) {
       setInquiries(prev => prev.map(i => i.id === inquiryId ? { ...i, status: 'replied', admin_reply: replyText.trim(), admin_replied_at: new Date().toISOString() } : i));
       setReplyText('');
       setSelectedId(null);
@@ -97,8 +97,8 @@ const AdminInquiries: React.FC<Props> = ({ adminToken, onToast }) => {
   };
 
   const handleClose = async (inquiryId: string) => {
-    const data = await authFetch({ action: 'admin-closeInquiry', token: adminToken, inquiryId });
-    if (data.success) {
+    const { ok } = await authFetch({ action: 'admin-closeInquiry', token: adminToken, inquiryId });
+    if (ok) {
       setInquiries(prev => prev.map(i => i.id === inquiryId ? { ...i, status: 'closed' } : i));
       onToast('success', '문의가 종료되었습니다.');
       loadStats();

@@ -1626,7 +1626,7 @@ const ShareModal: React.FC<{
               {projects.map(p => (
                 <button key={p.id} onClick={() => onSelectProject(p.id)}
                   className={`w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-all ${projectId === p.id ? 'ring-2' : 'hover:bg-white/5'}`}
-                  style={{ backgroundColor: projectId === p.id ? 'color-mix(in srgb, var(--brand-500) 15%, transparent)' : 'transparent', ringColor: 'var(--brand-400)' }}>
+                  style={{ backgroundColor: projectId === p.id ? 'color-mix(in srgb, var(--brand-500) 15%, transparent)' : 'transparent', outlineColor: 'var(--brand-400)' }}>
                   {p.thumbnail ? (
                     <img src={`data:image/jpeg;base64,${p.thumbnail}`} alt="" className="w-12 h-8 rounded object-cover flex-shrink-0" />
                   ) : (

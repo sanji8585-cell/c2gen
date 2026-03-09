@@ -88,8 +88,7 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
       const rawImage = await generateSingleSituation(artPrompt, scenario.label);
       const imageData = rawImage?.startsWith('data:') ? base64ToBlobUrl(rawImage) : rawImage;
       setScenarioStates((prev) => ({ ...prev, [id]: { generating: false, done: true, imageData } }));
-    } catch (err) {
-      console.error('Situation generation failed:', err);
+    } catch {
       setScenarioStates((prev) => ({ ...prev, [id]: { generating: false, done: false } }));
     }
   };
@@ -119,8 +118,7 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
         };
       });
       setScenarioStates(doneStates);
-    } catch (err) {
-      console.error('Situation gallery generation failed:', err);
+    } catch {
       setError('갤러리 생성에 실패했습니다. 다시 시도해주세요.');
       const resetStates: ScenarioState = {};
       SCENARIOS.forEach((s) => {

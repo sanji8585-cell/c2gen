@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { BrandPreset, CharacterProfile } from '../../types';
-import { createCharacter, deleteCharacter, listCharacters, generateReferenceSheet } from '../../services/characterService';
+import { createCharacter, updateCharacter, deleteCharacter, listCharacters, generateReferenceSheet } from '../../services/characterService';
 
 function base64ToBlobUrl(dataUrl: string): string {
   try {
@@ -22,6 +22,9 @@ interface Step3Props {
 
 type ImageType = 'mascot' | 'photo' | 'sketch';
 type CharRole = 'main' | 'supporting' | 'extra';
+
+// API may return `type` instead of `image_type`
+type CharacterProfileWithApiType = CharacterProfile & { type?: string };
 
 const IMAGE_TYPE_OPTIONS: { value: ImageType; label: string }[] = [
   { value: 'mascot', label: '완성된 마스코트' },
@@ -100,10 +103,12 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
     data.character_profiles || []
   );
   const [showForm, setShowForm] = useState(false);
+  const [editingCharId, setEditingCharId] = useState<string | null>(null);
   const [form, setForm] = useState<NewCharForm>({ ...emptyForm });
   const [submitting, setSubmitting] = useState(false);
   const [sheetLoading, setSheetLoading] = useState<Record<string, boolean>>({});
   const [sheetImages, setSheetImages] = useState<Record<string, Record<string, string>>>({});
+  const [expandedChar, setExpandedChar] = useState<string | null>(null);
 
   const syncCharacters = useCallback(
     (chars: CharacterProfile[]) => {
@@ -114,7 +119,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
           id: c.id,
           name: c.name,
           char_role: c.char_role || 'main',
-          image_type: c.image_type || (c as any).type || 'mascot',
+          image_type: c.image_type || (c as CharacterProfileWithApiType).type || 'mascot',
           species: c.species,
           personality: c.personality || '',
           appearance: c.appearance || { base_prompt: '', expression_range: [] },
@@ -189,14 +194,28 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
         },
         voice_id: form.selected_voice_id || undefined,
       };
-      const created = await createCharacter(charData);
-      // Ensure image_type is mapped from API's `type` field
-      const mappedCreated = { ...created, image_type: created.image_type || (created as any).type || form.image_type };
-      syncCharacters([...characters, mappedCreated]);
+      if (editingCharId) {
+        // Update existing character — strip base64 image to avoid 413
+        const updateData = { ...charData };
+        delete (updateData as any).brand_preset_id;
+        if (updateData.reference_sheet?.original_upload?.startsWith('data:')) {
+          delete updateData.reference_sheet;  // Don't re-upload existing image
+        }
+        const updated = await updateCharacter(editingCharId, updateData);
+        const mappedUpdated = { ...updated, image_type: (updated.image_type || (updated as CharacterProfileWithApiType).type || form.image_type) as ImageType };
+        syncCharacters(characters.map(c => c.id === editingCharId ? mappedUpdated : c));
+      } else {
+        // Create new character
+        const created = await createCharacter(charData);
+        const mappedCreated = { ...created, image_type: (created.image_type || (created as CharacterProfileWithApiType).type || form.image_type) as ImageType };
+        syncCharacters([...characters, mappedCreated]);
+      }
       setForm({ ...emptyForm });
+      setEditingCharId(null);
       setShowForm(false);
     } catch (err) {
-      console.error('Failed to create character:', err);
+      const msg = err instanceof Error ? err.message : '캐릭터 저장에 실패했습니다';
+      alert(msg);
     } finally {
       setSubmitting(false);
     }
@@ -207,20 +226,42 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
     try {
       const result = await generateReferenceSheet(charId, presetId);
       setSheetImages((prev) => ({ ...prev, [charId]: result.multi_angle }));
-    } catch (err) {
-      console.error('Failed to generate reference sheet:', err);
+    } catch {
+      // error handled silently — UI shows loading state reset
     } finally {
       setSheetLoading((prev) => ({ ...prev, [charId]: false }));
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm('캐릭터를 삭제하시겠습니까?')) return;
     try {
       await deleteCharacter(id);
       syncCharacters(characters.filter((c) => c.id !== id));
-    } catch (err) {
-      console.error('Failed to delete character:', err);
+      if (expandedChar === id) setExpandedChar(null);
+    } catch {
+      // error handled silently — delete failed, list unchanged
     }
+  };
+
+  const handleEditChar = (char: CharacterProfileWithApiType) => {
+    if (!char.id) return;
+    setEditingCharId(char.id);
+    setForm({
+      name: char.name || '',
+      image_type: char.image_type || char.type as ImageType || 'mascot',
+      char_role: char.char_role || 'main',
+      species: char.species || '',
+      personality: char.personality || '',
+      distinction_tags: (char.distinction_tags || []).join(', '),
+      imageDataUrl: char.reference_sheet?.original_upload || '',
+      voice_description: '',
+      voice_variants: [],
+      selected_voice_id: char.voice_id || '',
+      voiceLoading: false,
+    });
+    setShowForm(true);
+    setExpandedChar(null);
   };
 
   return (
@@ -268,11 +309,12 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
             return (
               <div
                 key={char.id}
-                className="rounded-lg overflow-hidden"
+                className="rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md"
                 style={{
                   background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
+                  border: expandedChar === char.id ? '1px solid #0891b2' : '1px solid var(--border-subtle)',
                 }}
+                onClick={() => setExpandedChar(prev => prev === char.id ? null : char.id)}
               >
                 <div className="flex items-center gap-4 p-3">
                   {/* Thumbnail */}
@@ -313,7 +355,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                           color: 'var(--text-muted)',
                         }}
                       >
-                        {IMAGE_TYPE_OPTIONS.find((t) => t.value === (char.image_type || (char as any).type))?.label}
+                        {IMAGE_TYPE_OPTIONS.find((t) => t.value === (char.image_type || (char as CharacterProfileWithApiType).type))?.label}
                       </span>
                     </div>
                     {char.species && (
@@ -326,7 +368,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                   {/* Reference Sheet Button — show if has original upload OR already generated */}
                   {(hasOriginalUpload || hasSheetImages) && (
                     <button
-                      onClick={() => handleGenerateSheet(char.id)}
+                      onClick={(e) => { e.stopPropagation(); handleGenerateSheet(char.id); }}
                       disabled={isSheetLoading}
                       className="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
                       style={{
@@ -352,7 +394,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
 
                   {/* Delete */}
                   <button
-                    onClick={() => handleDelete(char.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(char.id); }}
                     className="p-1.5 rounded-md hover:opacity-80 transition-opacity"
                     style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
                     title="삭제"
@@ -362,6 +404,56 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                     </svg>
                   </button>
                 </div>
+
+                {/* Expanded details */}
+                {expandedChar === char.id && (
+                  <div className="px-3 pb-3 pt-1" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <div className="grid grid-cols-2 gap-3">
+                      {char.reference_sheet?.original_upload && char.reference_sheet.original_upload !== '[uploaded]' && (
+                        <div>
+                          <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>원본 이미지</p>
+                          <img
+                            src={char.reference_sheet.original_upload.startsWith('data:') ? base64ToBlobUrl(char.reference_sheet.original_upload) : char.reference_sheet.original_upload}
+                            alt={char.name}
+                            className="w-full rounded-lg object-cover"
+                            style={{ maxHeight: 200 }}
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        {char.personality && (
+                          <div>
+                            <p className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>성격</p>
+                            <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{char.personality}</p>
+                          </div>
+                        )}
+                        {char.distinction_tags?.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>구별 태그</p>
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {char.distinction_tags.map((tag: string, i: number) => (
+                                <span key={i} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>{tag}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {char.voice_id && (
+                          <div>
+                            <p className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>음성 ID</p>
+                            <p className="text-[10px] font-mono" style={{ color: 'var(--text-secondary)' }}>{char.voice_id}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleEditChar(char); }}
+                      className="mt-3 w-full py-2 rounded-lg text-[12px] font-medium transition-all hover:opacity-90"
+                      style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-default)' }}
+                    >
+                      편집
+                    </button>
+                  </div>
+                )}
 
                 {/* Multi-angle Reference Sheet Grid */}
                 {hasSheetImages && (
@@ -700,6 +792,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
             <button
               onClick={() => {
                 setShowForm(false);
+                setEditingCharId(null);
                 setForm({ ...emptyForm });
               }}
               className="px-4 py-2 rounded-lg text-sm"
@@ -726,7 +819,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                 cursor: submitting || !form.name.trim() ? 'not-allowed' : 'pointer',
               }}
             >
-              {submitting ? '등록 중...' : '등록'}
+              {submitting ? (editingCharId ? '수정 중...' : '등록 중...') : (editingCharId ? '수정' : '등록')}
             </button>
           </div>
         </div>

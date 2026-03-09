@@ -28,7 +28,7 @@ async function verifyCampaignOwnership(
     .from('c2gen_campaigns')
     .select('id')
     .eq('id', campaignId)
-    .eq('email', email)
+    .eq('user_email', email)
     .single();
   return !!data;
 }

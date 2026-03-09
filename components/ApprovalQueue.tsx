@@ -121,7 +121,7 @@ export default function ApprovalQueue({ campaignId, campaignName, onBack }: Appr
               const topic = (item.content_data?.topic as string) || (item.content_data?.title as string) || '제목 없음';
               const narration = (item.content_data?.narration as string) || (item.content_data?.script as string) || '';
               const emotionInfo = item.emotion_curve_used
-                ? `감정 곡선: ${item.emotion_curve_used.points?.length || 0}포인트`
+                ? `감정 곡선: ${item.emotion_curve_used?.curve_points?.length || 0}포인트`
                 : null;
               const isProcessing = processing.has(item.id);
 

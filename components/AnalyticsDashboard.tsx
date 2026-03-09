@@ -26,6 +26,7 @@ export default function AnalyticsDashboard({ campaignId, campaignName, onBack }:
   const [insights, setInsights] = useState<FeedbackInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'auto_applied' | 'requires_approval' | 'observation'>('auto_applied');
 
   const loadData = useCallback(async () => {
@@ -37,8 +38,8 @@ export default function AnalyticsDashboard({ campaignId, campaignName, onBack }:
       ]);
       setSummary(summaryData);
       setInsights(insightsData);
-    } catch (err) {
-      console.error('Failed to load analytics:', err);
+    } catch {
+      setError('분석 데이터 로딩에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -49,10 +50,11 @@ export default function AnalyticsDashboard({ campaignId, campaignName, onBack }:
   const handleGenerateInsights = async () => {
     setInsightsLoading(true);
     try {
-      const newInsights = await generateInsights(campaignId);
-      setInsights(prev => [...newInsights, ...prev]);
-    } catch (err) {
-      console.error('Failed to generate insights:', err);
+      await generateInsights(campaignId);
+      const refreshed = await getInsights(campaignId);
+      setInsights(refreshed);
+    } catch {
+      setError('인사이트 생성에 실패했습니다.');
     } finally {
       setInsightsLoading(false);
     }
@@ -60,10 +62,10 @@ export default function AnalyticsDashboard({ campaignId, campaignName, onBack }:
 
   const handleApplyInsight = async (insightId: string) => {
     try {
-      await applyInsight(campaignId, insightId);
+      await applyInsight(insightId, 'apply');
       setInsights(prev => prev.map(i => i.id === insightId ? { ...i, applied: true } : i));
-    } catch (err) {
-      console.error('Failed to apply insight:', err);
+    } catch {
+      setError('인사이트 적용에 실패했습니다.');
     }
   };
 
@@ -71,15 +73,15 @@ export default function AnalyticsDashboard({ campaignId, campaignName, onBack }:
     setInsights(prev => prev.filter(i => i.id !== insightId));
   };
 
-  const filteredInsights = insights.filter(i => i.type === activeTab);
+  const filteredInsights = insights.filter(i => i.insight_type === activeTab);
 
   const summaryCards = summary ? [
-    { icon: '👁', value: summary.totalViews.toLocaleString(), label: 'Total Views' },
-    { icon: '❤', value: summary.totalLikes.toLocaleString(), label: 'Total Likes' },
-    { icon: '💬', value: summary.totalComments.toLocaleString(), label: 'Total Comments' },
-    { icon: '🔗', value: `${summary.avgCtr.toFixed(1)}%`, label: 'Avg CTR' },
-    { icon: '📊', value: `${summary.avgEngagement.toFixed(1)}%`, label: 'Avg Engagement' },
-    { icon: '📄', value: summary.contentCount.toString(), label: 'Content Count' },
+    { icon: '👁', value: summary.total_views.toLocaleString(), label: 'Total Views' },
+    { icon: '❤', value: summary.total_likes.toLocaleString(), label: 'Total Likes' },
+    { icon: '💬', value: summary.total_comments.toLocaleString(), label: 'Total Comments' },
+    { icon: '🔗', value: `${summary.avg_ctr.toFixed(1)}%`, label: 'Avg CTR' },
+    { icon: '📊', value: `${summary.avg_engagement_rate.toFixed(1)}%`, label: 'Avg Engagement' },
+    { icon: '📄', value: summary.content_count.toString(), label: 'Content Count' },
   ] : [];
 
   if (loading) {
@@ -104,6 +106,13 @@ export default function AnalyticsDashboard({ campaignId, campaignName, onBack }:
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>캠페인 분석 대시보드</p>
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-lg bg-red-500/20 text-red-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 ml-2">&#x2715;</button>
+        </div>
+      )}
 
       {/* Section 1: Summary Cards */}
       <section>

@@ -48,8 +48,8 @@ const PlatformUploader: React.FC<PlatformUploaderProps> = ({ videoBase64, title:
       setLoading(true);
       try {
         const [yt, tt] = await Promise.all([checkYoutubeStatus(), checkTiktokStatus()]);
-        setYtStatus(yt);
-        setTtStatus(tt);
+        setYtStatus({ connected: yt.connected, channelName: yt.channel_name });
+        setTtStatus({ connected: tt.connected });
         if (yt.connected) setUseYoutube(true);
         if (tt.connected) setUseTiktok(true);
       } catch { /* ignore */ }
@@ -58,16 +58,40 @@ const PlatformUploader: React.FC<PlatformUploaderProps> = ({ videoBase64, title:
     fetchStatus();
   }, []);
 
+  const popupIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (popupIntervalRef.current) {
+        clearInterval(popupIntervalRef.current);
+        popupIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   const handleConnect = async (platform: 'youtube' | 'tiktok') => {
     try {
-      const url = platform === 'youtube' ? await initYoutubeAuth() : await initTiktokAuth();
-      const popup = window.open(url, `${platform}_auth`, 'width=600,height=700');
-      const interval = setInterval(async () => {
-        if (popup?.closed) {
-          clearInterval(interval);
-          const status = platform === 'youtube' ? await checkYoutubeStatus() : await checkTiktokStatus();
-          if (platform === 'youtube') { setYtStatus(status); if (status.connected) setUseYoutube(true); }
-          else { setTtStatus(status); if (status.connected) setUseTiktok(true); }
+      const result = platform === 'youtube' ? await initYoutubeAuth() : await initTiktokAuth();
+      const popup = window.open(result.authUrl, `${platform}_auth`, 'width=600,height=700');
+      if (!popup) return;
+      if (popupIntervalRef.current) clearInterval(popupIntervalRef.current);
+      popupIntervalRef.current = setInterval(async () => {
+        if (popup.closed) {
+          if (popupIntervalRef.current) {
+            clearInterval(popupIntervalRef.current);
+            popupIntervalRef.current = null;
+          }
+          if (platform === 'youtube') {
+            const status = await checkYoutubeStatus();
+            const mapped = { connected: status.connected, channelName: status.channel_name };
+            setYtStatus(mapped);
+            if (mapped.connected) setUseYoutube(true);
+          } else {
+            const status = await checkTiktokStatus();
+            const mapped = { connected: status.connected };
+            setTtStatus(mapped);
+            if (mapped.connected) setUseTiktok(true);
+          }
         }
       }, 1000);
     } catch { /* ignore */ }
@@ -87,8 +111,8 @@ const PlatformUploader: React.FC<PlatformUploaderProps> = ({ videoBase64, title:
     if (useYoutube && ytStatus.connected) {
       setYtUpload({ status: 'uploading' });
       try {
-        const res = await uploadToYoutube({ videoBase64, title, description, tags: parsedTags, privacy });
-        setYtUpload({ status: 'success', videoId: res.videoId, videoUrl: res.videoUrl });
+        const res = await uploadToYoutube({ video_base64: videoBase64, title, description, tags: parsedTags, privacyStatus: privacy });
+        setYtUpload({ status: 'success', videoId: res.videoId });
       } catch (e: unknown) {
         setYtUpload({ status: 'error', error: e instanceof Error ? e.message : '업로드 실패' });
       }
@@ -97,8 +121,8 @@ const PlatformUploader: React.FC<PlatformUploaderProps> = ({ videoBase64, title:
     if (useTiktok && ttStatus.connected) {
       setTtUpload({ status: 'uploading' });
       try {
-        const res = await uploadToTiktok({ videoBase64, title, description, tags: parsedTags });
-        setTtUpload({ status: 'success', videoId: res.videoId, videoUrl: res.videoUrl });
+        const res = await uploadToTiktok({ video_base64: videoBase64, caption: title });
+        setTtUpload({ status: 'success', videoId: res.publishId });
       } catch (e: unknown) {
         setTtUpload({ status: 'error', error: e instanceof Error ? e.message : '업로드 실패' });
       }

@@ -114,13 +114,14 @@ const AdminProjectViewer: React.FC<Props> = ({ project, adminToken, onClose, onD
   }, [adminToken, project.id]);
 
   // ProjectAsset[] → GeneratedAsset[] 변환 (미리보기용)
-  const previewAssets = useMemo<GeneratedAsset[]>(() => {
+  const previewAssets = useMemo(() => {
     return assets
       .filter(a => a.imageData || a.imageUrl)
-      .map(a => ({
+      .map((a, idx) => ({
+        sceneNumber: idx + 1,
         narration: a.narration || '',
         visualPrompt: a.visualPrompt || '',
-        analysis: { charPresence: 'NO_CHAR' as const, composition: 'STANDARD' as const, cameraAngle: 'EYE' as const, colorMood: '', keyElement: '' },
+        analysis: { charPresence: 'NO_CHAR' as const, composition: 'STANDARD' as const, cameraAngle: 'EYE' as const, colorMood: '', keyElement: '' } as unknown as GeneratedAsset['analysis'],
         imageData: resolveMediaSrc(a.imageData, a.imageUrl, 'image/png'),
         audioData: resolveMediaSrc(a.audioData, a.audioUrl, 'audio/mp3'),
         imageUrl: a.imageUrl || null,
@@ -135,7 +136,7 @@ const AdminProjectViewer: React.FC<Props> = ({ project, adminToken, onClose, onD
         customDuration: a.customDuration,
         zoomEffect: (a.zoomEffect as any) || 'zoomIn',
         transition: (a.transition as any) || 'crossfade',
-      }));
+      })) as GeneratedAsset[];
   }, [assets]);
 
   // 개별 다운로드

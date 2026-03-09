@@ -298,7 +298,7 @@ const CreditShop: React.FC<CreditShopProps> = ({ onClose, currentCredits, curren
                     </div>
                     {plan.monthly_credits > 0 && (
                       <div className="text-sm text-emerald-400 font-bold mb-1">
-                        {t('creditShop.monthlyCredits', { count: plan.monthly_credits.toLocaleString() })}
+                        {t('creditShop.monthlyCredits', { count: plan.monthly_credits })}
                       </div>
                     )}
                     <ul className="space-y-0.5">

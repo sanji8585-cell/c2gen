@@ -68,7 +68,7 @@ const EmotionCurveEditor: React.FC<EmotionCurveEditorProps> = ({ curve, onChange
 
   // ── Derived SVG points ──
   const svgPoints = useMemo(
-    () => points.map(p => toSvg(p.time, p.intensity, dur)),
+    () => points.map(p => toSvg(p.time_seconds, p.intensity, dur)),
     [points, dur],
   );
 
@@ -127,7 +127,7 @@ const EmotionCurveEditor: React.FC<EmotionCurveEditorProps> = ({ curve, onChange
     const time = Math.max(0, Math.min(dur, ((svgX - PAD.left) / GRAPH_W) * dur));
     const intensity = fromSvgY(svgY);
     const newPoint: EmotionCurvePoint = {
-      time: Math.round(time * 10) / 10,
+      time_seconds: Math.round(time * 10) / 10,
       emotion: 'calm',
       intensity: Math.round(intensity * 100) / 100,
       label: 'New',
@@ -136,7 +136,7 @@ const EmotionCurveEditor: React.FC<EmotionCurveEditorProps> = ({ curve, onChange
       tts_pace: 'normal',
       subtitle_style: 'default',
     };
-    const updated = [...points, newPoint].sort((a, b) => a.time - b.time);
+    const updated = [...points, newPoint].sort((a, b) => a.time_seconds - b.time_seconds);
     onChange({ ...curve, curve_points: updated });
   }, [readOnly, dur, points, curve, onChange]);
 

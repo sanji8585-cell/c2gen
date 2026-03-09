@@ -151,7 +151,7 @@ const ResultCards: React.FC<ResultCardsProps> = ({
   const currentSubtitleConfig: Partial<SubtitleConfig> = {
     position: subtitlePos,
     fontSize: subtitleFontSize,
-    bgOpacity: subtitleBgOpacity / 100,
+    backgroundColor: `rgba(0, 0, 0, ${subtitleBgOpacity / 100})`,
     textColor: subtitleTextColor,
   };
 

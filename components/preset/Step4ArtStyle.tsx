@@ -96,8 +96,7 @@ export default function Step4ArtStyle({ data, onUpdate, presetId: _presetId }: S
         imageData: v.image_data?.startsWith('data:') ? base64ToBlobUrl(v.image_data) : (v.image_data || null),
       }));
       setVariants(newVariants);
-    } catch (err) {
-      console.error('Style preview generation failed:', err);
+    } catch {
       setError('프리뷰 생성에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setGenerating(false);

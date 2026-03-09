@@ -28,9 +28,9 @@ const initialWizardData: PresetWizardData = {
 };
 
 export default function PresetWizard({ onClose, onComplete, editPreset, channelId }: PresetWizardProps) {
-  const [currentStep, setCurrentStep] = useState<PresetWizardStep>(
-    editPreset?.wizard_step ? Math.min(editPreset.wizard_step, 6) as PresetWizardStep : 1
-  );
+  const initialStep = editPreset?.wizard_step ? Math.min(editPreset.wizard_step, 6) as PresetWizardStep : 1;
+  const [currentStep, setCurrentStep] = useState<PresetWizardStep>(initialStep);
+  const [maxReachedStep, setMaxReachedStep] = useState<number>(initialStep);
   const [wizardData, setWizardData] = useState<PresetWizardData>(() => {
     if (editPreset) {
       return { ...initialWizardData, ...editPreset, currentStep: (editPreset.wizard_step || 1) as PresetWizardStep };
@@ -120,6 +120,7 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
     if (currentStep < 6) {
       const next = (currentStep + 1) as PresetWizardStep;
       setCurrentStep(next);
+      setMaxReachedStep(prev => Math.max(prev, next));
       setWizardData(prev => ({ ...prev, currentStep: next }));
     }
   }, [currentStep, saveCurrentStep]);
@@ -226,9 +227,9 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
               return (
                 <React.Fragment key={stepNum}>
                   <div
-                    className={`flex flex-col items-center gap-1.5 ${stepNum <= currentStep ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                    className={`flex flex-col items-center gap-1.5 ${stepNum <= maxReachedStep ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                     onClick={() => {
-                      if (stepNum <= currentStep && stepNum !== currentStep) {
+                      if (stepNum <= maxReachedStep && stepNum !== currentStep) {
                         saveCurrentStep().then(() => {
                           setCurrentStep(stepNum);
                           setWizardData(prev => ({ ...prev, currentStep: stepNum }));

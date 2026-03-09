@@ -119,8 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const supabase = getSupabase();
-    const sessionToken = req.headers['x-session-token'] as string;
-    const email = await getSessionEmail(supabase, sessionToken);
+    const token = params.token;
+    const email = await getSessionEmail(supabase, token);
     if (!email) return res.status(401).json({ error: 'Unauthorized' });
 
     switch (action) {

@@ -160,8 +160,9 @@ export function useGameState(isAuthenticated: boolean): UseGameStateReturn {
       setQuests(prev => prev.map(q => {
         const update = result.questProgress.find((p: any) => p.questId === q.questId);
         if (update) {
-          if (update.justCompleted && !q.completed) playSFX('questComplete');
-          return { ...q, progress: update.progress, completed: update.justCompleted || q.completed };
+          const isJustCompleted = update.progress >= q.target && !q.completed;
+          if (isJustCompleted) playSFX('questComplete');
+          return { ...q, progress: update.progress, completed: isJustCompleted || q.completed };
         }
         return q;
       }));

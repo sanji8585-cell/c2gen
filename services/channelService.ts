@@ -21,16 +21,18 @@ async function apiCall(action: string, params: Record<string, unknown> = {}) {
 
 export async function listChannels(): Promise<Channel[]> {
   const data = await apiCall('channel-list');
-  return data.channels;
+  return data.channels || [];
 }
 
 export async function createChannel(channelData: Partial<Channel>): Promise<Channel> {
   const data = await apiCall('channel-create', channelData);
+  if (!data.channel) throw new Error('Failed to create channel: no channel returned');
   return data.channel;
 }
 
 export async function updateChannel(id: string, channelData: Partial<Channel>): Promise<Channel> {
   const data = await apiCall('channel-update', { id, ...channelData });
+  if (!data.channel) throw new Error('Failed to update channel: no channel returned');
   return data.channel;
 }
 
@@ -40,5 +42,6 @@ export async function deleteChannel(id: string): Promise<void> {
 
 export async function getChannel(id: string): Promise<Channel> {
   const data = await apiCall('channel-get', { id });
+  if (!data.channel) throw new Error('Channel not found');
   return data.channel;
 }
