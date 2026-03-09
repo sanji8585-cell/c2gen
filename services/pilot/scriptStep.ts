@@ -140,16 +140,28 @@ export async function runScriptStep(ctx: PipelineContext): Promise<ScriptStepRes
 
   onProgress({ step: 'script', current: 1, total: 3, message: 'Generating script...' });
 
-  // 2. Build enriched sourceContext
+  // 2. Build enriched sourceContext (truncate to prevent Gemini JSON corruption)
   const presetContext = buildPresetContext(ctx);
   const emotionGuide = buildEmotionGuide(emotionCurve);
-  const sourceContext = [presetContext, emotionGuide].filter(Boolean).join('\n\n');
+  let sourceContext = [presetContext, emotionGuide].filter(Boolean).join('\n\n');
+  if (sourceContext.length > 2000) sourceContext = sourceContext.slice(0, 2000) + '\n...';
 
-  // 3. Call existing Gemini script generation
+  // 3. Call existing Gemini script generation (with retry on JSON parse error)
   const hasRef = characters.some(
     (c) => c.reference_sheet?.original_upload || c.reference_sheet?.style_converted,
   );
-  const rawScenes = await generateScript(topic, hasRef, sourceContext || null, language);
+  let rawScenes;
+  try {
+    rawScenes = await generateScript(topic, hasRef, sourceContext || null, language);
+  } catch (e: any) {
+    // If JSON parse error, retry without sourceContext
+    if (e?.message?.includes('JSON') || e?.message?.includes('position')) {
+      console.warn('[scriptStep] JSON parse error with sourceContext, retrying without it');
+      rawScenes = await generateScript(topic, hasRef, null, language);
+    } else {
+      throw e;
+    }
+  }
 
   onProgress({ step: 'script', current: 2, total: 3, message: 'Applying emotion curve...' });
 
