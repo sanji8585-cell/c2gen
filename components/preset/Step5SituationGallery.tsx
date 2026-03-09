@@ -20,7 +20,8 @@ interface Step5Props {
 
 async function generateSituationGallery(
   artStylePrompt: string,
-  scenarios: string[]
+  scenarios: string[],
+  presetId?: string
 ): Promise<Array<{ scenario: string; image_data: string | null }>> {
   const token = localStorage.getItem('c2gen_session_token') || '';
   const res = await fetch('/api/brand-preset', {
@@ -31,6 +32,7 @@ async function generateSituationGallery(
       token,
       art_style_prompt: artStylePrompt || 'Warm illustration style',
       scenarios,
+      preset_id: presetId,
     }),
   });
   if (!res.ok) throw new Error('Situation gallery generation failed');
@@ -70,9 +72,25 @@ const SCENARIOS = [
 type ScenarioState = Record<string, { generating: boolean; done: boolean; imageData?: string }>;
 
 export default function Step5SituationGallery({ data, onUpdate, presetId }: Step5Props) {
-  const [scenarioStates, setScenarioStates] = useState<ScenarioState>(
-    Object.fromEntries(SCENARIOS.map((s) => [s.id, { generating: false, done: false }]))
-  );
+  // Load saved gallery images from art_style.situation_gallery
+  const savedGallery: Array<{ scenario: string; image_data: string | null }> =
+    (data.art_style as any)?.situation_gallery || [];
+
+  const initStates: ScenarioState = {};
+  SCENARIOS.forEach((s, i) => {
+    const saved = savedGallery[i];
+    if (saved?.image_data) {
+      initStates[s.id] = {
+        generating: false,
+        done: true,
+        imageData: saved.image_data.startsWith('data:') ? base64ToBlobUrl(saved.image_data) : saved.image_data,
+      };
+    } else {
+      initStates[s.id] = { generating: false, done: false };
+    }
+  });
+
+  const [scenarioStates, setScenarioStates] = useState<ScenarioState>(initStates);
   const [allGenerating, setAllGenerating] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +124,8 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
       const artPrompt = data.art_style?.custom_prompt || '';
       const galleryResult = await generateSituationGallery(
         artPrompt,
-        SCENARIOS.map((s) => s.label)
+        SCENARIOS.map((s) => s.label),
+        presetId
       );
       const doneStates: ScenarioState = {};
       SCENARIOS.forEach((s, i) => {

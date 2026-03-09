@@ -373,46 +373,97 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
-        // Generate 3 voice variants
+        // Generate 3 voice variants using POST /v1/text-to-voice/design
         const variants: Array<{ voice_id: string; preview_url: string; name: string }> = [];
-        const sampleText = sample_text || '안녕하세요, 저는 새로 만들어진 캐릭터 음성입니다. 이 음성이 마음에 드시나요?';
+        const errors: string[] = [];
 
-        // Call design endpoint with model_id + text to get JSON previews
-        try {
-          const designRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice/design', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'xi-api-key': apiKey,
-            },
-            body: JSON.stringify({
-              voice_description: description,
-              text: sampleText,
-              model_id: 'eleven_multilingual_ttv_v2',
-            }),
-          });
+        // Pad description if too short (API requires >= 20 chars)
+        const paddedDesc = description.length < 20
+          ? description + ' with clear natural pronunciation and moderate pace'
+          : description;
 
-          if (!designRes.ok) {
-            const errText = await designRes.text();
-            console.error('[designVoice] API failed:', designRes.status, errText);
-          } else {
-            const designData = await designRes.json();
-            if (designData.previews && Array.isArray(designData.previews)) {
-              designData.previews.forEach((preview: any, i: number) => {
+        for (let i = 0; i < 3; i++) {
+          try {
+            const designRes = await fetch('https://api.elevenlabs.io/v1/text-to-voice/design', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'xi-api-key': apiKey,
+              },
+              body: JSON.stringify({
+                voice_description: paddedDesc,
+                output_format: 'mp3_22050_32',
+                text: sample_text || '안녕하세요, 저는 새로 만들어진 캐릭터 음성입니다. 이 음성이 마음에 드시나요? 오늘도 좋은 하루 보내시길 바랍니다. 여러분과 함께하는 시간이 정말 즐겁습니다. 앞으로도 재미있는 이야기를 많이 들려드리겠습니다!',
+              }),
+            });
+
+            if (!designRes.ok) {
+              const errText = await designRes.text();
+              const errMsg = `variant ${i}: ${designRes.status} ${errText.slice(0, 300)}`;
+              console.error(`[designVoice]`, errMsg);
+              errors.push(errMsg);
+              continue;
+            }
+
+            // Try parsing as JSON first (API returns { previews: [...] })
+            const rawBuffer = await designRes.arrayBuffer();
+            const rawText = Buffer.from(rawBuffer).toString('utf-8');
+            let parsed = false;
+
+            try {
+              const jsonData = JSON.parse(rawText);
+              // Format: { previews: [{ audio_base_64, generated_voice_id, ... }] }
+              if (jsonData.previews && Array.isArray(jsonData.previews)) {
+                for (const preview of jsonData.previews) {
+                  variants.push({
+                    voice_id: preview.generated_voice_id || `designed_${Date.now()}_${variants.length}`,
+                    preview_url: preview.audio_base_64 ? `data:audio/mpeg;base64,${preview.audio_base_64}` : '',
+                    name: `변형 ${String.fromCharCode(65 + variants.length)}`,
+                  });
+                }
+                parsed = true;
+                // Got all previews from single call, no need to call again
+                break;
+              }
+              // Single voice format: { generated_voice_id, audio }
+              if (jsonData.generated_voice_id || jsonData.audio) {
                 variants.push({
-                  voice_id: preview.generated_voice_id || `preview_${i}`,
-                  preview_url: preview.audio_base_64 ? `data:audio/mpeg;base64,${preview.audio_base_64}` : '',
+                  voice_id: jsonData.generated_voice_id || `designed_${Date.now()}_${i}`,
+                  preview_url: jsonData.audio ? `data:audio/mpeg;base64,${jsonData.audio}` : '',
                   name: `변형 ${String.fromCharCode(65 + i)}`,
                 });
+                parsed = true;
+              }
+            } catch {
+              // Not JSON — treat as binary audio
+            }
+
+            if (!parsed) {
+              // Binary audio response
+              const audioBase64 = Buffer.from(rawBuffer).toString('base64');
+              variants.push({
+                voice_id: `designed_${Date.now()}_${i}`,
+                preview_url: audioBase64.length > 100 ? `data:audio/mpeg;base64,${audioBase64}` : '',
+                name: `변형 ${String.fromCharCode(65 + i)}`,
               });
             }
+
+            // Delay between calls to avoid rate limits
+            if (i < 2) await new Promise(r => setTimeout(r, 800));
+          } catch (err: any) {
+            const errMsg = `variant ${i} exception: ${err.message}`;
+            console.error(`[designVoice]`, errMsg);
+            errors.push(errMsg);
           }
-        } catch (err: any) {
-          console.error('[designVoice] error:', err.message);
         }
 
         logUsage(req, 'voice_design', 0.10);
-        return res.json({ variants, creditBalance: creditResult.balance });
+        return res.json({
+          variants,
+          creditBalance: creditResult.balance,
+          // Include debug errors so frontend can show what went wrong
+          ...(variants.length === 0 && errors.length > 0 ? { debug_errors: errors } : {}),
+        });
       }
 
       // ── C2 PILOT: Save Designed Voice ──

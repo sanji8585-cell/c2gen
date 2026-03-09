@@ -175,11 +175,11 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
     if (!form.name.trim() || !presetId) return;
     setSubmitting(true);
     try {
-      const charData: Partial<CharacterProfile> & { brand_preset_id: string; type: string } = {
+      const charData: Record<string, unknown> = {
         brand_preset_id: presetId,
         name: form.name.trim(),
-        type: form.image_type,
-        image_type: form.image_type,
+        type: form.image_type,       // DB column is `type`
+        image_type: form.image_type,  // Also send for backward compat
         char_role: form.char_role,
         species: form.species.trim() || undefined,
         personality: form.personality.trim(),
@@ -187,7 +187,8 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
           .split(',')
           .map((t) => t.trim())
           .filter(Boolean),
-        appearance: { base_prompt: '', expression_range: [] },
+        // Send image via original_upload_url (DB column) AND reference_sheet
+        original_upload_url: form.imageDataUrl || undefined,
         reference_sheet: {
           original_upload: form.imageDataUrl || undefined,
           multi_angle: {},
@@ -196,10 +197,11 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
       };
       if (editingCharId) {
         // Update existing character — strip base64 image to avoid 413
-        const updateData = { ...charData };
-        delete (updateData as any).brand_preset_id;
+        const updateData = { ...charData } as Record<string, any>;
+        delete updateData.brand_preset_id;
         if (updateData.reference_sheet?.original_upload?.startsWith('data:')) {
           delete updateData.reference_sheet;  // Don't re-upload existing image
+          delete updateData.original_upload_url;  // Don't re-upload
         }
         const updated = await updateCharacter(editingCharId, updateData);
         const mappedUpdated = { ...updated, image_type: (updated.image_type || (updated as CharacterProfileWithApiType).type || form.image_type) as ImageType };
@@ -247,6 +249,10 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
   const handleEditChar = (char: CharacterProfileWithApiType) => {
     if (!char.id) return;
     setEditingCharId(char.id);
+    // Get original image from reference_sheet OR original_upload_url column
+    const editImage = (char.reference_sheet?.original_upload && char.reference_sheet.original_upload !== '[uploaded]')
+      ? char.reference_sheet.original_upload
+      : (char as any).original_upload_url || '';
     setForm({
       name: char.name || '',
       image_type: char.image_type || char.type as ImageType || 'mascot',
@@ -254,7 +260,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
       species: char.species || '',
       personality: char.personality || '',
       distinction_tags: (char.distinction_tags || []).join(', '),
-      imageDataUrl: char.reference_sheet?.original_upload || '',
+      imageDataUrl: editImage,
       voice_description: '',
       voice_variants: [],
       selected_voice_id: char.voice_id || '',
@@ -295,7 +301,11 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
       {characters.length > 0 && (
         <div className="flex flex-col gap-3">
           {characters.map((char) => {
-            const hasOriginalUpload = !!char.reference_sheet?.original_upload;
+            // Check both reference_sheet.original_upload AND original_upload_url DB column
+            const originalImage = (char.reference_sheet?.original_upload && char.reference_sheet.original_upload !== '[uploaded]')
+              ? char.reference_sheet.original_upload
+              : (char as any).original_upload_url || '';
+            const hasOriginalUpload = !!originalImage;
             const isSheetLoading = sheetLoading[char.id] || false;
             const multiAngle = sheetImages[char.id] || char.reference_sheet?.multi_angle || {};
             const hasSheetImages = Object.keys(multiAngle).length > 0 && Object.values(multiAngle).some(Boolean);
@@ -322,9 +332,9 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                     className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center"
                     style={{ background: 'var(--bg-elevated)' }}
                   >
-                    {char.reference_sheet?.original_upload && char.reference_sheet.original_upload !== '[uploaded]' ? (
+                    {originalImage ? (
                       <img
-                        src={char.reference_sheet.original_upload.startsWith('data:') ? base64ToBlobUrl(char.reference_sheet.original_upload) : char.reference_sheet.original_upload}
+                        src={originalImage.startsWith('data:') ? base64ToBlobUrl(originalImage) : originalImage}
                         alt={char.name}
                         className="w-full h-full object-cover"
                       />
@@ -409,11 +419,11 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                 {expandedChar === char.id && (
                   <div className="px-3 pb-3 pt-1" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     <div className="grid grid-cols-2 gap-3">
-                      {char.reference_sheet?.original_upload && char.reference_sheet.original_upload !== '[uploaded]' && (
+                      {originalImage && (
                         <div>
                           <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>원본 이미지</p>
                           <img
-                            src={char.reference_sheet.original_upload.startsWith('data:') ? base64ToBlobUrl(char.reference_sheet.original_upload) : char.reference_sheet.original_upload}
+                            src={originalImage.startsWith('data:') ? base64ToBlobUrl(originalImage) : originalImage}
                             alt={char.name}
                             className="w-full rounded-lg object-cover"
                             style={{ maxHeight: 200 }}
@@ -686,6 +696,13 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
               </svg>
             </button>
             <div id="voice-design-section" style={{ display: 'none' }} className="px-4 pb-4 flex flex-col gap-3">
+              {/* Show existing voice ID if editing */}
+              {form.selected_voice_id && (
+                <div className="p-2 rounded-lg" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+                  <p className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>현재 음성 ID</p>
+                  <p className="text-[12px] font-mono" style={{ color: '#06b6d4' }}>{form.selected_voice_id}</p>
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>음성 설명</label>
                 <input
@@ -704,7 +721,8 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                   try {
                     const result = await designCharacterVoice(form.voice_description.trim());
                     if (!result.variants || result.variants.length === 0) {
-                      alert('음성 생성에 실패했습니다. 다른 설명으로 다시 시도해주세요.');
+                      const debugInfo = (result as any).debug_errors?.join('\n') || '';
+                      alert(`음성 생성에 실패했습니다.${debugInfo ? `\n\n상세: ${debugInfo}` : ' 다른 설명으로 다시 시도해주세요.'}`);
                       setForm((f) => ({ ...f, voiceLoading: false }));
                       return;
                     }

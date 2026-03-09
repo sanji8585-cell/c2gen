@@ -28,9 +28,11 @@ const initialWizardData: PresetWizardData = {
 };
 
 export default function PresetWizard({ onClose, onComplete, editPreset, channelId }: PresetWizardProps) {
-  const initialStep = editPreset?.wizard_step ? Math.min(editPreset.wizard_step, 6) as PresetWizardStep : 1;
+  const dbWizardStep = editPreset?.wizard_step ? Math.min(editPreset.wizard_step, 6) : 1;
+  // When editing, always start at step 1 for review, but preserve maxReachedStep from DB
+  const initialStep = (editPreset ? 1 : 1) as PresetWizardStep;
   const [currentStep, setCurrentStep] = useState<PresetWizardStep>(initialStep);
-  const [maxReachedStep, setMaxReachedStep] = useState<number>(initialStep);
+  const [maxReachedStep, setMaxReachedStep] = useState<number>(dbWizardStep);
   const [wizardData, setWizardData] = useState<PresetWizardData>(() => {
     if (editPreset) {
       return { ...initialWizardData, ...editPreset, currentStep: (editPreset.wizard_step || 1) as PresetWizardStep };
@@ -51,6 +53,10 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
       getPreset(editPreset.id).then(fullPreset => {
         if (fullPreset) {
           setWizardData(prev => ({ ...prev, ...fullPreset, currentStep: prev.currentStep }));
+          // Ensure maxReachedStep reflects DB value
+          if (fullPreset.wizard_step) {
+            setMaxReachedStep(prev => Math.max(prev, fullPreset.wizard_step as number));
+          }
         }
       }).catch(() => {});
     }
@@ -61,7 +67,9 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
   }, []);
 
   const getStepFields = useCallback((step: number, data: PresetWizardData): Partial<BrandPreset> => {
-    const base: Partial<BrandPreset> = { wizard_step: step };
+    // wizard_step should NEVER decrease — always save the max reached step
+    const savedWizardStep = Math.max(step, maxReachedStep);
+    const base: Partial<BrandPreset> = { wizard_step: savedWizardStep };
     switch (step) {
       case 1:
         return { ...base, name: data.name, description: data.description, world_view: data.world_view, target_audience: data.target_audience };
@@ -80,7 +88,7 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
       default:
         return base;
     }
-  }, []);
+  }, [maxReachedStep]);
 
   const saveCurrentStep = useCallback(async (): Promise<BrandPreset | null> => {
     setSaving(true);

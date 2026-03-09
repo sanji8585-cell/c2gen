@@ -40,6 +40,10 @@ export default function Step2ToneVoice({ data, onUpdate, presetId: _presetId }: 
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(
     data.tone_learned_patterns || null
   );
+  // Raw string state for forbidden_words to allow comma typing
+  const [forbiddenWordsRaw, setForbiddenWordsRaw] = useState(
+    (data.tone_voice?.forbidden_words || []).join(', ')
+  );
 
   const tone = data.tone_voice || { style: '', formality: 0.5, humor_level: 0.5 };
 
@@ -200,19 +204,17 @@ export default function Step2ToneVoice({ data, onUpdate, presetId: _presetId }: 
             <label style={labelStyle}>금지어</label>
             <input
               type="text"
-              value={(tone.forbidden_words || []).join(', ')}
-              onChange={(e) =>
-                updateTone({
-                  forbidden_words: e.target.value
-                    .split(',')
-                    .map((w) => w.trim())
-                    .filter(Boolean),
-                })
-              }
+              value={forbiddenWordsRaw}
+              onChange={(e) => setForbiddenWordsRaw(e.target.value)}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                // Convert raw string to array only on blur
+                const words = forbiddenWordsRaw.split(',').map((w) => w.trim()).filter(Boolean);
+                updateTone({ forbidden_words: words });
+              }}
               placeholder="쉼표로 구분 (예: 죽음, 폭력, 혐오)"
               style={inputStyle}
               onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border-default)')}
-              onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
             />
             <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>
               쉼표(,)로 구분하여 입력해주세요.

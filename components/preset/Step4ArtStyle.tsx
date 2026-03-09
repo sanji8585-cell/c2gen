@@ -23,12 +23,12 @@ interface Step4Props {
   presetId: string;
 }
 
-async function generateStylePreview(sceneDescription: string): Promise<Array<{style_prompt: string; image_data: string | null}>> {
+async function generateStylePreview(sceneDescription: string, presetId?: string): Promise<Array<{style_prompt: string; image_data: string | null}>> {
   const token = localStorage.getItem('c2gen_session_token') || '';
   const res = await fetch('/api/brand-preset', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'style-preview', token, scene_description: sceneDescription }),
+    body: JSON.stringify({ action: 'style-preview', token, scene_description: sceneDescription, preset_id: presetId }),
   });
   if (!res.ok) throw new Error('Preview generation failed');
   const data = await res.json();
@@ -66,17 +66,38 @@ type PreviewVariant = {
   imageData: string | null;
 };
 
-export default function Step4ArtStyle({ data, onUpdate, presetId: _presetId }: Step4Props) {
+export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) {
   const artStyle = data.art_style || { custom_prompt: '' };
   const [sceneDesc, setSceneDesc] = useState('캐릭터가 공원에서 산책하고 있다');
   const [generating, setGenerating] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
-  const [variants, setVariants] = useState<PreviewVariant[]>([
-    { id: 'A', label: '변형 A', stylePrompt: '', imageData: null },
-    { id: 'B', label: '변형 B', stylePrompt: '', imageData: null },
-    { id: 'C', label: '변형 C', stylePrompt: '', imageData: null },
-  ]);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize variants from saved preview images if available
+  const savedImages = data.style_preview_images || [];
+  const savedPreviews = (artStyle as any).preview_results || [];
+  const initialVariants: PreviewVariant[] = savedImages.length > 0
+    ? savedImages.map((img: string, i: number) => ({
+        id: String.fromCharCode(65 + i),
+        label: `변형 ${String.fromCharCode(65 + i)}`,
+        stylePrompt: savedPreviews[i]?.style_prompt || '',
+        imageData: img?.startsWith('data:') ? base64ToBlobUrl(img) : (img || null),
+      }))
+    : [
+        { id: 'A', label: '변형 A', stylePrompt: '', imageData: null },
+        { id: 'B', label: '변형 B', stylePrompt: '', imageData: null },
+        { id: 'C', label: '변형 C', stylePrompt: '', imageData: null },
+      ];
+  const [variants, setVariants] = useState<PreviewVariant[]>(initialVariants);
+
+  // Auto-select the variant that matches the saved custom_prompt
+  const savedPromptRef = useRef(artStyle.custom_prompt || '');
+  useEffect(() => {
+    if (savedPromptRef.current && savedImages.length > 0 && !selectedVariant) {
+      const match = variants.find(v => v.stylePrompt === savedPromptRef.current);
+      if (match) setSelectedVariant(match.id);
+    }
+  }, []);
 
   const updateArtStyle = (updates: Partial<ArtStyleConfig>) => {
     onUpdate({ art_style: { ...artStyle, ...updates } });
@@ -86,7 +107,7 @@ export default function Step4ArtStyle({ data, onUpdate, presetId: _presetId }: S
     setGenerating(true);
     setError(null);
     try {
-      const result = await generateStylePreview(sceneDesc);
+      const result = await generateStylePreview(sceneDesc, presetId);
       const labels = ['변형 A', '변형 B', '변형 C'];
       const newVariants: PreviewVariant[] = result.slice(0, 3).map((v, i) => ({
         id: String.fromCharCode(65 + i),
@@ -108,8 +129,34 @@ export default function Step4ArtStyle({ data, onUpdate, presetId: _presetId }: S
     updateArtStyle({ custom_prompt: v.stylePrompt });
   };
 
+  // Check if there's a previously saved style
+  const savedPrompt = artStyle.custom_prompt || '';
+
   return (
     <div className="flex flex-col gap-5">
+      {/* Show previously selected style */}
+      {savedPrompt && !selectedVariant && (
+        <div
+          className="rounded-xl p-4"
+          style={{ background: 'var(--bg-elevated)', border: '2px solid #0891b2' }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+            <span className="text-sm font-semibold" style={{ color: '#0891b2' }}>
+              현재 선택된 화풍
+            </span>
+          </div>
+          <p className="text-sm px-1" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>
+            {savedPrompt}
+          </p>
+          <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+            변경하려면 아래에서 새 프리뷰를 생성하거나 직접 스타일을 선택하세요.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>

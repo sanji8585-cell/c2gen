@@ -305,7 +305,7 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
         const email = await getSessionEmail(supabase, token);
         if (!email) return res.status(401).json({ error: 'Invalid session' });
 
-        const { scene_description, style_variants } = params;
+        const { scene_description, style_variants, preset_id } = params;
         if (!scene_description) {
           return res.status(400).json({ error: 'scene_description is required' });
         }
@@ -316,14 +316,31 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
         const geminiKey = process.env.GEMINI_API_KEY;
         if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
 
-        const defaultVariants = [
-          'Warm watercolor illustration, soft colors, hand-drawn feel',
-          'Minimal flat design, clean geometric shapes, bold accent colors',
-          'Korean webtoon style, clean outlines, cel-shaded coloring',
+        const stylePool = [
+          'Warm watercolor illustration, soft colors, hand-drawn feel, gentle brush strokes',
+          'Minimal flat design, clean geometric shapes, bold accent colors, modern look',
+          'Korean webtoon style, clean outlines, cel-shaded coloring, vibrant tones',
+          'Anime/manga illustration, large expressive eyes, dynamic shading, Japanese style',
+          'Pixar-style 3D render, soft lighting, glossy textures, rounded forms',
+          'Retro pixel art, 16-bit aesthetic, limited palette, nostalgic feel',
+          'Oil painting style, rich textures, classical lighting, gallery quality',
+          'Pastel chalk illustration, dreamy atmosphere, muted colors, soft edges',
+          'Storybook illustration, whimsical details, warm palette, hand-painted look',
+          'Pop art style, bold outlines, halftone dots, bright contrasting colors',
+          'Nordic minimalist, muted earth tones, simple shapes, cozy hygge vibe',
+          'Cyberpunk neon, dark backgrounds, glowing accents, futuristic atmosphere',
+          'Isometric illustration, clean vectors, flat shading, infographic style',
+          'Gouache painting, opaque layers, textured paper feel, earthy palette',
+          'Line art with color wash, delicate ink strokes, transparent watercolor fills',
         ];
-        const variants = (Array.isArray(style_variants) && style_variants.length === 3)
-          ? style_variants
-          : defaultVariants;
+        let variants: string[];
+        if (Array.isArray(style_variants) && style_variants.length === 3) {
+          variants = style_variants;
+        } else {
+          // Randomly pick 3 unique styles from the pool
+          const shuffled = [...stylePool].sort(() => Math.random() - 0.5);
+          variants = shuffled.slice(0, 3);
+        }
 
         // GoogleGenAI, Modality imported at top
         const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -356,6 +373,35 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
           }
         }
 
+        // Save preview images to preset DB if preset_id provided
+        if (preset_id) {
+          const previewImages = results
+            .filter(r => r.image_data)
+            .map(r => r.image_data as string);
+          if (previewImages.length > 0) {
+            // Save as JSONB in art_style.preview_results for re-display
+            const { data: currentPreset } = await supabase
+              .from('c2gen_brand_presets')
+              .select('art_style')
+              .eq('id', preset_id)
+              .single();
+            const currentArtStyle = currentPreset?.art_style || {};
+            await supabase
+              .from('c2gen_brand_presets')
+              .update({
+                art_style: {
+                  ...currentArtStyle,
+                  preview_results: results.map(r => ({
+                    style_prompt: r.style_prompt,
+                    has_image: !!r.image_data,
+                  })),
+                },
+                style_preview_images: previewImages,
+              })
+              .eq('id', preset_id);
+          }
+        }
+
         return res.json({ variants: results });
       }
 
@@ -364,7 +410,7 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
         const email = await getSessionEmail(supabase, token);
         if (!email) return res.status(401).json({ error: 'Invalid session' });
 
-        const { art_style_prompt, scenarios: customScenarios } = params;
+        const { art_style_prompt, scenarios: customScenarios, preset_id: galleryPresetId } = params;
         if (!art_style_prompt) {
           return res.status(400).json({ error: 'art_style_prompt is required' });
         }
@@ -416,6 +462,29 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
           } catch {
             gallery.push({ scenario: scenarios[i], image_data: null });
           }
+        }
+
+        // Save gallery images to preset DB if preset_id provided
+        if (galleryPresetId) {
+          const galleryData = gallery.map(g => ({
+            scenario: g.scenario,
+            image_data: g.image_data,
+          }));
+          const { data: currentPreset } = await supabase
+            .from('c2gen_brand_presets')
+            .select('art_style')
+            .eq('id', galleryPresetId)
+            .single();
+          const currentArtStyle = currentPreset?.art_style || {};
+          await supabase
+            .from('c2gen_brand_presets')
+            .update({
+              art_style: {
+                ...currentArtStyle,
+                situation_gallery: galleryData,
+              },
+            })
+            .eq('id', galleryPresetId);
         }
 
         return res.json({ gallery });
