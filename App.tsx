@@ -902,8 +902,9 @@ const AppContent: React.FC<{
               }
           };
 
-          // 연결 디렉티브가 있는 씬 확인 → 순차/병렬 하이브리드 결정
-          const hasSequentialNeeds = initialAssets.some((a, idx) => {
+          // 이미지 모드 확인: "빠른 생성"이면 디렉티브와 무관하게 항상 병렬
+          const renderMode = localStorage.getItem('tubegen_render_mode') || 'parallel';
+          const hasSequentialNeeds = renderMode === 'consistency' && initialAssets.some((a, idx) => {
             const d = sceneDirectivesRef.current[idx] || a.analysis?.directives;
             return d?.KEEP_PREV || d?.SAME_PLACE || d?.TIME_PASS;
           });
