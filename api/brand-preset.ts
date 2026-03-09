@@ -255,11 +255,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(404).json({ error: 'Preset not found or not authorized' });
         }
 
-        // Characters: use lightweight query (no original_upload_url which has base64)
-        // Step3 has its own character-list API that loads full data
+        // Characters: include reference_sheet (has angle images) but exclude original_upload_url (large upload base64)
         const { data: characters, error: charError } = await supabase
           .from('c2gen_character_references')
-          .select('id, brand_preset_id, name, type, char_role, species, personality, distinction_tags, voice_id, style_analysis, created_at')
+          .select('id, brand_preset_id, name, type, char_role, species, personality, distinction_tags, voice_id, reference_sheet, style_analysis, created_at')
           .eq('brand_preset_id', id);
 
         if (charError) return res.status(500).json({ error: charError.message });

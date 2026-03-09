@@ -307,7 +307,9 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
               : (char as any).original_upload_url || '';
             const hasOriginalUpload = !!originalImage;
             const isSheetLoading = sheetLoading[char.id] || false;
-            const multiAngle = sheetImages[char.id] || char.reference_sheet?.multi_angle || {};
+            // Reference sheet may be flat { front, angle_45, ... } or nested { multi_angle: { front, ... } }
+            const sheet = char.reference_sheet || {};
+            const multiAngle = sheetImages[char.id] || sheet.multi_angle || { front: sheet.front, angle_45: sheet.angle_45, side: sheet.side, full_body: sheet.full_body };
             const hasSheetImages = Object.keys(multiAngle).length > 0 && Object.values(multiAngle).some(Boolean);
             const ANGLE_LABELS: Record<string, string> = {
               front: '정면',

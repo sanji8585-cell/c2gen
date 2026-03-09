@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { BrandPreset, ArtStyleConfig } from '../../types';
 import { GEMINI_STYLE_CATEGORIES } from '../../config';
 
-// Convert base64 data URL to blob URL to avoid 414 URI Too Long errors
 function base64ToBlobUrl(dataUrl: string): string {
   try {
     const [header, data] = dataUrl.split(',');
@@ -10,11 +9,17 @@ function base64ToBlobUrl(dataUrl: string): string {
     const bytes = atob(data);
     const arr = new Uint8Array(bytes.length);
     for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-    const blob = new Blob([arr], { type: mime });
-    return URL.createObjectURL(blob);
+    return URL.createObjectURL(new Blob([arr], { type: mime }));
   } catch {
-    return dataUrl; // fallback
+    return dataUrl;
   }
+}
+
+function toDisplayUrl(img: string | null | undefined): string | null {
+  if (!img || img === '[saved]') return null;
+  if (img.startsWith('http')) return img;
+  if (img.startsWith('data:')) return base64ToBlobUrl(img);
+  return null;
 }
 
 interface Step4Props {
@@ -23,12 +28,14 @@ interface Step4Props {
   presetId: string;
 }
 
-async function generateStylePreview(sceneDescription: string, presetId?: string): Promise<Array<{style_prompt: string; image_data: string | null}>> {
+async function generateStylePreview(sceneDescription: string, presetId?: string, customStyles?: string[]): Promise<Array<{ style_prompt: string; image_data: string | null }>> {
   const token = localStorage.getItem('c2gen_session_token') || '';
+  const body: Record<string, unknown> = { action: 'style-preview', token, scene_description: sceneDescription, preset_id: presetId };
+  if (customStyles) body.style_variants = customStyles;
   const res = await fetch('/api/brand-preset', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'style-preview', token, scene_description: sceneDescription, preset_id: presetId }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error('Preview generation failed');
   const data = await res.json();
@@ -36,54 +43,42 @@ async function generateStylePreview(sceneDescription: string, presetId?: string)
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 14px',
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  color: 'var(--text-primary)',
-  fontSize: 14,
-  outline: 'none',
-  transition: 'border-color 0.2s',
+  width: '100%', padding: '10px 14px', background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)', borderRadius: 8,
+  color: 'var(--text-primary)', fontSize: 14, outline: 'none', transition: 'border-color 0.2s',
 };
 
 const labelStyle: React.CSSProperties = {
-  display: 'block',
-  marginBottom: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  color: 'var(--text-secondary)',
+  display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)',
 };
 
 const allStyles = GEMINI_STYLE_CATEGORIES.flatMap((cat) =>
   cat.styles.map((s) => ({ ...s, category: cat.name }))
 );
 
-type PreviewVariant = {
-  id: string;
-  label: string;
-  stylePrompt: string;
-  imageData: string | null;
-};
+type PreviewVariant = { id: string; label: string; stylePrompt: string; imageData: string | null };
 
 export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) {
   const artStyle = data.art_style || { custom_prompt: '' };
-  const [sceneDesc, setSceneDesc] = useState('캐릭터가 공원에서 산책하고 있다');
-  const [generating, setGenerating] = useState(false);
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Initialize variants from saved preview images (now URLs from Supabase Storage)
   const savedImages = data.style_preview_images || [];
   const savedPreviews = (artStyle as any).preview_results || [];
+  const savedPrompt = artStyle.custom_prompt || '';
+
+  // State
+  const [sceneDesc, setSceneDesc] = useState('캐릭터가 공원에서 산책하고 있다');
+  const [generating, setGenerating] = useState(false);
+  const [customGenerating, setCustomGenerating] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+  const [customPreviewImage, setCustomPreviewImage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Initialize variants from saved data
   const initialVariants: PreviewVariant[] = savedImages.length > 0
     ? savedImages.map((img: string, i: number) => ({
         id: String.fromCharCode(65 + i),
         label: `변형 ${String.fromCharCode(65 + i)}`,
-        stylePrompt: savedPreviews[i]?.style_prompt || savedPreviews[i]?.image_url ? '' : '',
-        imageData: img && img !== '[saved]'
-          ? (img.startsWith('data:') ? base64ToBlobUrl(img) : img) // URL or blob
-          : (savedPreviews[i]?.image_url || null),
+        stylePrompt: savedPreviews[i]?.style_prompt || '',
+        imageData: toDisplayUrl(img) || toDisplayUrl(savedPreviews[i]?.image_url),
       }))
     : [
         { id: 'A', label: '변형 A', stylePrompt: '', imageData: null },
@@ -92,11 +87,21 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
       ];
   const [variants, setVariants] = useState<PreviewVariant[]>(initialVariants);
 
-  // Auto-select the variant that matches the saved custom_prompt
-  const savedPromptRef = useRef(artStyle.custom_prompt || '');
+  // Find saved image for current style
+  const savedStyleImage = (() => {
+    const idx = savedPreviews.findIndex((p: any) => p.style_prompt === savedPrompt);
+    if (idx >= 0) return toDisplayUrl(savedImages[idx]) || toDisplayUrl(savedPreviews[idx]?.image_url);
+    // Check if any variant matches
+    const v = variants.find(v => v.stylePrompt === savedPrompt);
+    return v?.imageData || null;
+  })();
+
+  // Auto-select matching variant on load
+  const initRef = useRef(false);
   useEffect(() => {
-    if (savedPromptRef.current && savedImages.length > 0 && !selectedVariant) {
-      const match = variants.find(v => v.stylePrompt === savedPromptRef.current);
+    if (!initRef.current && savedPrompt && savedImages.length > 0) {
+      initRef.current = true;
+      const match = variants.find(v => v.stylePrompt === savedPrompt);
       if (match) setSelectedVariant(match.id);
     }
   }, []);
@@ -110,15 +115,14 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
     setError(null);
     try {
       const result = await generateStylePreview(sceneDesc, presetId);
-      const labels = ['변형 A', '변형 B', '변형 C'];
       const newVariants: PreviewVariant[] = result.slice(0, 3).map((v, i) => ({
         id: String.fromCharCode(65 + i),
-        label: labels[i] || `변형 ${String.fromCharCode(65 + i)}`,
+        label: `변형 ${String.fromCharCode(65 + i)}`,
         stylePrompt: v.style_prompt,
-        // Convert base64 to blob URL immediately to avoid 414/ERR_BLOCKED issues
-        imageData: v.image_data?.startsWith('data:') ? base64ToBlobUrl(v.image_data) : (v.image_data || null),
+        imageData: toDisplayUrl(v.image_data),
       }));
       setVariants(newVariants);
+      setSelectedVariant(null);
     } catch {
       setError('프리뷰 생성에 실패했습니다. 다시 시도해주세요.');
     } finally {
@@ -131,76 +135,73 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
     updateArtStyle({ custom_prompt: v.stylePrompt });
   };
 
-  // Check if there's a previously saved style
-  const savedPrompt = artStyle.custom_prompt || '';
+  // Generate single preview for custom prompt
+  const handleCustomPreview = async () => {
+    const prompt = artStyle.custom_prompt?.trim();
+    if (!prompt) return;
+    setCustomGenerating(true);
+    setError(null);
+    try {
+      const result = await generateStylePreview(sceneDesc, presetId, [prompt]);
+      if (result[0]?.image_data) {
+        setCustomPreviewImage(toDisplayUrl(result[0].image_data));
+      }
+    } catch {
+      setError('커스텀 프리뷰 생성에 실패했습니다.');
+    } finally {
+      setCustomGenerating(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Show previously selected style */}
-      {savedPrompt && !selectedVariant && (() => {
-        // Find the saved preview image that matches the selected prompt
-        const matchingPreview = savedPreviews.find((p: any) => p.style_prompt === savedPrompt);
-        const matchingIdx = savedPreviews.findIndex((p: any) => p.style_prompt === savedPrompt);
-        const savedImageUrl = matchingPreview?.image_url || (matchingIdx >= 0 ? savedImages[matchingIdx] : null);
-        const displayUrl = savedImageUrl && savedImageUrl !== '[saved]' ? savedImageUrl : null;
-
-        return (
-          <div
-            className="rounded-xl p-4"
-            style={{ background: 'var(--bg-elevated)', border: '2px solid #0891b2' }}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-              <span className="text-sm font-semibold" style={{ color: '#0891b2' }}>
-                현재 선택된 화풍
-              </span>
-            </div>
-            {displayUrl && (
-              <img
-                src={displayUrl.startsWith('data:') ? base64ToBlobUrl(displayUrl) : displayUrl}
-                alt="선택된 화풍"
-                className="w-full rounded-lg object-cover mb-3"
-                style={{ maxHeight: 200 }}
-              />
-            )}
-            <p className="text-sm px-1" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>
-              {savedPrompt}
-            </p>
-            <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
-              변경하려면 아래에서 새 프리뷰를 생성하거나 직접 스타일을 선택하세요.
-            </p>
-          </div>
-        );
-      })()}
-
       {/* Header */}
       <div>
         <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
           아트 스타일 선택
         </h2>
         <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          브랜드에 맞는 화풍을 선택하세요. 프리뷰를 생성하거나 직접 선택할 수 있습니다.
+          브랜드에 맞는 화풍을 선택하세요. AI 프리뷰를 생성하거나 직접 입력할 수 있습니다.
         </p>
       </div>
 
-      {/* A/B Preview Section */}
-      <div
-        className="rounded-xl p-4"
-        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
-      >
-        <label style={labelStyle}>테스트 씬 설명</label>
+      {/* Current Style Display */}
+      {savedPrompt && (
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{ border: '2px solid #0891b2', background: 'var(--bg-elevated)' }}
+        >
+          {savedStyleImage && (
+            <img
+              src={savedStyleImage}
+              alt="현재 화풍"
+              className="w-full object-cover"
+              style={{ maxHeight: 220 }}
+            />
+          )}
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
+              <span className="text-[12px] font-semibold" style={{ color: '#0891b2' }}>현재 선택된 화풍</span>
+            </div>
+            <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{savedPrompt}</p>
+          </div>
+        </div>
+      )}
+
+      {/* AI Preview Generation */}
+      <div className="rounded-xl p-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+        <label style={labelStyle}>AI 랜덤 화풍 프리뷰</label>
+        <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
+          테스트 씬을 입력하면 랜덤 3가지 화풍으로 프리뷰를 생성합니다.
+        </p>
         <input
           type="text"
           value={sceneDesc}
           onChange={(e) => setSceneDesc(e.target.value)}
           style={inputStyle}
-          placeholder="프리뷰에 사용할 장면을 설명해주세요"
-          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border-default)')}
-          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
+          placeholder="프리뷰에 사용할 장면 (예: 캐릭터가 공원에서 산책하고 있다)"
         />
-
         <button
           onClick={handleGeneratePreview}
           disabled={generating || !sceneDesc.trim()}
@@ -210,98 +211,64 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
           {generating ? (
             <span className="flex items-center justify-center gap-2">
               <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              생성 중...
+              3가지 화풍 생성 중...
             </span>
-          ) : (
-            '프리뷰 생성 (48 크레딧)'
-          )}
+          ) : '프리뷰 생성 (48 크레딧)'}
         </button>
 
-        {error && (
-          <p className="mt-2 text-[12px] text-center" style={{ color: '#f87171' }}>{error}</p>
-        )}
+        {error && <p className="mt-2 text-[12px] text-center" style={{ color: '#f87171' }}>{error}</p>}
 
         {/* Variant Grid */}
         <div className="grid grid-cols-3 gap-3 mt-4">
           {variants.map((v) => (
             <div
               key={v.id}
-              onClick={() => !generating && handleSelectVariant(v)}
-              className="rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.02]"
+              onClick={() => !generating && v.imageData && handleSelectVariant(v)}
+              className="rounded-lg overflow-hidden transition-all hover:scale-[1.02]"
               style={{
-                border: selectedVariant === v.id
-                  ? '2px solid #0891b2'
-                  : '1px solid var(--border-subtle)',
+                border: selectedVariant === v.id ? '2px solid #0891b2' : '1px solid var(--border-subtle)',
                 background: 'var(--bg-surface)',
+                cursor: v.imageData ? 'pointer' : 'default',
               }}
             >
-              {/* Image area */}
-              <div
-                className="relative w-full flex items-center justify-center"
-                style={{ aspectRatio: '16/9', background: 'var(--bg-base)' }}
-              >
+              <div className="relative w-full flex items-center justify-center" style={{ aspectRatio: '16/9', background: 'var(--bg-base)' }}>
                 {generating ? (
                   <div className="absolute inset-0 animate-pulse" style={{ background: 'linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-elevated) 50%, var(--bg-surface) 75%)', backgroundSize: '200% 100%' }} />
                 ) : v.imageData ? (
-                  <img
-                    src={v.imageData}
-                    alt={v.label}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={v.imageData} alt={v.label} className="w-full h-full object-cover" />
                 ) : (
-                  <p className="text-[12px] text-center px-2" style={{ color: 'var(--text-muted)' }}>
-                    프리뷰를<br />생성해주세요
-                  </p>
+                  <p className="text-[11px] text-center px-2" style={{ color: 'var(--text-muted)' }}>프리뷰를<br />생성해주세요</p>
                 )}
               </div>
-              {/* Label + radio */}
-              <div className="flex items-center gap-2 p-2.5">
-                <input
-                  type="radio"
-                  name="variant"
-                  checked={selectedVariant === v.id}
-                  onChange={() => handleSelectVariant(v)}
-                  className="accent-cyan-600"
-                />
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {v.label}
-                </span>
-                {v.stylePrompt && (
-                  <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
-                    {v.stylePrompt.slice(0, 30)}{v.stylePrompt.length > 30 ? '...' : ''}
-                  </span>
-                )}
+              <div className="flex items-center gap-2 p-2">
+                <input type="radio" name="variant" checked={selectedVariant === v.id} onChange={() => v.imageData && handleSelectVariant(v)} className="accent-cyan-600" disabled={!v.imageData} />
+                <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>{v.label}</span>
+                {v.stylePrompt && <span className="text-[9px] truncate flex-1" style={{ color: 'var(--text-muted)' }}>{v.stylePrompt.slice(0, 25)}...</span>}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Manual Style Fallback */}
-      <div
-        className="rounded-xl p-4"
-        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
-      >
-        <label style={labelStyle}>직접 스타일 선택</label>
+      {/* Manual Style + Custom Prompt */}
+      <div className="rounded-xl p-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+        <label style={labelStyle}>직접 스타일 입력</label>
+
         <select
           value={artStyle.style_id || ''}
           onChange={(e) => {
             const found = allStyles.find((s) => s.id === e.target.value);
-            updateArtStyle({
-              style_id: e.target.value,
-              custom_prompt: found?.prompt || artStyle.custom_prompt,
-            });
+            updateArtStyle({ style_id: e.target.value, custom_prompt: found?.prompt || artStyle.custom_prompt });
             setSelectedVariant(null);
+            setCustomPreviewImage(null);
           }}
           style={{ ...inputStyle, cursor: 'pointer' }}
         >
-          <option value="">스타일을 선택하세요</option>
+          <option value="">프리셋에서 선택하거나 아래 직접 입력</option>
           {GEMINI_STYLE_CATEGORIES.map((cat) => (
             <optgroup key={cat.id} label={cat.name}>
               {cat.styles.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — {s.description}
-                </option>
+                <option key={s.id} value={s.id}>{s.name} — {s.description}</option>
               ))}
             </optgroup>
           ))}
@@ -312,11 +279,37 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
           rows={3}
           value={artStyle.custom_prompt || ''}
           onChange={(e) => updateArtStyle({ custom_prompt: e.target.value })}
-          placeholder="스타일에 대한 추가 지시사항을 입력하세요..."
+          placeholder="원하는 스타일을 자유롭게 입력하세요 (예: 따뜻한 수채화풍, 부드러운 파스텔톤)"
           style={{ ...inputStyle, resize: 'vertical', minHeight: 72 }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border-default)')}
-          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
         />
+
+        {/* Custom Preview Button + Result */}
+        <button
+          onClick={handleCustomPreview}
+          disabled={customGenerating || !(artStyle.custom_prompt?.trim())}
+          className="mt-3 w-full py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50"
+          style={{
+            background: customGenerating || !(artStyle.custom_prompt?.trim()) ? 'var(--bg-surface)' : 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+            color: customGenerating || !(artStyle.custom_prompt?.trim()) ? 'var(--text-muted)' : '#fff',
+            border: 'none',
+          }}
+        >
+          {customGenerating ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              프리뷰 생성 중...
+            </span>
+          ) : '이 스타일로 프리뷰 보기 (16 크레딧)'}
+        </button>
+
+        {customPreviewImage && (
+          <div className="mt-3 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+            <img src={customPreviewImage} alt="커스텀 프리뷰" className="w-full object-cover" style={{ maxHeight: 220 }} />
+            <p className="text-[11px] py-1.5 text-center" style={{ color: 'var(--text-muted)', background: 'var(--bg-surface)' }}>
+              커스텀 스타일 프리뷰
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
