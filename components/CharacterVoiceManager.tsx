@@ -211,7 +211,7 @@ const CharacterVoiceManager: React.FC<CharacterVoiceManagerProps> = ({ compact =
                 ) : (
                   <div style={{ padding: '12px 10px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
                     즐겨찾기 음성이 없습니다<br/>
-                    <span style={{ fontSize: 10 }}>설정 {'>'} 사운드 {'>'} 즐겨찾기 탭에서 추가하세요</span>
+                    <span style={{ fontSize: 10 }}>사운드 설정 {'>'} 나레이션 {'>'} 즐겨찾기 탭에서 음성을 추가하면 여기서 선택할수 있어요</span>
                   </div>
                 )}
                 {/* 직접 입력 구분선 */}
@@ -254,7 +254,7 @@ const CharacterVoiceManager: React.FC<CharacterVoiceManagerProps> = ({ compact =
           ⚠️ 음성이 선택되지 않은 화자는 기본 음성으로 생성됩니다.
           {favoriteVoices.length === 0 && (
             <span style={{ display: 'block', marginTop: 2, color: 'var(--text-muted)' }}>
-              설정 &gt; 사운드 &gt; 즐겨찾기 탭에서 음성을 추가하면 여기서 선택할 수 있습니다.
+              사운드 설정 &gt; 나레이션 &gt; 즐겨찾기 탭에서 음성을 추가하면 여기서 선택할수 있어요
             </span>
           )}
         </div>
