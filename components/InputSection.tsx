@@ -372,6 +372,9 @@ const InputSection: React.FC<InputSectionProps> = ({
       styleStrength
     };
 
+    // 설정 패널 모두 닫기
+    setOpenGroup(null);
+
     if (activeTab === 'auto') {
       if (topic.trim()) onGenerate(topic, refImages, null);
     } else {

@@ -46,7 +46,26 @@
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:aimusic.so)",
       "Bash(git add -A)",
-      "Bash(git push origin imagemaker)"
+      "Bash(git push origin imagemaker)",
+      "Bash(npx vercel --prod --force)",
+      "WebFetch(domain:www.withorb.com)",
+      "WebFetch(domain:websitevoice.com)",
+      "WebFetch(domain:www.soundverse.ai)",
+      "WebFetch(domain:www.feisworld.com)",
+      "WebFetch(domain:www.joinsecret.com)",
+      "WebFetch(domain:www.saasworthy.com)",
+      "WebFetch(domain:fish.audio)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST https://tubegen-ai-bice.vercel.app/api/auth -H \"Content-Type: application/json\" -d '{\"\"action\"\":\"\"validate\"\",\"\"token\"\":\"\"test\"\"}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST https://tubegen-ai-bice.vercel.app/api/user -H \"Content-Type: application/json\" -d '{\"\"action\"\":\"\"getCredits\"\",\"\"token\"\":\"\"test\"\"}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST https://tubegen-ai-bice.vercel.app/api/gamification -H \"Content-Type: application/json\" -d '{\"\"action\"\":\"\"game-getConfig\"\"}')",
+      "Bash(git stash)",
+      "Read(//c/Users/最天동/**)",
+      "Read(//c/Users/**)",
+      "Bash(wc -l ./components/*.tsx)",
+      "Bash(start \"\" \"c:/Users/최천둥/Desktop/c2gen/docs/mockup-c.html\")",
+      "Bash(git add components/input/HeroInput.tsx components/input/ImageSettingsGroup.tsx components/input/PresetGroup.tsx components/input/SettingsAccordion.tsx components/input/SoundSettingsGroup.tsx components/InputSection.tsx components/input/VoiceSettings.tsx components/ResultTable.tsx public/bgm/ docs/plans/2026-03-09-input-ui-redesign-design.md docs/plans/2026-03-09-input-ui-redesign.md)",
+      "Bash(git add components/input/ImageSettingsGroup.tsx)",
+      "Bash(npx vercel inspect tubegen-o9ft1wx0b-sanji8585-cells-projects.vercel.app --logs)"
     ]
   }
 }

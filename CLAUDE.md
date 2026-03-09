@@ -228,3 +228,33 @@ await Promise.all([runAudio(), runImages(), runAutoBgm()]);
 - **URL**: https://tubegen-ai-bice.vercel.app
 - **빌드**: `npm run build` → `npx vercel --prod`
 - **환경 변수**: Vercel 대시보드에서 설정 (GEMINI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 등)
+
+## C2 PILOT (자동화 엔진)
+
+C2 PILOT은 C2 GEN 안에 내장되는 고도화 자동화 엔진입니다.
+전체 설계 문서: docs/C2PILOT_PRD_v1.7_FINAL.docx
+
+### 핵심 원칙
+- Phase 순서대로 구현 (1→2→3→4→5)
+- 기존 C2 GEN 코드 스타일을 반드시 따름
+- 새로운 코드는 기존 파일에 넣지 말고 별도 파일로 생성
+- C2 PILOT 관련 파일은 아래 구조를 따름:
+  - services/pilot/ (서비스 로직)
+  - components/pilot/ (UI 컴포넌트)
+  - api/pilot/ (API 엔드포인트)
+
+### 접근 권한
+- 채널 워크스페이스: assigned_operators가 함께 공유하며 작업
+- 개인 작업 영역: 각 계정 본인만 접근 가능 (Supabase RLS)
+
+### 기술 스택 (기존 유지 + 확장)
+- 기존: React 19 + TypeScript + Vite 6 + Vercel + Supabase
+- 이미지: Gemini 2.5 Flash (메인) + Flux (폴백) + GPT Image (썸네일)
+- 영상: PixVerse v5.5 (수동) + Kling 2.6/3.0 via fal.ai (자동화)
+- 오디오: ElevenLabs Scale 플랜 풀 활용
+  - TTS: Eleven v3 + Audio Tags
+  - BGM: Eleven Music API
+  - SFX: Sound Effects API
+  - 대화: Text to Dialogue API
+  - 목소리: Voice Design v3
+  - 립싱크: OmniHuman LipSync

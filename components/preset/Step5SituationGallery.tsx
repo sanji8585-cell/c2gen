@@ -19,9 +19,9 @@ interface Step5Props {
 }
 
 async function generateSituationGallery(
-  presetId: string,
-  scenarios: Array<{ id: string; label: string }>
-): Promise<Record<string, string>> {
+  artStylePrompt: string,
+  scenarios: string[]
+): Promise<Array<{ scenario: string; image_data: string | null }>> {
   const token = localStorage.getItem('c2gen_session_token') || '';
   const res = await fetch('/api/brand-preset', {
     method: 'POST',
@@ -29,20 +29,19 @@ async function generateSituationGallery(
     body: JSON.stringify({
       action: 'situation-gallery',
       token,
-      brand_preset_id: presetId,
-      scenarios: scenarios.map((s) => ({ id: s.id, description: s.label })),
+      art_style_prompt: artStylePrompt || 'Warm illustration style',
+      scenarios,
     }),
   });
   if (!res.ok) throw new Error('Situation gallery generation failed');
   const data = await res.json();
-  return data.images; // Record<scenarioId, base64ImageData>
+  return data.gallery || [];
 }
 
 async function generateSingleSituation(
-  presetId: string,
-  scenarioId: string,
-  description: string
-): Promise<string> {
+  artStylePrompt: string,
+  scenarioLabel: string
+): Promise<string | null> {
   const token = localStorage.getItem('c2gen_session_token') || '';
   const res = await fetch('/api/brand-preset', {
     method: 'POST',
@@ -50,13 +49,13 @@ async function generateSingleSituation(
     body: JSON.stringify({
       action: 'situation-gallery',
       token,
-      brand_preset_id: presetId,
-      scenarios: [{ id: scenarioId, description }],
+      art_style_prompt: artStylePrompt || 'Warm illustration style',
+      scenarios: [scenarioLabel],
     }),
   });
   if (!res.ok) throw new Error('Situation generation failed');
   const data = await res.json();
-  return data.images?.[scenarioId] || '';
+  return data.gallery?.[0]?.image_data || null;
 }
 
 const SCENARIOS = [
@@ -85,7 +84,8 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
     if (!scenario) return;
     setScenarioStates((prev) => ({ ...prev, [id]: { generating: true, done: false } }));
     try {
-      const rawImage = await generateSingleSituation(presetId, id, scenario.label);
+      const artPrompt = data.art_style?.custom_prompt || '';
+      const rawImage = await generateSingleSituation(artPrompt, scenario.label);
       const imageData = rawImage?.startsWith('data:') ? base64ToBlobUrl(rawImage) : rawImage;
       setScenarioStates((prev) => ({ ...prev, [id]: { generating: false, done: true, imageData } }));
     } catch (err) {
@@ -104,16 +104,18 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
     setScenarioStates(newStates);
 
     try {
-      const images = await generateSituationGallery(
-        presetId,
-        SCENARIOS.map((s) => ({ id: s.id, label: s.label }))
+      const artPrompt = data.art_style?.custom_prompt || '';
+      const galleryResult = await generateSituationGallery(
+        artPrompt,
+        SCENARIOS.map((s) => s.label)
       );
       const doneStates: ScenarioState = {};
-      SCENARIOS.forEach((s) => {
+      SCENARIOS.forEach((s, i) => {
+        const img = galleryResult[i]?.image_data || null;
         doneStates[s.id] = {
           generating: false,
           done: true,
-          imageData: images[s.id]?.startsWith('data:') ? base64ToBlobUrl(images[s.id]) : (images[s.id] || undefined),
+          imageData: img?.startsWith('data:') ? base64ToBlobUrl(img) : (img || undefined),
         };
       });
       setScenarioStates(doneStates);

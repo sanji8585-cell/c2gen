@@ -60,45 +60,49 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
     setWizardData(prev => ({ ...prev, ...partial }));
   }, []);
 
+  const getStepFields = useCallback((step: number, data: PresetWizardData): Partial<BrandPreset> => {
+    const base: Partial<BrandPreset> = { wizard_step: step };
+    switch (step) {
+      case 1:
+        return { ...base, name: data.name, description: data.description, world_view: data.world_view, target_audience: data.target_audience };
+      case 2:
+        return { ...base, tone_voice: data.tone_voice, tone_reference_texts: data.tone_reference_texts, tone_learned_patterns: data.tone_learned_patterns };
+      case 3:
+        // Characters are managed via character API separately - only save wizard_step
+        return { ...base };
+      case 4:
+        return { ...base, art_style: data.art_style };
+      case 5:
+        // Gallery images are ephemeral previews - only save wizard_step
+        return { ...base };
+      case 6:
+        return { ...base, bgm_preferences: data.bgm_preferences };
+      default:
+        return base;
+    }
+  }, []);
+
   const saveCurrentStep = useCallback(async (): Promise<BrandPreset | null> => {
     setSaving(true);
     setError(null);
     try {
-      const payload: Partial<BrandPreset> = { ...wizardData, wizard_step: currentStep };
-      delete (payload as Record<string, unknown>).currentStep;
-
-      // Strip large base64 data to avoid 413 Content Too Large on Vercel
-      // Character images are stored separately via character API
-      if (payload.character_profiles) {
-        payload.character_profiles = payload.character_profiles.map(cp => ({
-          ...cp,
-          reference_sheet: {
-            ...cp.reference_sheet,
-            original_upload: undefined,
-            multi_angle: {
-              front: cp.reference_sheet?.multi_angle?.front ? '[stored]' : undefined,
-              angle_45: cp.reference_sheet?.multi_angle?.angle_45 ? '[stored]' : undefined,
-              side: cp.reference_sheet?.multi_angle?.side ? '[stored]' : undefined,
-              full_body: cp.reference_sheet?.multi_angle?.full_body ? '[stored]' : undefined,
-            },
-          },
-        }));
-      }
-
-      // Strip style preview images (base64)
-      if (payload.style_preview_images) {
-        payload.style_preview_images = (payload.style_preview_images as string[]).map(img =>
-          img.startsWith('data:') ? '[preview_stored]' : img
-        );
-      }
-
       if (!presetId) {
+        // First save - create preset with basic info
+        const payload: Partial<BrandPreset> = {
+          name: wizardData.name || 'Untitled',
+          description: wizardData.description,
+          world_view: wizardData.world_view,
+          target_audience: wizardData.target_audience,
+          wizard_step: currentStep,
+        };
         if (channelId) payload.channel_id = channelId;
         const created = await createPreset(payload);
         setPresetId(created.id);
         return created;
       } else {
-        const updated = await updatePreset(presetId, payload);
+        // Update only current step's fields
+        const stepFields = getStepFields(currentStep, wizardData);
+        const updated = await updatePreset(presetId, stepFields);
         return updated;
       }
     } catch (err) {
@@ -108,7 +112,7 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
     } finally {
       setSaving(false);
     }
-  }, [wizardData, currentStep, presetId, channelId]);
+  }, [wizardData, currentStep, presetId, channelId, getStepFields]);
 
   const handleNext = useCallback(async () => {
     const saved = await saveCurrentStep();
@@ -221,7 +225,17 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
               const isCurrent = stepNum === currentStep;
               return (
                 <React.Fragment key={stepNum}>
-                  <div className="flex flex-col items-center gap-1.5">
+                  <div
+                    className={`flex flex-col items-center gap-1.5 ${stepNum <= currentStep ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                    onClick={() => {
+                      if (stepNum <= currentStep && stepNum !== currentStep) {
+                        saveCurrentStep().then(() => {
+                          setCurrentStep(stepNum);
+                          setWizardData(prev => ({ ...prev, currentStep: stepNum }));
+                        });
+                      }
+                    }}
+                  >
                     <div
                       className="flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-medium transition-all"
                       style={{

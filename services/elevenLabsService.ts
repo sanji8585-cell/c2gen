@@ -413,5 +413,27 @@ export const generateBrandBgm = async (
 
   const prompt = parts.join(', ');
 
-  return generateMusicWithElevenLabs(prompt, durationMs);
+  // Call API directly with the custom prompt (don't use generateMusicWithElevenLabs
+  // which overrides prompt with BGM_MOOD_PROMPTS lookup)
+  try {
+    const headers = buildElevenLabsHeaders();
+    const response = await fetch('/api/elevenlabs', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'generateMusic',
+        prompt,
+        durationMs,
+      }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+      return { audio_base64: null, error: errorData.error || `HTTP ${response.status}` };
+    }
+    const data = await response.json();
+    return { audio_base64: data.audio_base64 || null };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'BGM generation failed';
+    return { audio_base64: null, error: msg };
+  }
 };

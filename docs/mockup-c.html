@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C2 GEN - UI 개선안 C v3</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-base: #0b0f1a;
+    --bg-surface: #131825;
+    --bg-elevated: #1a2035;
+    --bg-hover: #212845;
+    --border-default: rgba(70, 80, 120, 0.45);
+    --border-subtle: rgba(55, 65, 100, 0.35);
+    --text-primary: #edf0f7;
+    --text-secondary: #9ba3be;
+    --text-muted: #6b7394;
+    --brand-green: #4ade80;
+    --brand-cyan: #38bdf8;
+    --brand-blue: #60a5fa;
+    --accent-purple: #a78bfa;
+    --accent-amber: #fbbf24;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    min-height: 100vh;
+    background: linear-gradient(180deg, #0e1222 0%, #0b0f1a 40%, #090d16 100%);
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 56px;
+    border-bottom: 1px solid var(--border-default);
+    backdrop-filter: blur(20px);
+    background: rgba(10, 14, 26, 0.8);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 24px; }
+  .logo { font-size: 18px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+  .logo span { color: var(--brand-green); }
+  .logo .icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    padding: 8px 16px; font-size: 14px; font-weight: 600;
+    color: var(--text-secondary); border-radius: 8px;
+    cursor: pointer; transition: all 0.2s; border: none; background: none;
+  }
+  .nav-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+  .nav-tab.active { color: var(--text-primary); background: var(--bg-elevated); border-bottom: 2px solid var(--brand-green); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700;
+  }
+  .badge-level { background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(139,92,246,0.1)); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; }
+  .badge-credit { background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.1)); border: 1px solid rgba(245,158,11,0.3); color: #fbbf24; }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--border-subtle); background: var(--bg-elevated);
+    color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 14px; transition: all 0.2s;
+  }
+  .icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    border: 2px solid rgba(139,92,246,0.5); cursor: pointer;
+  }
+
+  /* ===== MAIN ===== */
+  .main { max-width: 920px; margin: 0 auto; padding: 32px 24px; }
+
+  /* ===== HERO INPUT ===== */
+  .hero-input { margin-bottom: 28px; }
+  .input-wrapper {
+    position: relative; background: var(--bg-surface);
+    border: 1px solid var(--border-default); border-radius: 20px;
+    padding: 22px 26px; backdrop-filter: blur(20px); transition: all 0.3s;
+  }
+  .input-wrapper:hover, .input-wrapper:focus-within {
+    border-color: rgba(96, 165, 250, 0.4);
+    box-shadow: 0 0 30px rgba(96, 165, 250, 0.08), 0 0 60px rgba(96, 165, 250, 0.03);
+  }
+  .input-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .input-icon { font-size: 20px; opacity: 0.6; }
+  .input-field {
+    flex: 1; background: none; border: none; outline: none;
+    font-size: 20px; font-weight: 600; color: var(--text-primary); caret-color: var(--brand-cyan);
+  }
+  .input-field::placeholder { color: var(--text-muted); font-weight: 500; }
+  .input-bottom { display: flex; align-items: center; justify-content: space-between; }
+  .tab-switch { display: flex; gap: 2px; background: var(--bg-elevated); border-radius: 10px; padding: 3px; }
+  .tab-switch button {
+    padding: 7px 18px; border-radius: 8px; font-size: 13px; font-weight: 700;
+    border: none; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); background: none;
+  }
+  .tab-switch button.active { background: linear-gradient(135deg, #60a5fa, #818cf8); color: white; }
+  .start-btn {
+    padding: 11px 36px; border-radius: 12px;
+    background: linear-gradient(135deg, #60a5fa, #818cf8); color: white;
+    font-size: 15px; font-weight: 800; border: none; cursor: pointer;
+    transition: all 0.2s; letter-spacing: 0.5px;
+  }
+  .start-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(96, 165, 250, 0.3); }
+
+  /* ===== GROUP ACCORDION ===== */
+  .group-list { display: flex; flex-direction: column; gap: 10px; }
+  .group {
+    border: 1px solid var(--border-default); border-radius: 16px;
+    background: var(--bg-surface); overflow: hidden; transition: all 0.3s;
+  }
+  .group:hover { border-color: rgba(80, 100, 150, 0.55); }
+  .group.open { border-color: rgba(96, 165, 250, 0.3); box-shadow: 0 2px 20px rgba(96, 165, 250, 0.05); }
+
+  .group-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 22px; cursor: pointer; user-select: none; transition: background 0.2s;
+  }
+  .group-header:hover { background: rgba(30, 40, 70, 0.4); }
+  .group-icon {
+    width: 40px; height: 40px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .group-icon.image { background: linear-gradient(135deg, #60a5fa, #818cf8); }
+  .group-icon.sound { background: linear-gradient(135deg, #34d399, #38bdf8); }
+  .group-icon.preset { background: linear-gradient(135deg, #fbbf24, #f97316); }
+
+  .group-info { flex: 1; min-width: 0; }
+  .group-title { font-size: 15px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+
+  /* ===== 접힌 상태 요약 (multi-line) ===== */
+  .group-summary {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+  }
+  .group.open .group-summary { display: none; }
+  .group-summary .val { font-weight: 700; color: var(--text-primary); }
+  .group-summary .sep { margin: 0 4px; color: var(--text-muted); font-size: 10px; }
+  .group-summary .tag {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+  }
+  .group-summary .tag.on {
+    background: rgba(52, 211, 153, 0.12);
+    color: #6ee7b7;
+  }
+
+  .group-chevron { font-size: 13px; color: var(--text-muted); transition: transform 0.3s; flex-shrink: 0; }
+  .group.open .group-chevron { transform: rotate(180deg); }
+
+  .group-body { max-height: 0; overflow: hidden; transition: max-height 0.4s ease, padding 0.3s ease; }
+  .group.open .group-body { max-height: 1400px; padding: 0 22px 22px; }
+  .group-body-inner { border-top: 1px solid var(--border-subtle); padding-top: 18px; }
+
+  /* ===== SECTION INSIDE GROUP ===== */
+  .section { margin-bottom: 22px; }
+  .section:last-child { margin-bottom: 0; }
+  .section-label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--text-muted);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+  }
+  .section-label .icon { font-size: 14px; }
+
+  /* Model selector */
+  .model-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .model-option {
+    padding: 14px 16px; border-radius: 12px;
+    border: 1.5px solid var(--border-subtle); background: var(--bg-elevated);
+    cursor: pointer; transition: all 0.2s; text-align: left;
+  }
+  .model-option:hover { border-color: rgba(100,120,170,0.5); }
+  .model-option.selected {
+    border-color: rgba(96, 165, 250, 0.6);
+    background: rgba(96, 165, 250, 0.08);
+    box-shadow: 0 0 12px rgba(96, 165, 250, 0.08);
+  }
+  .model-name { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
+  .model-desc { font-size: 12px; color: var(--text-muted); }
+  .model-provider {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; background: var(--bg-hover); color: var(--text-secondary); margin-left: 6px;
+  }
+  .price-tag { font-size: 12px; font-weight: 700; color: #4ade80; margin-top: 5px; }
+
+  /* Style chips */
+  .style-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+  .style-row.two-col { grid-template-columns: repeat(2, 1fr); }
+  .style-chip {
+    padding: 11px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    background: var(--bg-elevated); color: var(--text-secondary);
+    border: 1px solid var(--border-subtle); cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+  .style-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .style-chip.selected { background: rgba(96, 165, 250, 0.12); border-color: rgba(96, 165, 250, 0.45); color: #93c5fd; }
+  .style-chip.active-toggle { background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.4); color: #fcd34d; }
+  .style-category { font-size: 11px; font-weight: 600; color: var(--text-muted); margin: 12px 0 8px; }
+
+  /* Orientation */
+  .orientation-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .orientation-btn {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; border-radius: 12px;
+    border: 1.5px solid var(--border-subtle); background: var(--bg-elevated);
+    cursor: pointer; transition: all 0.2s; color: var(--text-secondary);
+  }
+  .orientation-btn.selected {
+    border-color: rgba(96, 165, 250, 0.6);
+    background: rgba(96, 165, 250, 0.08);
+    color: var(--text-primary);
+  }
+  .orient-icon-h { width: 30px; height: 20px; border: 2px solid currentColor; border-radius: 3px; flex-shrink: 0; }
+  .orient-icon-v { width: 20px; height: 30px; border: 2px solid currentColor; border-radius: 3px; flex-shrink: 0; }
+  .orient-label { font-size: 14px; font-weight: 700; }
+  .orient-desc { font-size: 11px; color: var(--text-muted); }
+
+  /* Reference images */
+  .ref-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ref-slot { text-align: center; }
+  .ref-slot-label { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; }
+  .ref-upload {
+    width: 100%; height: 72px;
+    border: 2px dashed var(--border-subtle); border-radius: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    font-size: 20px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; background: var(--bg-elevated);
+  }
+  .ref-upload:hover { border-color: var(--text-secondary); color: var(--text-secondary); }
+  .ref-upload small { font-size: 11px; font-weight: 600; }
+  .ref-strength { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
+  .strength-tag {
+    padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    background: var(--bg-hover); color: var(--text-secondary);
+  }
+
+  /* ===== SOUND GROUP ===== */
+  .voice-card {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 18px; border-radius: 12px;
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+  }
+  .voice-avatar {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: linear-gradient(135deg, #34d399, #38bdf8);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .voice-details { flex: 1; }
+  .voice-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .voice-meta { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+  .voice-tags { display: flex; gap: 6px; margin-top: 8px; }
+  .voice-tag {
+    padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    background: rgba(52, 211, 153, 0.1); color: #6ee7b7;
+  }
+  .voice-change-btn {
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700;
+    border: 1px solid var(--border-subtle); background: var(--bg-hover);
+    color: var(--text-secondary); cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .voice-change-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+  /* BGM */
+  .bgm-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 18px; border-radius: 12px;
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+  }
+  .bgm-icon {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .bgm-info { flex: 1; }
+  .bgm-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .bgm-desc { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+  .bgm-toggle { display: flex; align-items: center; gap: 8px; }
+  .toggle-track {
+    width: 40px; height: 22px; border-radius: 11px; background: #22c55e;
+    position: relative; cursor: pointer; transition: all 0.2s;
+  }
+  .toggle-thumb {
+    width: 18px; height: 18px; border-radius: 50%; background: white;
+    position: absolute; top: 2px; left: 20px; transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .toggle-label { font-size: 13px; font-weight: 700; color: #22c55e; }
+
+  /* ===== PRESET GROUP ===== */
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .preset-card {
+    padding: 14px 16px; border-radius: 12px;
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .preset-card:hover { border-color: rgba(100,120,170,0.5); background: var(--bg-hover); }
+  .preset-card.add {
+    border-style: dashed; background: transparent;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    color: var(--text-muted); font-size: 14px; font-weight: 600;
+  }
+  .preset-card.add:hover { color: var(--text-secondary); }
+  .preset-card-name { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
+  .preset-card-meta { font-size: 12px; color: var(--text-muted); }
+  .preset-card-date { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+  .preset-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .preset-action {
+    padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 700;
+    border: none; cursor: pointer; transition: all 0.2s;
+  }
+  .preset-action.apply { background: #3b82f6; color: white; }
+  .preset-action.delete { background: rgba(239,68,68,0.2); color: #f87171; }
+
+  /* ===== CUSTOM PROMPT BOX ===== */
+  .prompt-box {
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: 12px; overflow: hidden; transition: border-color 0.2s;
+  }
+  .prompt-box:focus-within { border-color: rgba(96, 165, 250, 0.5); }
+  .prompt-textarea {
+    width: 100%; min-height: 88px; padding: 14px 16px;
+    background: none; border: none; outline: none; font-family: inherit;
+    font-size: 14px; font-weight: 500; color: var(--text-primary);
+    resize: vertical; line-height: 1.6;
+  }
+  .prompt-textarea::placeholder { color: var(--text-muted); font-weight: 400; }
+  .prompt-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; border-top: 1px solid var(--border-subtle);
+  }
+  .prompt-hint { font-size: 11px; color: var(--text-muted); }
+  .prompt-count { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+
+  /* ===== RESULT PLACEHOLDER ===== */
+  .result-placeholder {
+    border: 2px dashed var(--border-default); border-radius: 20px;
+    padding: 48px; text-align: center; margin-top: 28px;
+  }
+  .result-placeholder .icon { font-size: 36px; margin-bottom: 12px; opacity: 0.3; }
+  .result-placeholder p { font-size: 15px; font-weight: 700; color: var(--text-muted); }
+  .result-placeholder .sub { font-size: 13px; opacity: 0.6; margin-top: 4px; }
+
+  /* ===== DIVIDER ===== */
+  .divider { display: flex; align-items: center; gap: 12px; margin: 24px 0 16px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-default); }
+  .settings-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); }
+
+  /* ===== ANIMATIONS ===== */
+  .animate-in { animation: fadeSlideUp 0.4s ease-out; }
+  @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes glowPulse { 0%, 100% { box-shadow: 0 0 20px rgba(96, 165, 250, 0.05); } 50% { box-shadow: 0 0 40px rgba(96, 165, 250, 0.1); } }
+  .input-wrapper:focus-within { animation: glowPulse 3s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo"><div class="icon">🍀</div> C2GEN</div>
+    <nav class="nav-tabs">
+      <button class="nav-tab active">스토리보드 생성</button>
+      <button class="nav-tab">저장된 프로젝트 <span style="font-size:11px;background:var(--bg-hover);padding:2px 7px;border-radius:10px;margin-left:4px">36</span></button>
+      <button class="nav-tab">놀이터</button>
+    </nav>
+  </div>
+  <div class="header-right">
+    <div class="badge badge-level">💎 Lv.10</div>
+    <div class="badge badge-credit">🔥 3,424</div>
+    <button class="icon-btn">🔊</button>
+    <button class="icon-btn">KR</button>
+    <button class="icon-btn">⚙</button>
+    <div class="avatar"></div>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+
+  <!-- ===== HERO INPUT ===== -->
+  <section class="hero-input animate-in">
+    <div class="input-wrapper">
+      <div class="input-top">
+        <span class="input-icon">🔍</span>
+        <input class="input-field" type="text" placeholder="프리랜서 세금 절약 팁" />
+      </div>
+      <div class="input-bottom">
+        <div class="tab-switch">
+          <button class="active">자동 대본</button>
+          <button>수동 대본</button>
+        </div>
+        <button class="start-btn">시작 →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SETTINGS ===== -->
+  <div class="divider"><span class="settings-title">설정</span></div>
+
+  <div class="group-list animate-in">
+
+    <!-- ========== 1. 이미지 설정 ========== -->
+    <div class="group open" onclick="toggleGroup(this)">
+      <div class="group-header">
+        <div class="group-icon image">🖼️</div>
+        <div class="group-info">
+          <div class="group-title">이미지 설정</div>
+          <div class="group-summary">
+            <div><span class="val">Gemini 2.5 Flash</span><span class="sep">·</span>가로 16:9<span class="sep">·</span>캐릭터 0장<span class="tag" style="margin-left:4px">강도 70%</span><span class="sep">·</span>스타일 0장<span class="tag" style="margin-left:4px">강도 50%</span></div>
+            <div>화풍 <span class="val">없음 (기본)</span><span class="sep">·</span><span class="tag on">한글억제 ON</span></div>
+          </div>
+        </div>
+        <div class="group-chevron">▼</div>
+      </div>
+      <div class="group-body">
+        <div class="group-body-inner">
+
+          <!-- 1. 이미지 생성 모델 -->
+          <div class="section">
+            <div class="section-label"><span class="icon">🤖</span> 이미지 생성 모델</div>
+            <div class="model-options">
+              <div class="model-option selected">
+                <div class="model-name">Gemini 2.5 Flash <span class="model-provider">Google</span></div>
+                <div class="model-desc">고품질, 참조이미지 지원</div>
+                <div class="price-tag">$0.0315/장 · 16크레딧</div>
+              </div>
+              <div class="model-option">
+                <div class="model-name">GPT Image-1 <span class="model-provider">OpenAI</span></div>
+                <div class="model-desc">최고 품질, 사실적 표현</div>
+                <div class="price-tag">$0.0420/장 · 21크레딧</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 영상 방향 -->
+          <div class="section">
+            <div class="section-label"><span class="icon">📐</span> 영상 방향</div>
+            <div class="orientation-options">
+              <div class="orientation-btn selected">
+                <div class="orient-icon-h"></div>
+                <div>
+                  <div class="orient-label">가로 (16:9)</div>
+                  <div class="orient-desc">유튜브 · 일반 영상</div>
+                </div>
+              </div>
+              <div class="orientation-btn">
+                <div class="orient-icon-v"></div>
+                <div>
+                  <div class="orient-label">세로 (9:16)</div>
+                  <div class="orient-desc">쇼츠 · 릴스 · 틱톡</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 참조 이미지 -->
+          <div class="section">
+            <div class="section-label"><span class="icon">👤</span> 참조 이미지</div>
+            <div class="ref-row">
+              <div class="ref-slot">
+                <div class="ref-slot-label">캐릭터 참조 (최대 2장)</div>
+                <div class="ref-upload">+<small>이미지 업로드</small></div>
+              </div>
+              <div class="ref-slot">
+                <div class="ref-slot-label">화풍/스타일 참조 (최대 2장)</div>
+                <div class="ref-upload">+<small>이미지 업로드</small></div>
+              </div>
+            </div>
+            <div class="ref-strength">
+              <span class="strength-tag">캐릭터 강도 70%</span>
+              <span class="strength-tag">스타일 강도 50%</span>
+            </div>
+          </div>
+
+          <!-- 4. 화풍 선택 -->
+          <div class="section">
+            <div class="section-label"><span class="icon">🎨</span> 화풍 선택</div>
+            <div class="style-row two-col">
+              <span class="style-chip selected">🚫 없음 (기본)</span>
+              <span class="style-chip active-toggle">🔤 한글억제 ON</span>
+            </div>
+            <div class="style-category">캐주얼</div>
+            <div class="style-row">
+              <span class="style-chip">🖍️ 크레용</span>
+              <span class="style-chip">💧 수채화</span>
+              <span class="style-chip">◻️ 미니멀 플랫</span>
+            </div>
+            <div class="style-category">전문 / 뉴스</div>
+            <div class="style-row">
+              <span class="style-chip">📈 한국 경제 카툰</span>
+              <span class="style-chip">📊 인포그래픽</span>
+              <span class="style-chip">📰 레트로 뉴스</span>
+            </div>
+            <div class="style-category">입체 / 공간</div>
+            <div class="style-row">
+              <span class="style-chip">🧊 3D 아이소메트릭</span>
+              <span class="style-chip" style="visibility:hidden"></span>
+              <span class="style-chip" style="visibility:hidden"></span>
+            </div>
+          </div>
+
+          <!-- 5. 커스텀 화풍 프롬프트 -->
+          <div class="section">
+            <div class="section-label"><span class="icon">✏️</span> 커스텀 화풍 프롬프트</div>
+            <div class="prompt-box">
+              <textarea class="prompt-textarea" placeholder="직접 화풍을 설명해주세요. 예: 따뜻한 파스텔톤의 수채화 느낌, 부드러운 선과 밝은 배경..."></textarea>
+              <div class="prompt-footer">
+                <span class="prompt-hint">영어로 작성하면 더 정확한 결과를 얻을 수 있습니다</span>
+                <span class="prompt-count">0 / 500</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 2. 사운드 설정 ========== -->
+    <div class="group" onclick="toggleGroup(this)">
+      <div class="group-header">
+        <div class="group-icon sound">🔊</div>
+        <div class="group-info">
+          <div class="group-title">사운드 설정</div>
+          <div class="group-summary">
+            <div><span class="val">Do Hyeon</span><span class="sep">·</span>ElevenLabs Eleven v3<span class="sep">·</span>속도 <span class="val">1.20x</span><span class="sep">·</span>안정성 <span class="val">90%</span></div>
+            <div>BGM <span class="tag on">AI 자동선택 ON</span><span class="sep">·</span>볼륨 <span class="val">40%</span><span class="sep">·</span>덕킹 <span class="val">20%</span></div>
+          </div>
+        </div>
+        <div class="group-chevron">▼</div>
+      </div>
+      <div class="group-body">
+        <div class="group-body-inner">
+
+          <div class="section">
+            <div class="section-label"><span class="icon">🎤</span> 나레이션 음성</div>
+            <div class="voice-card">
+              <div class="voice-avatar">🎙️</div>
+              <div class="voice-details">
+                <div class="voice-name">Do Hyeon</div>
+                <div class="voice-meta">🇰🇷 한국어 · ElevenLabs Eleven v3</div>
+                <div class="voice-tags">
+                  <span class="voice-tag">속도 1.20x</span>
+                  <span class="voice-tag">안정성 90%</span>
+                </div>
+              </div>
+              <button class="voice-change-btn">변경 ▼</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-label"><span class="icon">🎵</span> 배경음악 (BGM)</div>
+            <div class="bgm-row">
+              <div class="bgm-icon">🎵</div>
+              <div class="bgm-info">
+                <div class="bgm-title">자동 선택</div>
+                <div class="bgm-desc">AI가 대본 분위기를 분석하여 BGM 자동 매칭</div>
+              </div>
+              <div class="bgm-toggle">
+                <div class="toggle-track"><div class="toggle-thumb"></div></div>
+                <span class="toggle-label">ON</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 3. 프리셋 ========== -->
+    <div class="group" onclick="toggleGroup(this)">
+      <div class="group-header">
+        <div class="group-icon preset">📁</div>
+        <div class="group-info">
+          <div class="group-title">프리셋</div>
+          <div class="group-summary">
+            <div><span class="val">2개</span> 저장됨<span class="sep">·</span>최근: <span class="val">금융 뉴스</span> (Gemini · 한국경제카툰 · Do Hyeon · 가로)</div>
+          </div>
+        </div>
+        <div class="group-chevron">▼</div>
+      </div>
+      <div class="group-body">
+        <div class="group-body-inner">
+          <div class="preset-grid">
+            <div class="preset-card">
+              <div class="preset-card-name">금융 뉴스</div>
+              <div class="preset-card-meta">Gemini · 한국경제카툰 · Do Hyeon · 가로</div>
+              <div class="preset-card-date">2026.03.08 저장</div>
+              <div class="preset-card-actions">
+                <button class="preset-action apply">적용</button>
+                <button class="preset-action delete">삭제</button>
+              </div>
+            </div>
+            <div class="preset-card">
+              <div class="preset-card-name">여행 브이로그</div>
+              <div class="preset-card-meta">GPT · 수채화 · Sarah · 세로</div>
+              <div class="preset-card-date">2026.03.05 저장</div>
+              <div class="preset-card-actions">
+                <button class="preset-action apply">적용</button>
+                <button class="preset-action delete">삭제</button>
+              </div>
+            </div>
+            <div class="preset-card add">+ 현재 설정 저장</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== RESULT PLACEHOLDER ===== -->
+  <div class="result-placeholder">
+    <div class="icon">🎬</div>
+    <p>생성 결과가 여기에 표시됩니다</p>
+    <p class="sub">키워드를 입력하고 '시작'을 눌러주세요</p>
+  </div>
+
+</main>
+
+<script>
+  function toggleGroup(el) {
+    if (el.classList.contains('open')) { el.classList.remove('open'); return; }
+    document.querySelectorAll('.group').forEach(g => g.classList.remove('open'));
+    el.classList.add('open');
+  }
+</script>
+
+</body>
+</html>

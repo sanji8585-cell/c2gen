@@ -347,7 +347,9 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
             const imagePart = parts.find((p: any) => p.inlineData);
             results.push({
               style_prompt: variants[i],
-              image_data: imagePart ? imagePart.inlineData.data : null,
+              image_data: imagePart
+                ? `data:image/${imagePart.inlineData.mimeType?.split('/')[1] || 'png'};base64,${imagePart.inlineData.data}`
+                : null,
             });
           } catch {
             results.push({ style_prompt: variants[i], image_data: null });
@@ -407,7 +409,9 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
             const imagePart = parts.find((p: any) => p.inlineData);
             gallery.push({
               scenario: scenarios[i],
-              image_data: imagePart ? imagePart.inlineData.data : null,
+              image_data: imagePart
+                ? `data:image/${imagePart.inlineData.mimeType?.split('/')[1] || 'png'};base64,${imagePart.inlineData.data}`
+                : null,
             });
           } catch {
             gallery.push({ scenario: scenarios[i], image_data: null });

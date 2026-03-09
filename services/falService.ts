@@ -3,7 +3,7 @@
  * fal.ai API 서비스
  * 서버 프록시(/api/fal, /api/fal-poll)를 통해 API 호출
  * - fal.ai 스토리지에 실제 이미지 업로드
- * - 동시 영상 변환 2개 제한 (큐잉)
+ * - 동시 영상 변환 7개 제한 (큐잉)
  * - 폴링 연속 실패 시 조기 종료
  * - 실패 시 크레딧 환불 (서버 측)
  */
@@ -49,9 +49,9 @@ async function callFalProxy(action: string, params: Record<string, any>): Promis
   return res.json();
 }
 
-// ── 동시 영상 변환 제한 (최대 4개) ──
+// ── 동시 영상 변환 제한 (최대 7개) ──
 
-const MAX_CONCURRENT_VIDEOS = 4;
+const MAX_CONCURRENT_VIDEOS = 7;
 let activeVideoCount = 0;
 const videoQueue: Array<{ resolve: (token: void) => void }> = [];
 
@@ -83,14 +83,14 @@ export function getVideoQueueStatus(): { active: number; waiting: number } {
 /**
  * 이미지를 영상으로 변환 (PixVerse v5.5)
  * submit → poll 패턴 (서버 타임아웃 회피)
- * - 동시 2개 제한, 폴링 연속 실패 시 조기 종료, 실패 시 서버 측 크레딧 환불
+ * - 동시 7개 제한, 폴링 연속 실패 시 조기 종료, 실패 시 서버 측 크레딧 환불
  */
 export async function generateVideoFromImage(
   imageBase64: string,
   motionPrompt: string,
   _apiKey?: string
 ): Promise<string | null> {
-  // 동시 변환 슬롯 획득 (최대 2개)
+  // 동시 변환 슬롯 획득 (최대 7개)
   await acquireVideoSlot();
 
   try {

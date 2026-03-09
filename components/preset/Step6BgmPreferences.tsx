@@ -63,10 +63,12 @@ export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetI
     setBgmLoading(true);
     setBgmError(null);
     try {
-      const result = await generateBrandBgm(prefs, 30000) as unknown as { audioBase64: string | null; audio_base64?: string | null; error?: string };
-      const audioData = result.audioBase64 || result.audio_base64;
-      if (!audioData) throw new Error(result.error || 'BGM 오디오 데이터를 받지 못했습니다.');
-      setBgmSamples((prev) => [...prev, { audio: audioData, prompt: '' }]);
+      const result = await generateBrandBgm(prefs, 30000);
+      const audioData = (result as any).audio_base64 || (result as any).audioBase64;
+      if (!audioData) throw new Error((result as any).error || 'BGM 오디오 데이터를 받지 못했습니다.');
+      // Build prompt description for display
+      const promptDesc = [prefs.genre, prefs.mood, `${Math.round((prefs.tempo_range.min + prefs.tempo_range.max) / 2)} BPM`, prefs.custom_prompt].filter(Boolean).join(', ');
+      setBgmSamples((prev) => [...prev, { audio: audioData, prompt: promptDesc }]);
     } catch (err) {
       setBgmError(err instanceof Error ? err.message : 'BGM 생성에 실패했습니다.');
     } finally {
@@ -151,12 +153,15 @@ export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetI
               max={200}
               value={prefs.tempo_range.min}
               onChange={(e) => {
-                const val = Math.max(40, Math.min(200, Number(e.target.value)));
-                updatePrefs({ tempo_range: { ...prefs.tempo_range, min: Math.min(val, prefs.tempo_range.max) } });
+                updatePrefs({ tempo_range: { ...prefs.tempo_range, min: Number(e.target.value) } });
               }}
               style={inputStyle}
               onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border-default)')}
-              onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                const val = Math.max(40, Math.min(prefs.tempo_range.max, Number(e.target.value) || 40));
+                updatePrefs({ tempo_range: { ...prefs.tempo_range, min: val } });
+              }}
             />
           </div>
           <span className="mt-5 text-sm font-bold" style={{ color: 'var(--text-muted)' }}>~</span>
@@ -168,12 +173,15 @@ export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetI
               max={200}
               value={prefs.tempo_range.max}
               onChange={(e) => {
-                const val = Math.max(40, Math.min(200, Number(e.target.value)));
-                updatePrefs({ tempo_range: { ...prefs.tempo_range, max: Math.max(val, prefs.tempo_range.min) } });
+                updatePrefs({ tempo_range: { ...prefs.tempo_range, max: Number(e.target.value) } });
               }}
               style={inputStyle}
               onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border-default)')}
-              onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-subtle)')}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                const val = Math.max(prefs.tempo_range.min, Math.min(200, Number(e.target.value) || 200));
+                updatePrefs({ tempo_range: { ...prefs.tempo_range, max: val } });
+              }}
             />
           </div>
         </div>
