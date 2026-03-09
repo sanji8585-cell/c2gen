@@ -1,6 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
+// Vercel body size 제한 확장 (이미지/오디오 base64 업로드용)
+export const config = {
+  api: { bodyParser: { sizeLimit: '50mb' } },
+};
+
 // ── Shared utilities (inlined for Vercel serverless compatibility) ──
 
 function getSupabase() {

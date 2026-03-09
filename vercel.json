@@ -32,6 +32,7 @@
     "api/youtube-upload.ts": { "maxDuration": 120 },
     "api/tiktok-auth.ts": { "maxDuration": 30 },
     "api/tiktok-upload.ts": { "maxDuration": 120 },
-    "api/analytics.ts": { "maxDuration": 60 }
+    "api/analytics.ts": { "maxDuration": 60 },
+    "api/pilot/save-content.ts": { "maxDuration": 120 }
   }
 }
