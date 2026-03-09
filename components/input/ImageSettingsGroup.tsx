@@ -264,9 +264,6 @@ const ImageSettingsGroup: React.FC<ImageSettingsGroupProps> = ({
 
       {/* ===== 3. 참조 이미지 ===== */}
       <div style={{ marginBottom: 22 }}>
-        <div style={sectionLabelStyle}>
-          <span style={{ fontSize: 14 }}>👤</span> 참조 이미지
-        </div>
         <ReferenceImageSelector
           characterRefImages={characterRefImages}
           styleRefImages={styleRefImages}
@@ -343,6 +340,7 @@ const ImageSettingsGroup: React.FC<ImageSettingsGroupProps> = ({
                         ...(active ? chipSelected : {}),
                         width: '100%',
                         display: 'block',
+                        minHeight: 70,
                       }}
                     >
                       {style.name}
@@ -397,6 +395,7 @@ const ImageSettingsGroup: React.FC<ImageSettingsGroupProps> = ({
                         ...(active ? chipSelected : {}),
                         width: '100%',
                         display: 'block',
+                        minHeight: 70,
                       }}
                     >
                       {style.name}
