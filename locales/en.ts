@@ -721,6 +721,70 @@ const en = {
 
   // ── Thumbnail Button ──
   thumbnailButton: 'Generate Thumbnail',
+
+  // ── Landing Page ──
+  landing: {
+    hero: {
+      headline: 'One Keyword. Imagination Becomes Reality.',
+      subtitle: 'Script → Images → Narration → Video. Fully automated.',
+      cta: 'Get Started Free',
+      ctaSecondary: 'See Demo',
+    },
+    workflow: {
+      title: 'How It Works',
+      step1Title: 'Enter Keyword',
+      step1Desc: 'Type a topic or paste your script',
+      step2Title: 'AI Script',
+      step2Desc: 'Auto-generate narration and visuals per scene',
+      step3Title: 'Images & Voice',
+      step3Desc: 'AI creates images and TTS for each scene',
+      step4Title: 'Final Video',
+      step4Desc: 'MP4 video with auto-generated subtitles',
+    },
+    features: {
+      title: 'Why C2GEN?',
+      scriptEngine: 'AI Script Engine',
+      scriptEngineDesc: 'Auto-generate scene splits, narration, and visual prompts from a single keyword. Handles long scripts with chunk processing',
+      multilingual: 'Multilingual Content',
+      multilingualDesc: 'Korean, English, and Japanese narration and subtitles in one go',
+      imageGen: 'AI Image Generation',
+      imageGenDesc: 'Auto-select from Gemini, Flux, and other top models per scene',
+      tts: 'Premium TTS',
+      ttsDesc: 'Natural narration via ElevenLabs with word-level subtitle sync',
+      videoAnim: 'Video Animation',
+      videoAnimDesc: 'Transform images into dynamic animated videos',
+      bgmThumb: 'BGM + Thumbnails',
+      bgmThumbDesc: 'AI mood-matched BGM + platform-optimized thumbnails',
+      playground: 'Playground',
+      playgroundDesc: "Browse other creators' images, voices, and styles — get inspired and reference them in your project",
+    },
+    gallery: {
+      title: 'Made with C2GEN',
+      moreExamples: 'See More Examples',
+      madeIn: 'Made in {{minutes}} min',
+    },
+    vision: {
+      title: 'Our Vision',
+      techStack: 'Tech Stack',
+      techStackDesc: 'Gemini · ElevenLabs · PixVerse · Flux — Integrated cutting-edge AI pipeline',
+      scalability: 'Scalability',
+      scalabilityDesc: 'C2 PILOT automation engine — Brand presets → Campaign automation → Multi-platform publishing',
+      market: 'Market',
+      marketDesc: 'Short-form content market is booming — AI empowers every creator to produce videos',
+      partnership: 'Partnership Inquiry',
+    },
+    cta: {
+      headline: 'Get Started Now',
+      subtitle: 'Sign up and get 100 free credits',
+      button: 'Get Started Free',
+    },
+    footer: {
+      tagline: 'AI-Powered Storyboard & Video Generation',
+      terms: 'Terms of Service',
+      privacy: 'Privacy Policy',
+      contact: 'Contact Us',
+    },
+  },
 };
 
 export default en;

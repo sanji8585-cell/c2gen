@@ -722,6 +722,70 @@ const ko = {
 
   // ── 썸네일 생성 버튼 ──
   thumbnailButton: '썸네일 생성',
+
+  // ── 랜딩페이지 ──
+  landing: {
+    hero: {
+      headline: '키워드 하나로, 상상은 현실이 됩니다!',
+      subtitle: '스크립트 → 이미지 → 나레이션 → 영상. 전부 자동.',
+      cta: '무료로 시작하기',
+      ctaSecondary: '데모 영상 보기',
+    },
+    workflow: {
+      title: '어떻게 동작하나요?',
+      step1Title: '키워드 입력',
+      step1Desc: '주제나 대본을 입력하세요',
+      step2Title: 'AI 스크립트',
+      step2Desc: '씬별 나레이션과 비주얼이 자동 생성',
+      step3Title: '이미지 & 음성',
+      step3Desc: '각 씬에 맞는 이미지와 TTS 생성',
+      step4Title: '완성 영상',
+      step4Desc: 'MP4 영상 + 자막 자동 렌더링',
+    },
+    features: {
+      title: '왜 C2GEN인가요?',
+      scriptEngine: 'AI 스크립트 엔진',
+      scriptEngineDesc: '키워드만으로 씬 분할·나레이션·비주얼 프롬프트 자동 생성. 긴 대본도 청크 분할로 완벽 처리',
+      multilingual: '다국어 콘텐츠',
+      multilingualDesc: '한국어·영어·일본어 나레이션과 자막을 한 번에',
+      imageGen: 'AI 이미지 생성',
+      imageGenDesc: 'Gemini·Flux 등 최고 모델을 씬에 맞게 자동 선택',
+      tts: '고품질 TTS',
+      ttsDesc: 'ElevenLabs 자연스러운 나레이션 + 단어별 자막 싱크',
+      videoAnim: '영상 애니메이션',
+      videoAnimDesc: '이미지를 역동적인 영상으로 자동 변환',
+      bgmThumb: 'BGM + 썸네일',
+      bgmThumbDesc: 'AI 분위기 분석 BGM 매칭 + 플랫폼별 썸네일 생성',
+      playground: '플레이그라운드',
+      playgroundDesc: '다른 크리에이터의 이미지·음성·스타일을 탐색하고 내 프로젝트에 바로 참조',
+    },
+    gallery: {
+      title: 'C2GEN으로 만든 영상들',
+      moreExamples: '더 많은 예시 보기',
+      madeIn: '{{minutes}}분 완성',
+    },
+    vision: {
+      title: 'C2GEN의 비전',
+      techStack: '기술 스택',
+      techStackDesc: 'Gemini · ElevenLabs · PixVerse · Flux — 최신 AI 모델 통합 파이프라인',
+      scalability: '확장성',
+      scalabilityDesc: 'C2 PILOT 자동화 엔진 — 브랜드 프리셋 → 캠페인 자동화 → 멀티 플랫폼 배포',
+      market: '시장',
+      marketDesc: '숏폼 콘텐츠 시장 급성장 — 크리에이터 누구나 AI로 영상 제작 가능한 시대',
+      partnership: '파트너십 문의',
+    },
+    cta: {
+      headline: '지금 바로 시작하세요',
+      subtitle: '가입하면 100크레딧 무료 제공',
+      button: '무료로 시작하기',
+    },
+    footer: {
+      tagline: 'AI 기반 스토리보드 & 영상 자동 생성',
+      terms: '이용약관',
+      privacy: '개인정보처리방침',
+      contact: '문의하기',
+    },
+  },
 };
 
 export default ko;
