@@ -722,7 +722,22 @@ const AppContent: React.FC<{
           const moodResult = await analyzeMood(narrations);
           if (isAbortedRef.current) return;
 
-          const detectedMood = moodResult.mood as BgmMood;
+          // sentiment 분포 기반 BGM mood 보정
+          let detectedMood = moodResult.mood as BgmMood;
+          const sentiments = initialAssets.map(a => a.analysis?.sentiment).filter(Boolean);
+          if (sentiments.length > 0) {
+            const posRatio = sentiments.filter(s => s === 'POSITIVE').length / sentiments.length;
+            const negRatio = sentiments.filter(s => s === 'NEGATIVE').length / sentiments.length;
+
+            // POSITIVE 60%+ 인데 차가운 mood면 → inspiring으로 보정
+            if (posRatio >= 0.6 && ['tech', 'dark', 'dramatic'].includes(detectedMood)) {
+              detectedMood = 'inspiring';
+            }
+            // NEGATIVE 60%+ 인데 밝은 mood면 → dramatic으로 보정
+            if (negRatio >= 0.6 && ['upbeat', 'inspiring', 'calm'].includes(detectedMood)) {
+              detectedMood = 'dramatic';
+            }
+          }
           // 1차: ElevenLabs Music AI 생성, 2차: public/bgm/ 정적 파일
           let base64: string | null = null;
 
@@ -1234,10 +1249,19 @@ const AppContent: React.FC<{
           const asset = assetsRef.current[i];
           const sentiment = asset.analysis?.sentiment;
           const motionType = asset.analysis?.motion_type;
-          if (sentiment === 'POSITIVE' && motionType === '동적') effect = 'zoomIn';
-          else if (sentiment === 'NEGATIVE' && motionType === '정적') effect = 'zoomOut';
-          else if (motionType === '동적') effect = i % 2 === 0 ? 'panLeft' : 'panRight';
-          else effect = 'zoomIn';
+          if (sentiment === 'POSITIVE' && motionType === '동적') {
+            effect = 'zoomIn';           // 희망, 성장, 에너지
+          } else if (sentiment === 'POSITIVE' && motionType === '정적') {
+            effect = 'zoomIn';           // 잔잔한 희망, 부드러운 접근
+          } else if (sentiment === 'NEGATIVE' && motionType === '정적') {
+            effect = 'none';             // 고요한 무거움, 정적 긴장
+          } else if (sentiment === 'NEGATIVE' && motionType === '동적') {
+            effect = i % 2 === 0 ? 'panLeft' : 'panRight'; // 불안, 긴장감
+          } else if (motionType === '동적') {
+            effect = i % 2 === 0 ? 'panLeft' : 'panRight'; // NEUTRAL 동적
+          } else {
+            effect = 'zoomIn';           // NEUTRAL 기본
+          }
           break;
         }
         case 'static':
