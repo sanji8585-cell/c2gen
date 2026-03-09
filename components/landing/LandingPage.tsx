@@ -2,6 +2,8 @@ import React from 'react';
 import LandingNav from './LandingNav';
 import HeroSection from './HeroSection';
 import WorkflowSection from './WorkflowSection';
+import FeaturesSection from './FeaturesSection';
+import GallerySection from './GallerySection';
 
 interface LandingPageProps {
   isDark: boolean;
@@ -15,6 +17,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme, onOpen
       <LandingNav isDark={isDark} onToggleTheme={onToggleTheme} onOpenAuth={onOpenAuth} />
       <HeroSection onOpenAuth={onOpenAuth} />
       <WorkflowSection />
+      <FeaturesSection />
+      <GallerySection />
     </div>
   );
 };
