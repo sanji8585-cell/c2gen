@@ -582,7 +582,7 @@ const AppContent: React.FC<{
 
     try {
       const runAudio = async () => {
-          const TTS_CONCURRENCY = 5; // 동시 TTS 생성 수 (ElevenLabs 동시 요청 제한)
+          const TTS_CONCURRENCY = 5; // 동시 TTS 생성 수 (ElevenLabs Scale 플랜 기준)
           const MAX_TTS_RETRIES = 2;
           let completedCount = 0;
 
@@ -595,7 +595,7 @@ const AppContent: React.FC<{
 
                   try {
                       if (attempt > 0) {
-                          await wait(1500);
+                          await wait(500);
                       }
 
                       const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
@@ -653,7 +653,7 @@ const AppContent: React.FC<{
 
       const runImages = async () => {
           const MAX_RETRIES = 2;
-          const CONCURRENCY = 5; // 동시 생성 수
+          const CONCURRENCY = 10; // 동시 이미지 생성 수 (Gemini 10개 가능)
           const imageModel = getSelectedImageModel();
           const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
 
