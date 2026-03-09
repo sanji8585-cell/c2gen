@@ -123,15 +123,18 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
   }, [wizardData, currentStep, presetId, channelId, getStepFields]);
 
   const handleNext = useCallback(async () => {
-    const saved = await saveCurrentStep();
-    if (!saved) return;
     if (currentStep < 6) {
       const next = (currentStep + 1) as PresetWizardStep;
+      // Only save if we're advancing to a NEW step (not revisiting)
+      if (next > maxReachedStep || !isEditing) {
+        const saved = await saveCurrentStep();
+        if (!saved) return;
+      }
       setCurrentStep(next);
       setMaxReachedStep(prev => Math.max(prev, next));
       setWizardData(prev => ({ ...prev, currentStep: next }));
     }
-  }, [currentStep, saveCurrentStep]);
+  }, [currentStep, maxReachedStep, isEditing, saveCurrentStep]);
 
   const handlePrev = useCallback(() => {
     if (currentStep > 1) {
@@ -147,9 +150,12 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
   }, [saveCurrentStep, onComplete]);
 
   const handleSaveAndExit = useCallback(async () => {
-    await saveCurrentStep();
+    // Only save if there's something meaningful to save (skip character step which uses its own API)
+    if (presetId && currentStep !== 3) {
+      await saveCurrentStep();
+    }
     onClose();
-  }, [saveCurrentStep, onClose]);
+  }, [saveCurrentStep, onClose, presetId, currentStep]);
 
   // Close on Escape
   useEffect(() => {
@@ -230,18 +236,18 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
           <div className="flex items-center justify-between max-w-2xl mx-auto">
             {STEP_LABELS.map((label, idx) => {
               const stepNum = (idx + 1) as PresetWizardStep;
-              const isCompleted = stepNum < currentStep;
+              const isCompleted = stepNum < maxReachedStep;
               const isCurrent = stepNum === currentStep;
               return (
                 <React.Fragment key={stepNum}>
                   <div
                     className={`flex flex-col items-center gap-1.5 ${stepNum <= maxReachedStep ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                     onClick={() => {
+                      // Navigate without saving — just switch the view
                       if (stepNum <= maxReachedStep && stepNum !== currentStep) {
-                        saveCurrentStep().then(() => {
-                          setCurrentStep(stepNum);
-                          setWizardData(prev => ({ ...prev, currentStep: stepNum }));
-                        });
+                        setError(null);
+                        setCurrentStep(stepNum);
+                        setWizardData(prev => ({ ...prev, currentStep: stepNum }));
                       }
                     }}
                   >
@@ -277,7 +283,7 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
                     <div
                       className="flex-1 h-px mx-2 mt-[-18px]"
                       style={{
-                        backgroundColor: stepNum < currentStep
+                        backgroundColor: stepNum < maxReachedStep
                           ? '#0891b2'
                           : 'var(--border-default)',
                       }}
