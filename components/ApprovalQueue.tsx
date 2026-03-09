@@ -22,6 +22,8 @@ export default function ApprovalQueue({ campaignId, campaignName, onBack }: Appr
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState('');
   const [processing, setProcessing] = useState<Set<string>>(new Set());
+  const [viewingItem, setViewingItem] = useState<ApprovalQueueItem | null>(null);
+  const [viewingSceneIdx, setViewingSceneIdx] = useState(0);
 
   const loadItems = useCallback(async () => {
     try {
@@ -101,6 +103,113 @@ export default function ApprovalQueue({ campaignId, campaignName, onBack }: Appr
 
   useEffect(() => { return () => { audioRef.current?.pause(); }; }, []);
 
+  // ── Storyboard Detail Viewer ──
+  if (viewingItem) {
+    const vcd = viewingItem.content_data as Record<string, any>;
+    const vAssets = (vcd?.assets || []) as Array<{ sceneNumber: number; imageUrl?: string; audioUrl?: string; narration?: string }>;
+    const vScenes = (vcd?.scenes || []) as Array<{ sceneNumber: number; narration: string; speakerName?: string; emotionTag?: string }>;
+    const vBgmUrl = vcd?.bgmUrl as string | undefined;
+    const vMeta = vcd?.metadata as { title?: string; description?: string; tags?: string[] } | undefined;
+    const currentAsset = vAssets[viewingSceneIdx];
+    const currentScene = vScenes[viewingSceneIdx];
+
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--bg-base)' }}>
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-6 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{vcd?.topic || '스토리보드'}</h2>
+            {vMeta?.title && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{vMeta.title}</p>}
+          </div>
+          <button onClick={() => { setViewingItem(null); setViewingSceneIdx(0); audioRef.current?.pause(); }}
+            className="px-4 py-2 rounded-lg text-sm font-medium" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-elevated)' }}>
+            닫기
+          </button>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4 overflow-y-auto">
+          {/* Image */}
+          {currentAsset?.imageUrl ? (
+            <img src={currentAsset.imageUrl} alt={`Scene ${viewingSceneIdx + 1}`}
+              className="rounded-xl shadow-2xl" style={{ maxWidth: '100%', maxHeight: '50vh', objectFit: 'contain' }} />
+          ) : (
+            <div className="rounded-xl flex items-center justify-center" style={{ width: 640, height: 360, backgroundColor: 'var(--bg-elevated)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>이미지 없음</span>
+            </div>
+          )}
+
+          {/* Scene info */}
+          <div className="w-full max-w-2xl">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: 'rgba(8,145,178,0.2)', color: '#06b6d4' }}>
+                씬 {viewingSceneIdx + 1} / {vAssets.length}
+              </span>
+              {currentScene?.speakerName && (
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>화자: {currentScene.speakerName}</span>
+              )}
+              {currentScene?.emotionTag && (
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{currentScene.emotionTag}</span>
+              )}
+            </div>
+
+            {/* Narration text */}
+            <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--text-primary)' }}>
+              {currentScene?.narration || currentAsset?.narration || ''}
+            </p>
+
+            {/* Audio controls */}
+            <div className="flex items-center gap-3">
+              {currentAsset?.audioUrl && (
+                <button onClick={() => toggleAudio(currentAsset.audioUrl!, `viewer-s${viewingSceneIdx}`)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ backgroundColor: playingAudio === `viewer-s${viewingSceneIdx}` ? 'rgba(96,165,250,0.2)' : 'var(--bg-elevated)', color: playingAudio === `viewer-s${viewingSceneIdx}` ? '#60a5fa' : 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                  {playingAudio === `viewer-s${viewingSceneIdx}` ? '⏸ 나레이션 정지' : '▶ 나레이션 재생'}
+                </button>
+              )}
+              {vBgmUrl && (
+                <button onClick={() => toggleAudio(vBgmUrl, 'viewer-bgm')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ backgroundColor: playingAudio === 'viewer-bgm' ? 'rgba(96,165,250,0.2)' : 'var(--bg-elevated)', color: playingAudio === 'viewer-bgm' ? '#60a5fa' : 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                  {playingAudio === 'viewer-bgm' ? '⏸ BGM 정지' : '🎵 BGM 재생'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom navigation */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <button onClick={() => { setViewingSceneIdx(Math.max(0, viewingSceneIdx - 1)); audioRef.current?.pause(); setPlayingAudio(null); }}
+            disabled={viewingSceneIdx === 0}
+            className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-30"
+            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}>
+            ← 이전 씬
+          </button>
+
+          {/* Scene dots */}
+          <div className="flex gap-2">
+            {vAssets.map((_, i) => (
+              <button key={i} onClick={() => { setViewingSceneIdx(i); audioRef.current?.pause(); setPlayingAudio(null); }}
+                className="rounded-full transition-all"
+                style={{
+                  width: viewingSceneIdx === i ? 24 : 8, height: 8,
+                  backgroundColor: viewingSceneIdx === i ? '#06b6d4' : 'var(--bg-hover)',
+                }} />
+            ))}
+          </div>
+
+          <button onClick={() => { setViewingSceneIdx(Math.min(vAssets.length - 1, viewingSceneIdx + 1)); audioRef.current?.pause(); setPlayingAudio(null); }}
+            disabled={viewingSceneIdx >= vAssets.length - 1}
+            className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-30"
+            style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}>
+            다음 씬 →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
       <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-default)' }}>
@@ -152,7 +261,9 @@ export default function ApprovalQueue({ campaignId, campaignName, onBack }: Appr
               const hasStoryboard = assets.length > 0 && assets.some(a => a.imageUrl);
 
               return (
-                <div key={item.id} className="p-4 rounded-xl" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+                <div key={item.id} className="p-4 rounded-xl cursor-pointer transition-all hover:ring-1 hover:ring-cyan-500/30"
+                  onClick={() => { if (hasStoryboard) { setViewingItem(item); setViewingSceneIdx(0); } }}
+                  style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
                   {/* Header */}
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
