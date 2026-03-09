@@ -259,30 +259,39 @@ export default function PilotDashboard({ onClose }: PilotDashboardProps) {
             selectedCampaignId ? (
               <ApprovalQueue
                 campaignId={selectedCampaignId}
-                campaignName={campaigns.find(c => c.id === selectedCampaignId)?.name || ''}
+                campaignName={selectedCampaignId === '__direct__' ? '직접 생성 콘텐츠' : (campaigns.find(c => c.id === selectedCampaignId)?.name || '')}
                 onBack={() => setSelectedCampaignId(null)}
               />
             ) : (
               <div>
                 <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>승인 대기열</h2>
-                {campaigns.length > 0 ? (
-                  <div className="space-y-2">
-                    {campaigns.filter(c => c.status === 'active').map(campaign => (
-                      <button key={campaign.id}
-                        onClick={() => setSelectedCampaignId(campaign.id)}
-                        className="w-full flex items-center justify-between rounded-lg border p-4 transition-all hover:shadow-md"
-                        style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
-                        <div className="text-left">
-                          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{campaign.name}</div>
-                          <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>생성 {campaign.total_generated} / 게시 {campaign.total_published}</div>
-                        </div>
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>→</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>활성 캠페인이 없습니다</p>
-                )}
+                <div className="space-y-2">
+                  {/* 직접 생성 콘텐츠 (캠페인 없이 콘텐츠 엔진에서 생성) */}
+                  <button
+                    onClick={() => setSelectedCampaignId('__direct__')}
+                    className="w-full flex items-center justify-between rounded-lg border p-4 transition-all hover:shadow-md"
+                    style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'rgba(8,145,178,0.3)' }}>
+                    <div className="text-left">
+                      <div className="text-sm font-medium" style={{ color: '#06b6d4' }}>직접 생성 콘텐츠</div>
+                      <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>콘텐츠 엔진에서 직접 생성한 스토리보드</div>
+                    </div>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>→</span>
+                  </button>
+
+                  {/* 캠페인별 대기열 */}
+                  {campaigns.filter(c => c.status === 'active').map(campaign => (
+                    <button key={campaign.id}
+                      onClick={() => setSelectedCampaignId(campaign.id)}
+                      className="w-full flex items-center justify-between rounded-lg border p-4 transition-all hover:shadow-md"
+                      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+                      <div className="text-left">
+                        <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{campaign.name}</div>
+                        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>생성 {campaign.total_generated} / 게시 {campaign.total_published}</div>
+                      </div>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>→</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )
           )}

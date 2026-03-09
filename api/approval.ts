@@ -68,6 +68,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ── 승인 대기 목록 ──
       case 'approval-list': {
         const { campaign_id } = params;
+
+        // __direct__: 캠페인 없이 직접 생성한 콘텐츠 조회
+        if (campaign_id === '__direct__') {
+          const { data, error } = await supabase
+            .from('c2gen_approval_queue')
+            .select('*')
+            .is('campaign_id', null)
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+          return res.json({ success: true, items: data || [] });
+        }
+
         if (!campaign_id) {
           return res.status(400).json({ success: false, message: 'campaign_id is required' });
         }
@@ -82,7 +95,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .from('c2gen_approval_queue')
           .select('*')
           .eq('campaign_id', campaign_id)
-          .eq('status', 'pending')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
