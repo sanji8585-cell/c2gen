@@ -393,7 +393,7 @@ export const generateVideo = async (
 ): Promise<VideoGenerationResult | null> => {
   // 옵션 기본값
   const enableSubtitles = options?.enableSubtitles ?? true;
-  const sceneGap = options?.sceneGap ?? 0.3; // 씬 간 기본 0.3초 간격
+  const sceneGap = options?.sceneGap ?? 0.4; // 씬 간 기본 0.4초 간격
   const config: SubtitleConfig = { ...DEFAULT_SUBTITLE_CONFIG, ...options?.subtitleConfig };
 
   // 해상도별 자막 크기 자동 스케일링 (720p 기준)
