@@ -14,6 +14,17 @@ import { generateMetadata } from '../metadataEngine';
 
 const API_URL = '/api/pilot/save-content';
 
+/**
+ * Ensure a value is a proper data URL.
+ * API responses often return raw base64 without the `data:...;base64,` prefix.
+ * Storage upload requires the full data URL format for MIME detection.
+ */
+function ensureDataUrl(value: string, defaultMime: string): string {
+  if (value.startsWith('data:') || value.startsWith('http')) return value;
+  // Raw base64 — wrap with the appropriate data URL prefix
+  return `data:${defaultMime};base64,${value}`;
+}
+
 function getToken(): string {
   const token = localStorage.getItem('c2gen_session_token');
   if (!token) throw new Error('No session token found — please log in');
@@ -114,6 +125,14 @@ export async function runSaveStep(
   for (const asset of assets) {
     let imageUrl = asset.imageUrl;
     let audioUrl = asset.audioUrl;
+
+    // Normalize raw base64 to data URL (APIs return raw base64 without prefix)
+    if (imageUrl && !imageUrl.startsWith('data:') && !imageUrl.startsWith('http')) {
+      imageUrl = ensureDataUrl(imageUrl, 'image/png');
+    }
+    if (audioUrl && !audioUrl.startsWith('data:') && !audioUrl.startsWith('http')) {
+      audioUrl = ensureDataUrl(audioUrl, 'audio/mpeg');
+    }
 
     // Upload image
     if (imageUrl && imageUrl.startsWith('data:')) {

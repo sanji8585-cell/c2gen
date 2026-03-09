@@ -108,6 +108,15 @@ function isRateLimitError(err: unknown): boolean {
   return false;
 }
 
+/** Check if an error is a voice-not-found (invalid voice_id) error. */
+function isVoiceNotFoundError(err: unknown): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return msg.includes('voice_not_found') || msg.includes('404') || msg.includes('voice not found');
+  }
+  return false;
+}
+
 // ── Single Scene TTS ──
 
 async function generateTtsForScene(
@@ -125,7 +134,8 @@ async function generateTtsForScene(
   if (!cleanedText) return;
 
   // 3. Select voice
-  const voiceId = scene.speakerVoiceId || LANGUAGE_CONFIG[language]?.defaultVoiceId;
+  const defaultVoiceId = LANGUAGE_CONFIG[language]?.defaultVoiceId;
+  let voiceId = scene.speakerVoiceId || defaultVoiceId;
 
   // 4. Get TTS speed from emotion
   const speed = getEmotionTtsPace(emotionMeta);
@@ -155,6 +165,15 @@ async function generateTtsForScene(
       lastError = new Error('ElevenLabs returned null audioData');
     } catch (err) {
       lastError = err;
+
+      // On voice_not_found/404, immediately switch to default voice and retry once
+      if (isVoiceNotFoundError(err) && voiceId !== defaultVoiceId && defaultVoiceId) {
+        console.warn(
+          `[ttsStep] Scene ${scene.sceneNumber}: voice_id "${voiceId}" not found, falling back to default voice "${defaultVoiceId}"`,
+        );
+        voiceId = defaultVoiceId;
+        continue;
+      }
 
       // On 429, wait before retrying
       if (isRateLimitError(err) && attempt < MAX_RETRIES) {
