@@ -28,6 +28,7 @@ GPT_STYLE_CATEGORIES.forEach(category => {
 
 interface InputSectionProps {
   onGenerate: (topic: string, referenceImages: ReferenceImages, sourceText: string | null) => void;
+  onGenerateAdvanced?: (topic: string, referenceImages: ReferenceImages, sourceText: string) => void;
   step: GenerationStep;
   bgmData: string | null;
   onBgmDataChange: (data: string | null) => void;
@@ -40,15 +41,16 @@ interface InputSectionProps {
 }
 
 const InputSection: React.FC<InputSectionProps> = ({
-  onGenerate, step,
+  onGenerate, onGenerateAdvanced, step,
   bgmData, onBgmDataChange,
   bgmVolume, onBgmVolumeChange,
   bgmDuckingEnabled, onBgmDuckingToggle,
   bgmDuckingAmount, onBgmDuckingAmountChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
+  const [activeTab, setActiveTab] = useState<'auto' | 'manual' | 'advanced'>('auto');
   const [topic, setTopic] = useState('');
   const [manualScript, setManualScript] = useState('');
+  const [advancedScript, setAdvancedScript] = useState('');
 
   // 참조 이미지 상태 분리 (캐릭터/스타일)
   const [characterRefImages, setCharacterRefImages] = useState<string[]>([]);
@@ -377,13 +379,18 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     if (activeTab === 'auto') {
       if (topic.trim()) onGenerate(topic, refImages, null);
-    } else {
+    } else if (activeTab === 'manual') {
       if (manualScript.trim()) {
         const autoTopic = manualScript.trim().split('\n')[0].slice(0, 50).trim() || '직접 입력 대본';
         onGenerate(autoTopic, refImages, manualScript);
       }
+    } else if (activeTab === 'advanced' && onGenerateAdvanced) {
+      if (advancedScript.trim()) {
+        const autoTopic = advancedScript.trim().split('\n')[0].slice(0, 50).trim() || '고급 대본';
+        onGenerateAdvanced(autoTopic, refImages, advancedScript);
+      }
     }
-  }, [isDisabled, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, onGenerate]);
+  }, [isDisabled, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, advancedScript, onGenerate, onGenerateAdvanced]);
 
   // --- Accordion summaries ---
   const imageSummary = useMemo(() => {
@@ -473,6 +480,8 @@ const InputSection: React.FC<InputSectionProps> = ({
         onManualScriptChange={setManualScript}
         onSubmit={handleSubmit}
         step={step}
+        advancedScript={advancedScript}
+        onAdvancedScriptChange={setAdvancedScript}
       />
 
       {/* Settings Divider */}

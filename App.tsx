@@ -563,6 +563,17 @@ const AppContent: React.FC<{
     }
   }, [checkApiKeyStatus, userCredits, userPlan, isAuthenticated, setShowAuthModal]);
 
+  // ── Engine V2.0: 고급 대본 전용 핸들러 ──
+  // Sprint 0: 수동 대본과 동일하게 동작 (래퍼)
+  // Sprint 1~5에서 디렉티브 파싱, 다중 음성, 일관성 모드 등 점진적 확장
+  const handleGenerateAdvanced = useCallback(async (
+    topic: string,
+    refImgs: ReferenceImages,
+    sourceText: string,
+  ) => {
+    await handleGenerate(topic, refImgs, sourceText);
+  }, [handleGenerate]);
+
   // ── Phase 2: 스크립트 승인 → 에셋 생성 ──
   const handleApproveScript = useCallback(async () => {
     if (isProcessingRef.current) return;
@@ -1468,6 +1479,7 @@ const AppContent: React.FC<{
       <main className="py-8">
         <InputSection
           onGenerate={handleGenerate}
+          onGenerateAdvanced={handleGenerateAdvanced}
           step={step}
           bgmData={bgmData}
           onBgmDataChange={setBgmData}
