@@ -195,6 +195,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
         }
 
+        // MERGE art_style and bgm_preferences with existing DB data to prevent overwriting
+        // (e.g., Step4 saves custom_prompt but shouldn't wipe situation_gallery)
+        if (updates.art_style || updates.bgm_preferences) {
+          const { data: currentPreset } = await supabase
+            .from('c2gen_brand_presets')
+            .select('art_style, bgm_preferences')
+            .eq('id', id)
+            .single();
+          if (currentPreset) {
+            if (updates.art_style) {
+              updates.art_style = { ...(currentPreset.art_style || {}), ...(updates.art_style as Record<string, unknown>) };
+            }
+            if (updates.bgm_preferences) {
+              updates.bgm_preferences = { ...(currentPreset.bgm_preferences || {}), ...(updates.bgm_preferences as Record<string, unknown>) };
+            }
+          }
+        }
+
         const { data, error } = await supabase
           .from('c2gen_brand_presets')
           .update(updates)

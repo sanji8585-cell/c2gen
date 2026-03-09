@@ -42,7 +42,8 @@ async function generateSituationGallery(
 
 async function generateSingleSituation(
   artStylePrompt: string,
-  scenarioLabel: string
+  scenarioLabel: string,
+  presetId?: string
 ): Promise<string | null> {
   const token = localStorage.getItem('c2gen_session_token') || '';
   const res = await fetch('/api/brand-preset', {
@@ -53,6 +54,7 @@ async function generateSingleSituation(
       token,
       art_style_prompt: artStylePrompt || 'Warm illustration style',
       scenarios: [scenarioLabel],
+      preset_id: presetId,
     }),
   });
   if (!res.ok) throw new Error('Situation generation failed');
@@ -103,7 +105,7 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
     setScenarioStates((prev) => ({ ...prev, [id]: { generating: true, done: false } }));
     try {
       const artPrompt = data.art_style?.custom_prompt || '';
-      const rawImage = await generateSingleSituation(artPrompt, scenario.label);
+      const rawImage = await generateSingleSituation(artPrompt, scenario.label, presetId);
       const imageData = rawImage?.startsWith('data:') ? base64ToBlobUrl(rawImage) : rawImage;
       setScenarioStates((prev) => ({ ...prev, [id]: { generating: false, done: true, imageData } }));
     } catch {
