@@ -1349,11 +1349,24 @@ const AppContent: React.FC<{
     updateAssetAt(idx, { status: 'generating' });
     setProgressMessage(`씬 ${idx + 1} 음성 재생성 중...`);
     try {
-      const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
-      const elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
+      let elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
+      let elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
+      // V2.0: 화자별 Voice ID + speed/stability 적용
+      let voiceIdForRegen: string | undefined;
+      const speakerDirective = sceneDirectivesRef.current[idx]?.SPEAKER || assetsRef.current[idx].analysis?.directives?.SPEAKER;
+      if (speakerDirective) {
+        try {
+          const cv = JSON.parse(localStorage.getItem('tubegen_character_voices') || '[]');
+          const matched = cv.find((v: any) => v.name === speakerDirective || speakerDirective.includes(v.name) || v.name.includes(speakerDirective))
+            || cv.find((v: any) => /남자|남성|male/i.test(speakerDirective) ? v.gender === 'male' : /여자|여성|female/i.test(speakerDirective) ? v.gender === 'female' : false);
+          if (matched?.voiceId) voiceIdForRegen = matched.voiceId;
+          if (matched?.speed !== undefined) elSpeed = matched.speed;
+          if (matched?.stability !== undefined) elStability = matched.stability;
+        } catch {}
+      }
       const result = await generateAudioWithElevenLabs(
         assetsRef.current[idx].narration,
-        undefined, undefined, undefined,
+        undefined, voiceIdForRegen, undefined,
         { speed: elSpeed, stability: elStability }
       );
       if (result.audioData && !isAbortedRef.current) {
