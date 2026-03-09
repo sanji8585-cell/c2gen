@@ -652,7 +652,13 @@ const AppContent: React.FC<{
     setIsAiAssisting(true);
     try {
       const language = localStorage.getItem('tubegen_language') || 'ko';
-      const result = await generateAdvancedScript(intent, settings, language);
+      // 화자 이름을 CharacterVoiceManager에서 읽어서 AI에게 전달
+      let characterNames: string[] = [];
+      try {
+        const voices = JSON.parse(localStorage.getItem('tubegen_character_voices') || '[]');
+        characterNames = voices.map((v: any) => v.name).filter(Boolean);
+      } catch {}
+      const result = await generateAdvancedScript(intent, { ...settings, characterNames } as any, language);
       setAiAssistResult(typeof result === 'string' ? result : (result as any).script || String(result));
     } catch (e) {
       console.warn('[AI Assist] Failed:', e);
@@ -707,7 +713,30 @@ const AppContent: React.FC<{
                       if (speakerDirective) {
                         try {
                           const characterVoices = JSON.parse(localStorage.getItem('tubegen_character_voices') || '[]');
-                          const matched = characterVoices.find((v: any) => v.name === speakerDirective);
+                          // 1차: 정확한 이름 매칭
+                          let matched = characterVoices.find((v: any) => v.name === speakerDirective);
+                          // 2차: 이름에 화자명이 포함되어 있는지 (부분 매칭)
+                          if (!matched) matched = characterVoices.find((v: any) =>
+                            speakerDirective.includes(v.name) || v.name.includes(speakerDirective)
+                          );
+                          // 3차: 성별 키워드로 매칭 (남자/남/male → gender male, 여자/여/female → gender female)
+                          if (!matched) {
+                            const isMale = /남자|남성|남|male|man|아빠|형|오빠|삼촌|할아버지/i.test(speakerDirective);
+                            const isFemale = /여자|여성|여|female|woman|엄마|언니|누나|이모|할머니/i.test(speakerDirective);
+                            if (isMale) matched = characterVoices.find((v: any) => v.gender === 'male');
+                            else if (isFemale) matched = characterVoices.find((v: any) => v.gender === 'female');
+                          }
+                          // 4차: 순서 기반 폴백 (첫번째 ≠ 현재 → 두번째 화자)
+                          if (!matched && characterVoices.length >= 2) {
+                            const prevSpeaker = i > 0 ? assetsRef.current[i - 1].analysis?.directives?.SPEAKER : null;
+                            if (prevSpeaker && prevSpeaker !== speakerDirective) {
+                              // 이전 씬과 다른 화자 → 이전 씬에서 안 쓴 voice 선택
+                              const prevMatched = characterVoices.find((v: any) => v.name === prevSpeaker || (prevSpeaker.includes(v.name) || v.name.includes(prevSpeaker)));
+                              matched = characterVoices.find((v: any) => v !== prevMatched) || characterVoices[1];
+                            } else {
+                              matched = characterVoices[0];
+                            }
+                          }
                           if (matched?.voiceId) {
                             voiceIdForScene = matched.voiceId;
                             matchedSpeakerName = matched.name;

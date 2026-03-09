@@ -603,7 +603,7 @@ Return ONLY the motion prompt, no explanation.`;
 - (배경: 설명) — 배경 장면
 - (분위기: 밝음/어두움/중립) — 이미지 톤
 - (구도: 클로즈업/미디엄샷/와이드샷/캐릭터없음) — 카메라 구도
-- (화자: 이름) — 해당 씬의 화자 (대화형일 때)
+- (화자: 이름) — 해당 씬의 화자 (대화형일 때). 아래 화자 이름 목록을 반드시 사용하세요.
 - (이전씬유지) — 이전 씬과 같은 배경 유지
 - (같은장소) — 이전 씬 배경만 유지
 - (시간경과) — 같은 장소 + 조명 변화
@@ -618,6 +618,7 @@ Return ONLY the motion prompt, no explanation.`;
 - 자연스럽고 몰입감 있는 대본 작성
 - 디렉티브는 적절히 배치 (매 씬마다 넣을 필요 없음)
 ${settingsText ? `\n## 사용자 설정\n${settingsText}` : ''}
+${settings.characterNames?.length ? `\n## 화자 이름 (반드시 이 이름만 사용)\n${settings.characterNames.map((n: string, i: number) => `- ${n}`).join('\n')}\n⚠️ (화자: ) 디렉티브에 위 이름을 정확히 그대로 사용하세요. 다른 이름을 만들지 마세요.` : ''}
 
 ## 사용자 의도
 ${userIntent}
