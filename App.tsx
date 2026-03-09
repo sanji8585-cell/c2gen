@@ -545,9 +545,22 @@ const AppContent: React.FC<{
       }
       if (isAbortedRef.current) return;
       
-      const initialAssets = scriptScenes.map(scene => ({
-        ...scene, imageData: null, audioData: null, audioDuration: null, subtitleData: null, videoData: null, videoDuration: null, status: 'pending' as const
-      }));
+      const initialAssets = scriptScenes.map((scene, i) => {
+        // sentiment 기반 줌 이펙트 자동 적용
+        const sentiment = scene.analysis?.sentiment;
+        const motionType = scene.analysis?.motion_type;
+        let zoomEffect: GeneratedAsset['zoomEffect'];
+        if (sentiment === 'POSITIVE') {
+          zoomEffect = 'zoomIn';
+        } else if (sentiment === 'NEGATIVE') {
+          zoomEffect = motionType === '동적' ? (i % 2 === 0 ? 'panLeft' : 'panRight') : 'none';
+        } else {
+          zoomEffect = motionType === '동적' ? (i % 2 === 0 ? 'panLeft' : 'panRight') : 'zoomIn';
+        }
+        return {
+          ...scene, imageData: null, audioData: null, audioDuration: null, subtitleData: null, videoData: null, videoDuration: null, status: 'pending' as const, zoomEffect,
+        };
+      });
       assetsRef.current = initialAssets;
       setGeneratedData(initialAssets);
 
