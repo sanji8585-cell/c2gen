@@ -119,8 +119,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.json({ audio_base64: null, alignment: null, error: 'API key not configured' });
         }
 
-        const voiceId = (req.headers['x-custom-voice-id'] as string)
-          || params.voiceId
+        // params.voiceId가 명시적으로 전달되면 우선 사용 (V2.0 화자별 TTS)
+        const voiceId = params.voiceId
+          || (req.headers['x-custom-voice-id'] as string)
           || process.env.ELEVENLABS_VOICE_ID
           || '21m00Tcm4TlvDq8ikWAM'; // Rachel default
 
