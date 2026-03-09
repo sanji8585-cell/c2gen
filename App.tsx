@@ -39,6 +39,7 @@ import CreditShop from './components/CreditShop';
 import UserProfile from './components/UserProfile';
 import PaymentSuccess from './components/PaymentSuccess';
 import PilotDashboard from './components/PilotDashboard';
+import LandingPage from './components/landing/LandingPage';
 import * as FileSaver from 'file-saver';
 
 const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
@@ -60,10 +61,12 @@ const App: React.FC = () => {
   );
 };
 
-// 라우팅 (관리자/일반 분기)
+// 라우팅 (관리자/일반/랜딩 분기)
 const AppRouter: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = ({ isDark, onToggleTheme }) => {
   const auth = useAuth();
-  const isAdminPath = window.location.pathname === '/admin';
+  const pathname = window.location.pathname;
+  const isAdminPath = pathname === '/admin';
+  const isAppPath = pathname.startsWith('/app');
 
   if (auth.isAdmin && auth.adminToken) {
     return <AdminDashboard adminToken={auth.adminToken} onLogout={auth.handleAdminLogout} />;
@@ -71,6 +74,24 @@ const AppRouter: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = ({ i
   if (isAdminPath) {
     return <AuthGate onSuccess={auth.handleAuthSuccess} onAdminSuccess={auth.handleAdminSuccess} mode="page" initialTab="admin" />;
   }
+
+  // 로그인 상태에서 / 접속 → /app 리다이렉트
+  if (!isAppPath && auth.isAuthenticated) {
+    window.history.replaceState(null, '', '/app');
+  }
+
+  // 비로그인 + / 경로 → 랜딩페이지
+  if (!isAppPath && !auth.isAuthenticated) {
+    return (
+      <>
+        <LandingPage isDark={isDark} onToggleTheme={onToggleTheme} onOpenAuth={() => auth.setShowAuthModal(true)} />
+        {auth.showAuthModal && (
+          <AuthModal onSuccess={auth.handleAuthSuccess} onAdminSuccess={auth.handleAdminSuccess} onClose={() => auth.setShowAuthModal(false)} />
+        )}
+      </>
+    );
+  }
+
   return <AppContent isDark={isDark} onToggleTheme={onToggleTheme} />;
 };
 
@@ -588,43 +609,40 @@ const AppContent: React.FC<{
     refImgs: ReferenceImages,
     sourceText: string,
   ) => {
-    // 원본 소스 텍스트에서 문장별 디렉티브를 미리 파싱 (Gemini가 제거할 수 있으므로)
-    const sourceLines = sourceText.split(/(?<=[.!?。])\s*/).filter(s => s.trim());
-    const preParseMap = sourceLines.map(line => parseDirectives(line));
+    // ── 핵심: 디렉티브를 Gemini에 보내지 않는다 ──
+    // 1단계: 원본 문장별로 디렉티브 추출 + 정제된 텍스트 생성
+    const sourceLines = sourceText.split(/\n+/).map(s => s.trim()).filter(Boolean);
+    const parsedLines = sourceLines.map(line => parseDirectives(line));
+    const cleanSourceText = parsedLines.map(p => p.cleanNarration).join('\n');
 
-    // 기존 수동 대본 플로우로 위임 (스크립트 생성)
-    await handleGenerate(topic, refImgs, sourceText);
+    // 2단계: 정제된 텍스트(디렉티브 제거)만 Gemini에 전달
+    await handleGenerate(topic, refImgs, cleanSourceText);
 
     // handleGenerate가 정상 완료(SCRIPT_REVIEW)했는지 확인
     if (!pendingGenContextRef.current || assetsRef.current.length === 0) return;
 
-    // 각 씬에 디렉티브 적용: Gemini 응답에서 파싱 시도 → 실패 시 원본 매칭
+    // 3단계: Gemini가 반환한 씬에 사전 추출한 디렉티브를 재합체
+    console.log('[Advanced] 원본 문장:', sourceLines.length, '| Gemini 씬:', assetsRef.current.length);
+    console.log('[Advanced] 추출된 디렉티브:', parsedLines.map((p, i) => ({ line: i, directives: p.directives, raw: p.rawDirectives })));
     const updated = assetsRef.current.map((asset, idx) => {
-      // 1차: Gemini 응답 narration에서 직접 파싱
-      const { cleanNarration, directives, rawDirectives } = parseDirectives(asset.narration);
+      // Gemini 응답 narration에도 혹시 남아있을 수 있는 디렉티브 정리
+      const { cleanNarration, directives: geminiDirectives, rawDirectives } = parseDirectives(asset.narration);
 
-      if (rawDirectives.length > 0) {
-        // Gemini가 디렉티브를 유지한 경우 — 직접 파싱 결과 사용
-        return {
-          ...asset,
-          narration: cleanNarration,
-          analysis: { ...asset.analysis, directives },
-        };
-      }
+      // 원본에서 추출한 디렉티브 (우선) + Gemini 응답에 남은 디렉티브 (보조)
+      const sourceDirectives = idx < parsedLines.length ? parsedLines[idx].directives : {};
+      const mergedDirectives = { ...geminiDirectives, ...sourceDirectives };
+      const hasAnyDirective = Object.keys(mergedDirectives).length > 0;
 
-      // 2차: 원본 소스 텍스트의 같은 인덱스 문장에서 디렉티브 복원
-      if (idx < preParseMap.length && preParseMap[idx].rawDirectives.length > 0) {
-        return {
-          ...asset,
-          narration: asset.narration, // Gemini가 이미 정제한 나레이션 유지
-          analysis: { ...asset.analysis, directives: preParseMap[idx].directives },
-        };
-      }
+      if (!hasAnyDirective) return asset;
 
-      return asset;
+      return {
+        ...asset,
+        narration: rawDirectives.length > 0 ? cleanNarration : asset.narration,
+        analysis: { ...asset.analysis, directives: mergedDirectives },
+      };
     });
 
-    // 연결 디렉티브 처리 (프롬프트 레벨 일관성) — 항상 적용
+    // 연결 디렉티브 처리 (프롬프트 레벨 일관성)
     const hasConnectionDirectives = updated.some(a =>
       a.analysis?.directives?.KEEP_PREV || a.analysis?.directives?.SAME_PLACE || a.analysis?.directives?.TIME_PASS
     );
@@ -737,12 +755,13 @@ const AppContent: React.FC<{
                               matched = characterVoices[0];
                             }
                           }
-                          if (matched?.voiceId) {
+                              if (matched?.voiceId) {
                             voiceIdForScene = matched.voiceId;
                             matchedSpeakerName = matched.name;
                             matchedSpeakerColor = matched.color;
                           }
-                        } catch {}
+                          console.log(`[TTS] 씬 ${i + 1}: SPEAKER="${speakerDirective}" → matched=${matched?.name || 'NONE'} voiceId=${voiceIdForScene || 'DEFAULT'}`);
+                        } catch (e) { console.warn('[TTS] Voice lookup error:', e); }
                       }
 
                       const elResult = await generateAudioWithElevenLabs(
