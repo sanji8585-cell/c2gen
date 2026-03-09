@@ -482,3 +482,48 @@ export const CONFIG = {
     VIDEO_DURATION: 5        // 생성 영상 길이 (초) - PixVerse v5.5
   }
 };
+
+// ══════════════════════════════════════════
+// Engine V2.0 — 디렉티브 매핑 테이블
+// ══════════════════════════════════════════
+
+/** 다국어 디렉티브 키 → 내부 키 */
+export const DIRECTIVE_KEY_MAP: Record<string, string> = {
+  // 한국어
+  '구도': 'COMPOSITION', '분위기': 'MOOD', '배경': 'BACKGROUND',
+  '스타일': 'STYLE', '텍스트': 'TEXT', '카메라': 'CAMERA',
+  '색상': 'COLOR', '화자': 'SPEAKER',
+  '이전씬유지': 'KEEP_PREV', '같은장소': 'SAME_PLACE', '시간경과': 'TIME_PASS',
+  // English
+  'composition': 'COMPOSITION', 'mood': 'MOOD', 'background': 'BACKGROUND',
+  'style': 'STYLE', 'text': 'TEXT', 'camera': 'CAMERA',
+  'color': 'COLOR', 'speaker': 'SPEAKER',
+  'keep-prev': 'KEEP_PREV', 'same-place': 'SAME_PLACE', 'time-pass': 'TIME_PASS',
+  // 日本語
+  '構図': 'COMPOSITION', '雰囲気': 'MOOD', '背景': 'BACKGROUND',
+  'スタイル': 'STYLE', 'テキスト': 'TEXT', 'カメラ': 'CAMERA',
+  '色': 'COLOR', '話者': 'SPEAKER',
+  '前シーン維持': 'KEEP_PREV', '同じ場所': 'SAME_PLACE', '時間経過': 'TIME_PASS',
+};
+
+/** 다국어 구도 값 → 내부 값 */
+export const COMPOSITION_VALUE_MAP: Record<string, string> = {
+  '클로즈업': 'MACRO', 'close-up': 'MACRO', 'クローズアップ': 'MACRO',
+  '미디엄샷': 'STANDARD', 'medium': 'STANDARD', 'ミディアム': 'STANDARD',
+  '와이드샷': 'MICRO', 'wide': 'MICRO', 'ワイド': 'MICRO',
+  '캐릭터없음': 'NO_CHAR', 'no-char': 'NO_CHAR', 'キャラなし': 'NO_CHAR',
+};
+
+/** 다국어 분위기 값 → 내부 값 */
+export const MOOD_VALUE_MAP: Record<string, string> = {
+  '밝음': 'POSITIVE', 'bright': 'POSITIVE', '明るい': 'POSITIVE',
+  '어두움': 'NEGATIVE', 'dark': 'NEGATIVE', '暗い': 'NEGATIVE',
+  '중립': 'NEUTRAL', 'neutral': 'NEUTRAL', '中立': 'NEUTRAL',
+};
+
+/** Gemini TTS 폴백 음성 매핑 */
+export const GEMINI_VOICE_MAP: Record<string, Record<string, string>> = {
+  ko: { male: 'Charon', female: 'Kore' },
+  en: { male: 'Fenrir', female: 'Aoede' },
+  ja: { male: 'Charon', female: 'Kore' },
+};

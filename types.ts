@@ -15,6 +15,29 @@ export const DEFAULT_REFERENCE_IMAGES: ReferenceImages = {
   styleStrength: 70
 };
 
+// ── Engine V2.0 디렉티브 시스템 ──
+
+export interface SceneDirectives {
+  COMPOSITION?: 'MICRO' | 'STANDARD' | 'MACRO' | 'NO_CHAR';
+  MOOD?: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+  BACKGROUND?: string;
+  STYLE?: string;
+  TEXT?: string;
+  CAMERA?: string;
+  COLOR?: string;
+  SPEAKER?: string;
+  KEEP_PREV?: boolean;
+  SAME_PLACE?: boolean;
+  TIME_PASS?: boolean;
+}
+
+export interface CharacterVoice {
+  name: string;
+  voiceId: string;
+  color: string;
+  gender?: 'male' | 'female';
+}
+
 export interface SceneAnalysis {
   composition_type: 'MICRO' | 'STANDARD' | 'MACRO';
   composition_explanation: string; // 구도_설명
@@ -51,6 +74,7 @@ export interface SceneAnalysis {
   motion_type: '정적' | '동적';
   motion_detail: string; // 동작디테일
   sentiment?: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'; // 감정 (선택적)
+  directives?: SceneDirectives;
 }
 
 export interface ScriptScene {
@@ -119,7 +143,11 @@ export interface GeneratedAsset extends ScriptScene {
   zoomEffect?: 'zoomIn' | 'zoomOut' | 'panLeft' | 'panRight' | 'none'; // 씬별 줌/팬 효과 (기본: zoomIn)
   transition?: 'crossfade' | 'fadeBlack' | 'wipeLeft' | 'wipeRight' | 'none'; // 씬 전환 효과 (이 씬→다음 씬, 기본: none)
   audioMuted?: boolean; // 음성 뮤트 (영상만 사용하는 연장 씬에 사용)
+  speakerName?: string;
+  speakerColor?: string;
 }
+
+export type ScriptMode = 'auto' | 'manual' | 'advanced';
 
 export enum GenerationStep {
   IDLE = 'IDLE',
