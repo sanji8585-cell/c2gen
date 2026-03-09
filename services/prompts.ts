@@ -4,6 +4,8 @@
  * - 미사용 코드 제거
  */
 
+import { SceneDirectives } from '../types';
+
 // 캐릭터 기본 설명 (화풍 없을 때 기본값)
 export const VAR_BASE_CHAR = `A realistic person with natural proportions, detailed facial features, and appropriate clothing for the scene context.`;
 
@@ -89,12 +91,12 @@ export function getColorPaletteHint(sentiment: string, narration: string): strin
 /**
  * 최종 이미지 프롬프트 생성
  */
-export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = false, artStylePrompt?: string, suppressKorean?: boolean) => {
+export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = false, artStylePrompt?: string, suppressKorean?: boolean, directives?: SceneDirectives) => {
   const basePrompt = scene.visualPrompt || "";
   const analysis = scene.analysis || {};
-  const keywords = scene.visual_keywords || "";
-  const type = analysis.composition_type || "STANDARD";
-  const sentiment = analysis.sentiment || "NEUTRAL";
+  const keywords = directives?.TEXT || scene.visual_keywords || "";
+  const type = directives?.COMPOSITION || analysis.composition_type || "STANDARD";
+  const sentiment = directives?.MOOD || analysis.sentiment || "NEUTRAL";
 
   // 한글 억제 규칙
   const koreanRule = suppressKorean
@@ -110,7 +112,8 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
   const colorHint = getColorPaletteHint(sentiment, scene.narration || '');
 
   // 캐릭터 (화풍 적용)
-  const styleNote = artStylePrompt ? ` Render in ${artStylePrompt} style.` : '';
+  const effectiveStyle = directives?.STYLE || artStylePrompt;
+  const styleNote = effectiveStyle ? ` Render in ${effectiveStyle} style.` : '';
   const charPrompt = type === 'NO_CHAR'
     ? `NO CHARACTER - objects/text only.${styleNote}`
     : hasCharacterRef
@@ -118,8 +121,8 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
     : `Person (${type === 'MICRO' ? '5-15% of frame' : type === 'MACRO' ? '60-80% close-up' : '30-40% medium shot'}).${styleNote}`;
 
   // 스타일
-  const style = artStylePrompt
-    ? `STYLE: 16:9, ${artStylePrompt}.`
+  const style = effectiveStyle
+    ? `STYLE: 16:9, ${effectiveStyle}.`
     : `STYLE: 16:9, 2D hand-drawn, crayon texture.`;
 
   const char = hasCharacterRef
@@ -129,6 +132,9 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
   const sections = [
     `[SCENE INTENT]\n${basePrompt}`,
     `[EMOTION & ATMOSPHERE]\nMOOD: ${mood}\n${colorHint}`,
+    directives?.BACKGROUND ? `[BACKGROUND]\nSetting: ${directives.BACKGROUND}` : '',
+    directives?.CAMERA ? `[CAMERA]\nCamera angle: ${directives.CAMERA}` : '',
+    directives?.COLOR ? `[COLOR]\nDominant color emphasis: ${directives.COLOR}` : '',
     `[CHARACTER]\n${charPrompt}\n${char}`,
     keywords ? `[ON-SCREEN TEXT]\nTEXT: "${keywords}"` : '',
     `[STYLE]\n${style}`,
