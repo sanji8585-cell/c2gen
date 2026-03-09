@@ -63,7 +63,7 @@ const FeaturesSection: React.FC = () => {
                   key={feature.key}
                   className="md:col-span-2 rounded-2xl p-[1.5px]"
                   style={{
-                    background: 'linear-gradient(135deg, var(--color-brand-500), #22d3ee)',
+                    background: 'linear-gradient(135deg, #0ea5e9, #22d3ee)',
                     opacity: isVisible ? 1 : 0,
                     transform: isVisible ? 'translateY(0)' : 'translateY(28px)',
                     transition: `all 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}s`,

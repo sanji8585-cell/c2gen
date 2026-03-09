@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useScrollReveal } from '../../hooks/useScrollReveal';
 
 const SAMPLES = [
-  { id: 1, genre: '\uACBD\uC81C', genreEn: 'Economy', minutes: 3, gradient: 'from-blue-500 to-cyan-400' },
-  { id: 2, genre: '\uD14C\uD06C', genreEn: 'Tech', minutes: 4, gradient: 'from-purple-500 to-pink-400' },
-  { id: 3, genre: '\uC5EC\uD589', genreEn: 'Travel', minutes: 5, gradient: 'from-green-500 to-emerald-400' },
-  { id: 4, genre: '\uAD50\uC721', genreEn: 'Education', minutes: 3, gradient: 'from-orange-500 to-yellow-400' },
-  { id: 5, genre: '\uBE44\uC988\uB2C8\uC2A4', genreEn: 'Business', minutes: 2, gradient: 'from-red-500 to-rose-400' },
-  { id: 6, genre: '\uB77C\uC774\uD504', genreEn: 'Life', minutes: 4, gradient: 'from-indigo-500 to-violet-400' },
+  { id: 1, title: 'AI 경제 브리핑', titleEn: 'AI Economy Brief', genre: '\uACBD\uC81C', genreEn: 'Economy', minutes: 3, gradient: 'from-blue-500 to-cyan-400' },
+  { id: 2, title: '테크 리뷰 2026', titleEn: 'Tech Review 2026', genre: '\uD14C\uD06C', genreEn: 'Tech', minutes: 4, gradient: 'from-purple-500 to-pink-400' },
+  { id: 3, title: '세계 여행 가이드', titleEn: 'World Travel Guide', genre: '\uC5EC\uD589', genreEn: 'Travel', minutes: 5, gradient: 'from-green-500 to-emerald-400' },
+  { id: 4, title: 'AI 트렌드 분석', titleEn: 'AI Trend Analysis', genre: '\uAD50\uC721', genreEn: 'Education', minutes: 3, gradient: 'from-orange-500 to-yellow-400' },
+  { id: 5, title: '스타트업 뉴스', titleEn: 'Startup News', genre: '\uBE44\uC988\uB2C8\uC2A4', genreEn: 'Business', minutes: 2, gradient: 'from-red-500 to-rose-400' },
+  { id: 6, title: '건강 습관 TOP 5', titleEn: 'Top 5 Health Habits', genre: '\uB77C\uC774\uD504', genreEn: 'Life', minutes: 4, gradient: 'from-indigo-500 to-violet-400' },
 ] as const;
 
 const GallerySection: React.FC = () => {
@@ -119,7 +119,7 @@ const GallerySection: React.FC = () => {
                       className="text-sm font-medium"
                       style={{ color: 'var(--text-primary)' }}
                     >
-                      {isKo ? sample.genre : sample.genreEn}
+                      {isKo ? sample.title : sample.titleEn}
                     </span>
                     <span
                       className="text-xs"
@@ -142,16 +142,16 @@ const GallerySection: React.FC = () => {
             transition: 'opacity 0.7s ease 0.9s',
           }}
         >
-          <a
-            href="/app"
-            className="inline-flex items-center gap-2 text-sm font-semibold transition-colors duration-200"
-            style={{ color: 'var(--color-brand-500, #0ea5e9)' }}
+          <button
+            onClick={() => document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' })}
+            className="inline-flex items-center gap-2 text-sm font-semibold transition-colors duration-200 bg-transparent border-none cursor-pointer"
+            style={{ color: '#0ea5e9' }}
           >
             {t('landing.gallery.moreExamples')}
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
-          </a>
+          </button>
         </div>
       </div>
     </section>

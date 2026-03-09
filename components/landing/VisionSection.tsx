@@ -61,11 +61,10 @@ const VisionSection: React.FC = () => {
           {BLOCKS.map((block, i) => (
             <div
               key={block.key}
-              className="p-8 sm:p-10"
+              className={`p-8 sm:p-10 ${i < BLOCKS.length - 1 ? 'border-b md:border-b-0 md:border-r' : ''}`}
               style={{
                 backgroundColor: 'var(--bg-surface)',
-                borderRight: i < BLOCKS.length - 1 ? '1px solid var(--border-default)' : undefined,
-                borderBottom: i < BLOCKS.length - 1 ? '1px solid var(--border-default)' : undefined,
+                borderColor: 'var(--border-default)',
               }}
             >
               <div

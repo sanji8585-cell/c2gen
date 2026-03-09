@@ -14,6 +14,7 @@ const CTAFooterSection: React.FC<CTAFooterSectionProps> = ({ onOpenAuth }) => {
     <>
       {/* CTA Block */}
       <section
+        id="cta"
         ref={ref}
         className="relative py-24 sm:py-32 px-6 overflow-hidden"
         style={{
@@ -91,14 +92,16 @@ const CTAFooterSection: React.FC<CTAFooterSectionProps> = ({ onOpenAuth }) => {
             {/* Links */}
             <div className="flex items-center gap-6">
               <a
-                href="/terms"
+                href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-sm transition-colors duration-200 hover:underline"
                 style={{ color: 'var(--text-secondary)' }}
               >
                 {t('landing.footer.terms')}
               </a>
               <a
-                href="/privacy"
+                href="#"
+                onClick={(e) => e.preventDefault()}
                 className="text-sm transition-colors duration-200 hover:underline"
                 style={{ color: 'var(--text-secondary)' }}
               >
