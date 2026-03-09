@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { ApprovalQueueItem, ApprovalStatus } from '../types';
+import type { ApprovalQueueItem, ApprovalStatus, GeneratedAsset } from '../types';
 import { listPendingItems, approveItem, rejectItem, bulkApprove } from '../services/approvalQueueService';
+import PreviewPlayer from './PreviewPlayer';
 
 interface ApprovalQueueProps {
   campaignId: string;
@@ -24,6 +25,7 @@ export default function ApprovalQueue({ campaignId, campaignName, onBack }: Appr
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [viewingItem, setViewingItem] = useState<ApprovalQueueItem | null>(null);
   const [viewingSceneIdx, setViewingSceneIdx] = useState(0);
+  const [showPreview, setShowPreview] = useState(false);
 
   const loadItems = useCallback(async () => {
     try {
@@ -103,6 +105,44 @@ export default function ApprovalQueue({ campaignId, campaignName, onBack }: Appr
 
   useEffect(() => { return () => { audioRef.current?.pause(); }; }, []);
 
+  // ── Convert PILOT assets to GeneratedAsset[] for PreviewPlayer ──
+  function toGeneratedAssets(item: ApprovalQueueItem): GeneratedAsset[] {
+    const cd = item.content_data as Record<string, any>;
+    const assets = (cd?.assets || []) as Array<any>;
+    const scenes = (cd?.scenes || []) as Array<any>;
+    return assets.map((a: any, i: number) => ({
+      sceneNumber: a.sceneNumber || i + 1,
+      narration: scenes[i]?.narration || a.narration || '',
+      visualPrompt: scenes[i]?.visualPrompt || '',
+      imageData: null,
+      imageUrl: a.imageUrl || null,
+      audioData: null,
+      audioUrl: a.audioUrl || null,
+      audioDuration: a.audioDuration || null,
+      subtitleData: a.subtitleData || null,
+      videoData: null,
+      videoDuration: null,
+      status: 'completed' as const,
+    }));
+  }
+
+  // ── PreviewPlayer (full video preview) ──
+  if (showPreview && viewingItem) {
+    const previewAssets = toGeneratedAssets(viewingItem);
+    const vcd = viewingItem.content_data as Record<string, any>;
+    return (
+      <PreviewPlayer
+        assets={previewAssets}
+        sceneGap={0.3}
+        bgmData={vcd?.bgmUrl || null}
+        bgmVolume={0.25}
+        bgmDuckingEnabled={true}
+        bgmDuckingAmount={0.3}
+        onClose={() => setShowPreview(false)}
+      />
+    );
+  }
+
   // ── Storyboard Detail Viewer ──
   if (viewingItem) {
     const vcd = viewingItem.content_data as Record<string, any>;
@@ -121,10 +161,17 @@ export default function ApprovalQueue({ campaignId, campaignName, onBack }: Appr
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{vcd?.topic || '스토리보드'}</h2>
             {vMeta?.title && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{vMeta.title}</p>}
           </div>
-          <button onClick={() => { setViewingItem(null); setViewingSceneIdx(0); audioRef.current?.pause(); }}
-            className="px-4 py-2 rounded-lg text-sm font-medium" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-elevated)' }}>
-            닫기
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowPreview(true)}
+              className="px-4 py-2 rounded-lg text-sm font-medium"
+              style={{ background: 'linear-gradient(135deg, #0891b2, #2563eb)', color: '#fff' }}>
+              ▶ 영상 프리뷰
+            </button>
+            <button onClick={() => { setViewingItem(null); setViewingSceneIdx(0); audioRef.current?.pause(); }}
+              className="px-4 py-2 rounded-lg text-sm font-medium" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-elevated)' }}>
+              닫기
+            </button>
+          </div>
         </div>
 
         {/* Main content */}
