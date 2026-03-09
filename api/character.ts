@@ -436,14 +436,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const storageUrl = await uploadToStorage(supabase, origUpload, `characters/${character_id}/original-${Date.now()}`);
           if (storageUrl) origUpload = storageUrl;
         }
-        const mergedSheet = {
-          ...existingSheet,
-          ...referenceSheet,
+        // Build clean sheet: only URLs, no base64, no old data
+        const mergedSheet: Record<string, unknown> = {
           original_upload: origUpload,
+          front: referenceSheet.front,
+          angle_45: referenceSheet.angle_45,
+          side: referenceSheet.side,
+          full_body: referenceSheet.full_body,
         };
-        // Log what's being saved
-        const sheetSummary = Object.entries(mergedSheet).map(([k, v]) => `${k}: ${typeof v === 'string' ? (v.startsWith('http') ? 'URL' : v.startsWith('data:') ? 'base64' : v?.slice(0, 20)) : v}`);
-        console.log('[generate-sheet] Saving reference_sheet:', sheetSummary);
+        // Strip any remaining base64 values
+        for (const [k, v] of Object.entries(mergedSheet)) {
+          if (typeof v === 'string' && v.startsWith('data:')) {
+            console.warn(`[generate-sheet] WARNING: ${k} still base64, stripping`);
+            delete mergedSheet[k];
+          }
+        }
+        console.log('[generate-sheet] Saving:', Object.entries(mergedSheet).map(([k, v]) => `${k}: ${v ? 'OK' : 'null'}`));
 
         const updatePayload: Record<string, unknown> = {
           reference_sheet: mergedSheet,
