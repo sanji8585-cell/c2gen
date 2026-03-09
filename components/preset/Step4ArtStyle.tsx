@@ -1,6 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { BrandPreset, ArtStyleConfig } from '../../types';
 import { GEMINI_STYLE_CATEGORIES } from '../../config';
+
+// Convert base64 data URL to blob URL to avoid 414 URI Too Long errors
+function base64ToBlobUrl(dataUrl: string): string {
+  try {
+    const [header, data] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+    const bytes = atob(data);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    const blob = new Blob([arr], { type: mime });
+    return URL.createObjectURL(blob);
+  } catch {
+    return dataUrl; // fallback
+  }
+}
 
 interface Step4Props {
   data: Partial<BrandPreset>;
@@ -77,7 +92,8 @@ export default function Step4ArtStyle({ data, onUpdate, presetId: _presetId }: S
         id: String.fromCharCode(65 + i),
         label: labels[i] || `변형 ${String.fromCharCode(65 + i)}`,
         stylePrompt: v.style_prompt,
-        imageData: v.image_data || null,
+        // Convert base64 to blob URL immediately to avoid 414/ERR_BLOCKED issues
+        imageData: v.image_data?.startsWith('data:') ? base64ToBlobUrl(v.image_data) : (v.image_data || null),
       }));
       setVariants(newVariants);
     } catch (err) {

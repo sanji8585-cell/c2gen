@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { BrandPreset, CharacterProfile } from '../../types';
 import { createCharacter, deleteCharacter, listCharacters, generateReferenceSheet } from '../../services/characterService';
+
+function base64ToBlobUrl(dataUrl: string): string {
+  try {
+    const [header, data] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+    const bytes = atob(data);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    return URL.createObjectURL(new Blob([arr], { type: mime }));
+  } catch { return dataUrl; }
+}
 import { designCharacterVoice } from '../../services/elevenLabsService';
 
 interface Step3Props {
@@ -97,17 +108,53 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
   const syncCharacters = useCallback(
     (chars: CharacterProfile[]) => {
       setCharacters(chars);
-      onUpdate({ character_profiles: chars });
+      // Sync to parent, but strip large base64 data to avoid 413 errors
+      onUpdate({
+        character_profiles: chars.map(c => ({
+          id: c.id,
+          name: c.name,
+          char_role: c.char_role || 'main',
+          image_type: c.image_type || (c as any).type || 'mascot',
+          species: c.species,
+          personality: c.personality || '',
+          appearance: c.appearance || { base_prompt: '', expression_range: [] },
+          distinction_tags: c.distinction_tags || [],
+          reference_sheet: {
+            original_upload: c.reference_sheet?.original_upload?.startsWith?.('data:') ? '[uploaded]' : c.reference_sheet?.original_upload,
+            multi_angle: {
+              front: c.reference_sheet?.multi_angle?.front ? '[generated]' : undefined,
+              angle_45: c.reference_sheet?.multi_angle?.angle_45 ? '[generated]' : undefined,
+              side: c.reference_sheet?.multi_angle?.side ? '[generated]' : undefined,
+              full_body: c.reference_sheet?.multi_angle?.full_body ? '[generated]' : undefined,
+            },
+          },
+          voice_id: c.voice_id,
+        })) as CharacterProfile[],
+      });
     },
     [onUpdate]
   );
 
+  // Load characters from API when component mounts or presetId changes
+  // Always fetch from DB as source of truth, not from wizardData
   useEffect(() => {
     if (!presetId) return;
+    let cancelled = false;
     listCharacters(presetId)
-      .then((chars) => syncCharacters(chars))
+      .then((chars) => {
+        if (!cancelled) {
+          // Map API field names: API returns `type`, component uses `image_type`
+          const mapped = chars.map((c: any) => ({
+            ...c,
+            image_type: c.image_type || c.type || 'mascot',
+          }));
+          syncCharacters(mapped);
+        }
+      })
       .catch(() => {});
-  }, [presetId, syncCharacters]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -143,7 +190,9 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
         voice_id: form.selected_voice_id || undefined,
       };
       const created = await createCharacter(charData);
-      syncCharacters([...characters, created]);
+      // Ensure image_type is mapped from API's `type` field
+      const mappedCreated = { ...created, image_type: created.image_type || (created as any).type || form.image_type };
+      syncCharacters([...characters, mappedCreated]);
       setForm({ ...emptyForm });
       setShowForm(false);
     } catch (err) {
@@ -211,7 +260,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
             const hasSheetImages = Object.keys(multiAngle).length > 0 && Object.values(multiAngle).some(Boolean);
             const ANGLE_LABELS: Record<string, string> = {
               front: '정면',
-              '45deg': '45도',
+              angle_45: '45도',
               side: '측면',
               full_body: '전신',
             };
@@ -231,9 +280,9 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                     className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center"
                     style={{ background: 'var(--bg-elevated)' }}
                   >
-                    {char.reference_sheet?.original_upload ? (
+                    {char.reference_sheet?.original_upload && char.reference_sheet.original_upload !== '[uploaded]' ? (
                       <img
-                        src={char.reference_sheet.original_upload}
+                        src={char.reference_sheet.original_upload.startsWith('data:') ? base64ToBlobUrl(char.reference_sheet.original_upload) : char.reference_sheet.original_upload}
                         alt={char.name}
                         className="w-full h-full object-cover"
                       />
@@ -264,7 +313,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                           color: 'var(--text-muted)',
                         }}
                       >
-                        {IMAGE_TYPE_OPTIONS.find((t) => t.value === char.image_type)?.label}
+                        {IMAGE_TYPE_OPTIONS.find((t) => t.value === (char.image_type || (char as any).type))?.label}
                       </span>
                     </div>
                     {char.species && (
@@ -274,8 +323,8 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                     )}
                   </div>
 
-                  {/* Reference Sheet Button */}
-                  {hasOriginalUpload && (
+                  {/* Reference Sheet Button — show if has original upload OR already generated */}
+                  {(hasOriginalUpload || hasSheetImages) && (
                     <button
                       onClick={() => handleGenerateSheet(char.id)}
                       disabled={isSheetLoading}
@@ -296,7 +345,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                           생성 중...
                         </>
                       ) : (
-                        <>레퍼런스 시트 생성 <span style={{ opacity: 0.8 }}>(32 크레딧)</span></>
+                        <>{hasSheetImages ? '재생성' : '레퍼런스 시트 생성'} <span style={{ opacity: 0.8 }}>(32 크레딧)</span></>
                       )}
                     </button>
                   )}
@@ -321,7 +370,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                       레퍼런스 시트
                     </p>
                     <div className="grid grid-cols-2 gap-2">
-                      {['front', '45deg', 'side', 'full_body'].map((angle) => (
+                      {['front', 'angle_45', 'side', 'full_body'].map((angle) => (
                         multiAngle[angle] ? (
                           <div
                             key={angle}
@@ -329,7 +378,7 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                             style={{ border: '1px solid var(--border-subtle)' }}
                           >
                             <img
-                              src={multiAngle[angle]}
+                              src={multiAngle[angle]?.startsWith('data:') ? base64ToBlobUrl(multiAngle[angle]) : multiAngle[angle]}
                               alt={`${char.name} - ${ANGLE_LABELS[angle]}`}
                               className="w-full object-cover"
                               style={{ aspectRatio: '1/1' }}
@@ -562,14 +611,20 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                   setForm((f) => ({ ...f, voiceLoading: true, voice_variants: [], selected_voice_id: '' }));
                   try {
                     const result = await designCharacterVoice(form.voice_description.trim());
-                    const variants = result.variants.map((v, i) => ({
+                    if (!result.variants || result.variants.length === 0) {
+                      alert('음성 생성에 실패했습니다. 다른 설명으로 다시 시도해주세요.');
+                      setForm((f) => ({ ...f, voiceLoading: false }));
+                      return;
+                    }
+                    const variants = result.variants.map((v: { voice_id: string; preview_url: string; name: string }, i: number) => ({
                       voice_id: v.voice_id,
                       preview_url: v.preview_url,
                       name: v.name || `변형 ${String.fromCharCode(65 + i)}`,
                     }));
                     setForm((f) => ({ ...f, voice_variants: variants, voiceLoading: false }));
-                  } catch (err) {
-                    console.error('Voice design failed:', err);
+                  } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : '음성 생성 실패';
+                    alert(msg);
                     setForm((f) => ({ ...f, voiceLoading: false }));
                   }
                 }}

@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { BrandPreset, PresetWizardStep, PresetWizardData } from '../../types';
-import { createPreset, updatePreset } from '../../services/brandPresetService';
+import { createPreset, updatePreset, getPreset } from '../../services/brandPresetService';
 import Step1BasicInfo from './Step1BasicInfo';
 import Step2ToneVoice from './Step2ToneVoice';
 import Step3Characters from './Step3Characters';
@@ -28,7 +28,9 @@ const initialWizardData: PresetWizardData = {
 };
 
 export default function PresetWizard({ onClose, onComplete, editPreset, channelId }: PresetWizardProps) {
-  const [currentStep, setCurrentStep] = useState<PresetWizardStep>(1);
+  const [currentStep, setCurrentStep] = useState<PresetWizardStep>(
+    editPreset?.wizard_step ? Math.min(editPreset.wizard_step, 6) as PresetWizardStep : 1
+  );
   const [wizardData, setWizardData] = useState<PresetWizardData>(() => {
     if (editPreset) {
       return { ...initialWizardData, ...editPreset, currentStep: (editPreset.wizard_step || 1) as PresetWizardStep };
@@ -41,6 +43,19 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
 
   const isEditing = !!editPreset;
 
+  // Load full preset data from API on edit (prop data may lack character images)
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (editPreset?.id && !loadedRef.current) {
+      loadedRef.current = true;
+      getPreset(editPreset.id).then(fullPreset => {
+        if (fullPreset) {
+          setWizardData(prev => ({ ...prev, ...fullPreset, currentStep: prev.currentStep }));
+        }
+      }).catch(() => {});
+    }
+  }, [editPreset?.id]);
+
   const handleUpdate = useCallback((partial: Partial<PresetWizardData>) => {
     setWizardData(prev => ({ ...prev, ...partial }));
   }, []);
@@ -51,6 +66,31 @@ export default function PresetWizard({ onClose, onComplete, editPreset, channelI
     try {
       const payload: Partial<BrandPreset> = { ...wizardData, wizard_step: currentStep };
       delete (payload as Record<string, unknown>).currentStep;
+
+      // Strip large base64 data to avoid 413 Content Too Large on Vercel
+      // Character images are stored separately via character API
+      if (payload.character_profiles) {
+        payload.character_profiles = payload.character_profiles.map(cp => ({
+          ...cp,
+          reference_sheet: {
+            ...cp.reference_sheet,
+            original_upload: undefined,
+            multi_angle: {
+              front: cp.reference_sheet?.multi_angle?.front ? '[stored]' : undefined,
+              angle_45: cp.reference_sheet?.multi_angle?.angle_45 ? '[stored]' : undefined,
+              side: cp.reference_sheet?.multi_angle?.side ? '[stored]' : undefined,
+              full_body: cp.reference_sheet?.multi_angle?.full_body ? '[stored]' : undefined,
+            },
+          },
+        }));
+      }
+
+      // Strip style preview images (base64)
+      if (payload.style_preview_images) {
+        payload.style_preview_images = (payload.style_preview_images as string[]).map(img =>
+          img.startsWith('data:') ? '[preview_stored]' : img
+        );
+      }
 
       if (!presetId) {
         if (channelId) payload.channel_id = channelId;

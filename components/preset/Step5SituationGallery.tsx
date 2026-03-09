@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import type { BrandPreset } from '../../types';
 
+function base64ToBlobUrl(dataUrl: string): string {
+  try {
+    const [header, data] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+    const bytes = atob(data);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    return URL.createObjectURL(new Blob([arr], { type: mime }));
+  } catch { return dataUrl; }
+}
+
 interface Step5Props {
   data: Partial<BrandPreset>;
   onUpdate: (data: Partial<BrandPreset>) => void;
@@ -74,7 +85,8 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
     if (!scenario) return;
     setScenarioStates((prev) => ({ ...prev, [id]: { generating: true, done: false } }));
     try {
-      const imageData = await generateSingleSituation(presetId, id, scenario.label);
+      const rawImage = await generateSingleSituation(presetId, id, scenario.label);
+      const imageData = rawImage?.startsWith('data:') ? base64ToBlobUrl(rawImage) : rawImage;
       setScenarioStates((prev) => ({ ...prev, [id]: { generating: false, done: true, imageData } }));
     } catch (err) {
       console.error('Situation generation failed:', err);
@@ -101,7 +113,7 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
         doneStates[s.id] = {
           generating: false,
           done: true,
-          imageData: images[s.id] || undefined,
+          imageData: images[s.id]?.startsWith('data:') ? base64ToBlobUrl(images[s.id]) : (images[s.id] || undefined),
         };
       });
       setScenarioStates(doneStates);

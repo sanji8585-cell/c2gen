@@ -36,6 +36,7 @@ export default function Step2ToneVoice({ data, onUpdate, presetId: _presetId }: 
     (data.tone_reference_texts || []).join('\n\n---\n\n')
   );
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(
     data.tone_learned_patterns || null
   );
@@ -49,6 +50,7 @@ export default function Step2ToneVoice({ data, onUpdate, presetId: _presetId }: 
   const handleAnalyze = async () => {
     if (!referenceText.trim()) return;
     setAnalyzing(true);
+    setAnalyzeError(null);
     try {
       const texts = referenceText
         .split(/---/)
@@ -61,7 +63,8 @@ export default function Step2ToneVoice({ data, onUpdate, presetId: _presetId }: 
         tone_learned_patterns: result,
       });
     } catch (err) {
-      console.error('Tone analysis failed:', err);
+      const msg = err instanceof Error ? err.message : '톤 분석에 실패했습니다. 다시 시도해주세요.';
+      setAnalyzeError(msg);
     } finally {
       setAnalyzing(false);
     }
@@ -261,6 +264,20 @@ export default function Step2ToneVoice({ data, onUpdate, presetId: _presetId }: 
               'AI 분석 시작'
             )}
           </button>
+
+          {/* Analysis Error */}
+          {analyzeError && (
+            <div
+              className="p-3 rounded-lg text-sm"
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#ef4444',
+              }}
+            >
+              {analyzeError}
+            </div>
+          )}
 
           {/* Analysis Result */}
           {analysisResult && (

@@ -54,12 +54,12 @@ async function getItemWithOwnership(
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { action, sessionToken, ...params } = req.body;
+  const { action, token, ...params } = req.body;
 
   try {
     const supabase = getSupabase();
 
-    const email = await getSessionEmail(supabase, sessionToken);
+    const email = await getSessionEmail(supabase, token);
     if (!email) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }

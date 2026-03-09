@@ -39,5 +39,8 @@ export async function deleteCharacter(id: string): Promise<void> {
 }
 
 export async function generateReferenceSheet(characterId: string, presetId: string): Promise<{ multi_angle: Record<string, string> }> {
-  return apiCall('character-generate-sheet', { character_id: characterId, brand_preset_id: presetId });
+  const data = await apiCall('character-generate-sheet', { character_id: characterId, brand_preset_id: presetId });
+  // API returns { character: { reference_sheet: { front, angle_45, side, full_body } } }
+  const sheet = data.character?.reference_sheet || {};
+  return { multi_angle: sheet };
 }

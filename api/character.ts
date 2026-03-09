@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { GoogleGenAI, Modality } from '@google/genai';
 
 // ── Shared utilities (inlined for Vercel serverless compatibility) ──
 
@@ -251,14 +252,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await deductCredits(supabase, email, 32, `Reference sheet: ${character.name}`);
 
         // Gemini setup
-        const { GoogleGenAI, Modality } = require('@google/genai');
+        // GoogleGenAI, Modality imported at top
         const geminiKey = process.env.GEMINI_API_KEY;
         if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
         const ai = new GoogleGenAI({ apiKey: geminiKey });
 
         // Prepare original image part (if available)
-        const originalImagePart = character.original_upload_url
-          ? buildImagePart(character.original_upload_url)
+        // Image may be in original_upload_url column OR inside reference_sheet JSONB
+        const originalUrl = character.original_upload_url
+          || character.reference_sheet?.original_upload
+          || null;
+        const originalImagePart = originalUrl
+          ? buildImagePart(originalUrl)
           : null;
 
         // Style analysis for mascot type

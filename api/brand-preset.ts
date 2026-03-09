@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { GoogleGenAI, Modality } from '@google/genai';
 
 // ── Shared utilities (inlined for Vercel serverless compatibility) ──
 
@@ -128,6 +129,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
         updates.updated_at = new Date().toISOString();
+
+        // Safety: strip any base64 data from character_profiles before saving
+        if (updates.character_profiles && Array.isArray(updates.character_profiles)) {
+          updates.character_profiles = (updates.character_profiles as any[]).map((cp: any) => {
+            if (cp.reference_sheet) {
+              const sheet = { ...cp.reference_sheet };
+              // Remove base64 data URLs
+              if (sheet.original_upload?.startsWith('data:')) sheet.original_upload = '[uploaded]';
+              if (sheet.multi_angle) {
+                for (const key of Object.keys(sheet.multi_angle)) {
+                  if (typeof sheet.multi_angle[key] === 'string' && sheet.multi_angle[key].startsWith('data:')) {
+                    sheet.multi_angle[key] = '[generated]';
+                  }
+                }
+              }
+              return { ...cp, reference_sheet: sheet };
+            }
+            return cp;
+          });
+        }
+
+        // Strip base64 style preview images
+        if (updates.style_preview_images && Array.isArray(updates.style_preview_images)) {
+          updates.style_preview_images = (updates.style_preview_images as string[]).map(img =>
+            typeof img === 'string' && img.startsWith('data:') ? '[preview_stored]' : img
+          );
+        }
 
         const { data, error } = await supabase
           .from('c2gen_brand_presets')
@@ -297,7 +325,7 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
           ? style_variants
           : defaultVariants;
 
-        const { GoogleGenAI, Modality } = require('@google/genai');
+        // GoogleGenAI, Modality imported at top
         const ai = new GoogleGenAI({ apiKey: geminiKey });
 
         const results: Array<{ style_prompt: string; image_data: string | null }> = [];
@@ -357,7 +385,7 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
           ? customScenarios
           : defaultScenarios;
 
-        const { GoogleGenAI, Modality } = require('@google/genai');
+        // GoogleGenAI, Modality imported at top
         const ai = new GoogleGenAI({ apiKey: geminiKey });
 
         const gallery: Array<{ scenario: string; image_data: string | null }> = [];
