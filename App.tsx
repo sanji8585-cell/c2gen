@@ -75,14 +75,8 @@ const AppRouter: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = ({ i
     return <AuthGate onSuccess={auth.handleAuthSuccess} onAdminSuccess={auth.handleAdminSuccess} mode="page" initialTab="admin" />;
   }
 
-  // 로그인 상태에서 / 접속 → /app 리다이렉트 (쿼리 파라미터 유지)
-  if (!isAppPath && auth.isAuthenticated) {
-    const search = window.location.search;
-    window.history.replaceState(null, '', '/app' + search);
-  }
-
-  // 비로그인 + / 경로 → 랜딩페이지
-  if (!isAppPath && !auth.isAuthenticated) {
+  // /landing 경로 → 랜딩페이지 미리보기 (임시)
+  if (pathname === '/landing') {
     return (
       <>
         <LandingPage isDark={isDark} onToggleTheme={onToggleTheme} onOpenAuth={() => auth.setShowAuthModal(true)} />
@@ -655,6 +649,10 @@ const AppContent: React.FC<{
       assetsRef.current = updated;
       setGeneratedData([...updated]);
     }
+
+    // V2.0 디버그: 디렉티브 저장 직후 확인
+    console.log('[Advanced] 디렉티브 저장 완료. 씬별 SPEAKER:',
+      assetsRef.current.map((a, i) => `씬${i+1}=${a.analysis?.directives?.SPEAKER || 'NONE'}`).join(', '));
   }, [handleGenerate]);
 
   // ── Engine V2.0: 고급 대본 전용 에셋 생성 ──
@@ -690,6 +688,16 @@ const AppContent: React.FC<{
   const handleApproveScript = useCallback(async () => {
     if (isProcessingRef.current) return;
     if (!pendingGenContextRef.current) return;
+
+    // V2.0 디버그: 디렉티브 존재 여부 확인
+    console.log('[ApproveScript] 씬 수:', assetsRef.current.length);
+    assetsRef.current.forEach((a, i) => {
+      const d = a.analysis?.directives;
+      if (d && Object.keys(d).length > 0) console.log(`[ApproveScript] 씬 ${i+1} directives:`, d);
+    });
+    if (!assetsRef.current.some(a => a.analysis?.directives && Object.keys(a.analysis.directives).length > 0)) {
+      console.warn('[ApproveScript] ⚠️ 디렉티브가 없음! assetsRef가 덮어쓰기 된 것으로 추정');
+    }
 
     isProcessingRef.current = true;
     isAbortedRef.current = false;
