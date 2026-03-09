@@ -4,6 +4,44 @@ import { GoogleGenAI, Modality } from '@google/genai';
 
 // ── Shared utilities (inlined for Vercel serverless compatibility) ──
 
+// Upload base64 image to Supabase Storage and return public URL
+async function uploadImageToStorage(
+  supabase: ReturnType<typeof createClient>,
+  base64DataUrl: string,
+  path: string
+): Promise<string | null> {
+  try {
+    const match = base64DataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    const ext = mimeType.split('/')[1] || 'png';
+    const fullPath = `${path}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('preset-images')
+      .upload(fullPath, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('[uploadImageToStorage] error:', error.message);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('preset-images')
+      .getPublicUrl(fullPath);
+
+    return urlData?.publicUrl || null;
+  } catch (err) {
+    console.error('[uploadImageToStorage] exception:', err);
+    return null;
+  }
+}
+
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
@@ -375,33 +413,42 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
           }
         }
 
-        // Save preview images to preset DB if preset_id provided
+        // Upload images to Supabase Storage and save URLs
         if (preset_id) {
-          const previewImages = results
-            .filter(r => r.image_data)
-            .map(r => r.image_data as string);
-          if (previewImages.length > 0) {
-            // Save as JSONB in art_style.preview_results for re-display
-            const { data: currentPreset } = await supabase
-              .from('c2gen_brand_presets')
-              .select('art_style')
-              .eq('id', preset_id)
-              .single();
-            const currentArtStyle = currentPreset?.art_style || {};
-            await supabase
-              .from('c2gen_brand_presets')
-              .update({
-                art_style: {
-                  ...currentArtStyle,
-                  preview_results: results.map(r => ({
-                    style_prompt: r.style_prompt,
-                    has_image: !!r.image_data,
-                  })),
-                },
-                style_preview_images: previewImages,
-              })
-              .eq('id', preset_id);
+          const imageUrls: string[] = [];
+          for (let i = 0; i < results.length; i++) {
+            if (results[i].image_data) {
+              const url = await uploadImageToStorage(
+                supabase,
+                results[i].image_data as string,
+                `presets/${preset_id}/style-preview-${i}-${Date.now()}`
+              );
+              if (url) {
+                imageUrls.push(url);
+                results[i].image_data = url; // Replace base64 with URL in response too
+              }
+            }
           }
+
+          const { data: currentPreset } = await supabase
+            .from('c2gen_brand_presets')
+            .select('art_style')
+            .eq('id', preset_id)
+            .single();
+          const currentArtStyle = currentPreset?.art_style || {};
+          await supabase
+            .from('c2gen_brand_presets')
+            .update({
+              art_style: {
+                ...currentArtStyle,
+                preview_results: results.map(r => ({
+                  style_prompt: r.style_prompt,
+                  image_url: typeof r.image_data === 'string' && r.image_data.startsWith('http') ? r.image_data : null,
+                })),
+              },
+              style_preview_images: imageUrls.length > 0 ? imageUrls : undefined,
+            })
+            .eq('id', preset_id);
         }
 
         return res.json({ variants: results });
@@ -466,12 +513,21 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
           }
         }
 
-        // Save gallery images to preset DB if preset_id provided
+        // Upload gallery images to Supabase Storage and save URLs
         if (galleryPresetId) {
-          const galleryData = gallery.map(g => ({
-            scenario: g.scenario,
-            image_data: g.image_data,
-          }));
+          for (let i = 0; i < gallery.length; i++) {
+            if (gallery[i].image_data?.startsWith('data:')) {
+              const url = await uploadImageToStorage(
+                supabase,
+                gallery[i].image_data as string,
+                `presets/${galleryPresetId}/gallery-${i}-${Date.now()}`
+              );
+              if (url) {
+                gallery[i].image_data = url; // Replace base64 with URL
+              }
+            }
+          }
+
           const { data: currentPreset } = await supabase
             .from('c2gen_brand_presets')
             .select('art_style')
@@ -483,13 +539,40 @@ ${texts.map((t: string, i: number) => `--- Text ${i + 1} ---\n${t}`).join('\n\n'
             .update({
               art_style: {
                 ...currentArtStyle,
-                situation_gallery: galleryData,
+                situation_gallery: gallery.map(g => ({
+                  scenario: g.scenario,
+                  image_data: g.image_data, // Now URLs, not base64
+                })),
               },
             })
             .eq('id', galleryPresetId);
         }
 
         return res.json({ gallery });
+      }
+
+      // ── BGM 오디오 업로드 to Storage ──
+      case 'upload-bgm': {
+        const email = await getSessionEmail(supabase, token);
+        if (!email) return res.status(401).json({ error: 'Invalid session' });
+
+        const { preset_id: bgmPresetId, audio_base64, sample_index } = params;
+        if (!bgmPresetId || !audio_base64) {
+          return res.status(400).json({ error: 'preset_id and audio_base64 are required' });
+        }
+
+        const dataUrl = `data:audio/mpeg;base64,${audio_base64}`;
+        const url = await uploadImageToStorage(
+          supabase,
+          dataUrl,
+          `presets/${bgmPresetId}/bgm-sample-${sample_index || 0}-${Date.now()}`
+        );
+
+        if (!url) {
+          return res.status(500).json({ error: 'Failed to upload BGM to storage' });
+        }
+
+        return res.json({ url });
       }
 
       default:

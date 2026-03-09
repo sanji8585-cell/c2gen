@@ -73,15 +73,17 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize variants from saved preview images if available
+  // Initialize variants from saved preview images (now URLs from Supabase Storage)
   const savedImages = data.style_preview_images || [];
   const savedPreviews = (artStyle as any).preview_results || [];
   const initialVariants: PreviewVariant[] = savedImages.length > 0
     ? savedImages.map((img: string, i: number) => ({
         id: String.fromCharCode(65 + i),
         label: `변형 ${String.fromCharCode(65 + i)}`,
-        stylePrompt: savedPreviews[i]?.style_prompt || '',
-        imageData: img?.startsWith('data:') ? base64ToBlobUrl(img) : (img || null),
+        stylePrompt: savedPreviews[i]?.style_prompt || savedPreviews[i]?.image_url ? '' : '',
+        imageData: img && img !== '[saved]'
+          ? (img.startsWith('data:') ? base64ToBlobUrl(img) : img) // URL or blob
+          : (savedPreviews[i]?.image_url || null),
       }))
     : [
         { id: 'A', label: '변형 A', stylePrompt: '', imageData: null },
@@ -135,27 +137,43 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
   return (
     <div className="flex flex-col gap-5">
       {/* Show previously selected style */}
-      {savedPrompt && !selectedVariant && (
-        <div
-          className="rounded-xl p-4"
-          style={{ background: 'var(--bg-elevated)', border: '2px solid #0891b2' }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2">
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
-            <span className="text-sm font-semibold" style={{ color: '#0891b2' }}>
-              현재 선택된 화풍
-            </span>
+      {savedPrompt && !selectedVariant && (() => {
+        // Find the saved preview image that matches the selected prompt
+        const matchingPreview = savedPreviews.find((p: any) => p.style_prompt === savedPrompt);
+        const matchingIdx = savedPreviews.findIndex((p: any) => p.style_prompt === savedPrompt);
+        const savedImageUrl = matchingPreview?.image_url || (matchingIdx >= 0 ? savedImages[matchingIdx] : null);
+        const displayUrl = savedImageUrl && savedImageUrl !== '[saved]' ? savedImageUrl : null;
+
+        return (
+          <div
+            className="rounded-xl p-4"
+            style={{ background: 'var(--bg-elevated)', border: '2px solid #0891b2' }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              <span className="text-sm font-semibold" style={{ color: '#0891b2' }}>
+                현재 선택된 화풍
+              </span>
+            </div>
+            {displayUrl && (
+              <img
+                src={displayUrl.startsWith('data:') ? base64ToBlobUrl(displayUrl) : displayUrl}
+                alt="선택된 화풍"
+                className="w-full rounded-lg object-cover mb-3"
+                style={{ maxHeight: 200 }}
+              />
+            )}
+            <p className="text-sm px-1" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>
+              {savedPrompt}
+            </p>
+            <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+              변경하려면 아래에서 새 프리뷰를 생성하거나 직접 스타일을 선택하세요.
+            </p>
           </div>
-          <p className="text-sm px-1" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>
-            {savedPrompt}
-          </p>
-          <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
-            변경하려면 아래에서 새 프리뷰를 생성하거나 직접 스타일을 선택하세요.
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Header */}
       <div>

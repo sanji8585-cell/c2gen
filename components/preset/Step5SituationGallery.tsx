@@ -79,7 +79,7 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
   const initStates: ScenarioState = {};
   SCENARIOS.forEach((s, i) => {
     const saved = savedGallery[i];
-    if (saved?.image_data) {
+    if (saved?.image_data && saved.image_data !== '[saved]') {
       initStates[s.id] = {
         generating: false,
         done: true,

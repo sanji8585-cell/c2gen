@@ -43,7 +43,7 @@ const inputStyle: React.CSSProperties = {
 
 const moodKeys = Object.keys(BGM_MOODS) as BgmMood[];
 
-export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetId }: Step6Props) {
+export default function Step6BgmPreferences({ data, onUpdate, presetId }: Step6Props) {
   const raw = data.bgm_preferences || {};
   const prefs: BgmPreferences = {
     genre: raw.genre || '',
@@ -51,13 +51,36 @@ export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetI
     tempo_range: { min: raw.tempo_range?.min ?? 80, max: raw.tempo_range?.max ?? 120 },
     custom_prompt: raw.custom_prompt || '',
   };
-  const [bgmSamples, setBgmSamples] = useState<Array<{ audio: string; prompt: string }>>([]);
+
+  // Load saved BGM samples from bgm_preferences
+  const savedSamples: Array<{ audio: string; prompt: string }> = ((raw as any).saved_samples || [])
+    .map((s: any) => ({ audio: s.audio_url || s.audio || '', prompt: s.prompt || '' }))
+    .filter((s: any) => s.audio);
+  const [bgmSamples, setBgmSamples] = useState<Array<{ audio: string; prompt: string }>>(savedSamples);
   const [bgmLoading, setBgmLoading] = useState(false);
   const [bgmError, setBgmError] = useState<string | null>(null);
-  const [selectedBgmIndex, setSelectedBgmIndex] = useState<number | null>(null);
+  const savedSelectedIdx = (raw as any).selected_sample_index;
+  const [selectedBgmIndex, setSelectedBgmIndex] = useState<number | null>(
+    typeof savedSelectedIdx === 'number' ? savedSelectedIdx : null
+  );
 
   const updatePrefs = (updates: Partial<BgmPreferences>) => {
     onUpdate({ bgm_preferences: { ...prefs, ...updates } });
+  };
+
+  // Save BGM samples to bgm_preferences for persistence
+  const saveBgmToPreset = (samples: Array<{ audio: string; prompt: string }>, selIdx: number | null) => {
+    onUpdate({
+      bgm_preferences: {
+        ...prefs,
+        saved_samples: samples.map(s => ({
+          audio_url: s.audio.startsWith('http') ? s.audio : undefined,
+          audio: s.audio.startsWith('http') ? undefined : s.audio,
+          prompt: s.prompt,
+        })),
+        selected_sample_index: selIdx,
+      } as any,
+    });
   };
 
   const handleSampleGenerate = async () => {
@@ -67,9 +90,34 @@ export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetI
       const result = await generateBrandBgm(prefs, 30000);
       const audioData = (result as any).audio_base64 || (result as any).audioBase64;
       if (!audioData) throw new Error((result as any).error || 'BGM 오디오 데이터를 받지 못했습니다.');
-      // Build prompt description for display
+
+      // Upload audio to Supabase Storage via brand-preset API
+      let audioUrl = `data:audio/mpeg;base64,${audioData}`;
+      if (presetId) {
+        try {
+          const token = localStorage.getItem('c2gen_session_token') || '';
+          const uploadRes = await fetch('/api/brand-preset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'upload-bgm',
+              token,
+              preset_id: presetId,
+              audio_base64: audioData,
+              sample_index: bgmSamples.length,
+            }),
+          });
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            if (uploadData.url) audioUrl = uploadData.url;
+          }
+        } catch { /* fallback to base64 */ }
+      }
+
       const promptDesc = [prefs.genre, prefs.mood, `${Math.round((prefs.tempo_range.min + prefs.tempo_range.max) / 2)} BPM`, prefs.custom_prompt].filter(Boolean).join(', ');
-      setBgmSamples((prev) => [...prev, { audio: audioData, prompt: promptDesc }]);
+      const newSamples = [...bgmSamples, { audio: audioUrl, prompt: promptDesc }];
+      setBgmSamples(newSamples);
+      saveBgmToPreset(newSamples, selectedBgmIndex);
     } catch (err) {
       setBgmError(err instanceof Error ? err.message : 'BGM 생성에 실패했습니다.');
     } finally {
@@ -294,14 +342,17 @@ export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetI
                   </p>
                   <audio
                     controls
-                    src={`data:audio/mpeg;base64,${sample.audio}`}
+                    src={sample.audio.startsWith('http') || sample.audio.startsWith('data:') ? sample.audio : `data:audio/mpeg;base64,${sample.audio}`}
                     className="w-full"
                     style={{ height: 32 }}
                     preload="none"
                   />
                 </div>
                 <button
-                  onClick={() => setSelectedBgmIndex(idx)}
+                  onClick={() => {
+                    setSelectedBgmIndex(idx);
+                    saveBgmToPreset(bgmSamples, idx);
+                  }}
                   className="px-3 py-1.5 rounded-lg text-[12px] font-medium shrink-0 transition-all"
                   style={{
                     background: isSelected
