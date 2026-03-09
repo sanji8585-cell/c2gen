@@ -15,6 +15,7 @@ import { generateImage, getSelectedImageModel } from './services/imageService';
 import { generateAudioWithElevenLabs, generateMusicWithElevenLabs } from './services/elevenLabsService';
 import { generateVideo } from './services/videoService';
 import { generateVideoFromImage } from './services/falService';
+import { parseDirectives } from './services/directiveParser';
 // projectService는 useProjectManagement 훅으로 이동
 import { useGameState } from './hooks/useGameState';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -571,7 +572,27 @@ const AppContent: React.FC<{
     refImgs: ReferenceImages,
     sourceText: string,
   ) => {
+    // Sprint 1: 기존 수동 대본 플로우로 위임 (스크립트 생성)
     await handleGenerate(topic, refImgs, sourceText);
+
+    // 스크립트 생성 완료 후, 각 씬의 narration에서 디렉티브 파싱
+    // handleGenerate가 assetsRef를 채운 후 SCRIPT_REVIEW 단계에서 실행됨
+    if (assetsRef.current.length > 0) {
+      const updated = assetsRef.current.map(asset => {
+        const { cleanNarration, directives, rawDirectives } = parseDirectives(asset.narration);
+        if (rawDirectives.length === 0) return asset; // 디렉티브 없으면 원본 유지
+        return {
+          ...asset,
+          narration: cleanNarration,
+          analysis: {
+            ...asset.analysis,
+            directives,
+          },
+        };
+      });
+      assetsRef.current = updated;
+      setGeneratedData([...updated]);
+    }
   }, [handleGenerate]);
 
   // ── Phase 2: 스크립트 승인 → 에셋 생성 ──

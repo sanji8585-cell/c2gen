@@ -326,7 +326,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const hasCharacterRef = referenceImages?.character?.length > 0;
         const hasStyleRef = referenceImages?.style?.length > 0;
         const geminiStylePrompt = hasStyleRef ? undefined : resolveStylePrompt(styleId, customStylePrompt);
-        const basePrompt = getFinalVisualPrompt(scene, hasCharacterRef, geminiStylePrompt, suppressKorean);
+        const basePrompt = getFinalVisualPrompt(scene, hasCharacterRef, geminiStylePrompt, suppressKorean, scene?.analysis?.directives);
 
         const characterStrength = referenceImages?.characterStrength ?? 70;
         const styleStrength = referenceImages?.styleStrength ?? 70;
