@@ -116,6 +116,8 @@ const AppContent: React.FC<{
   // 갤러리 뷰 관련
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab === 'pilot') return 'pilot';
     return urlParams.has('post') ? 'playground' : 'main';
   });
   const projectMgmt = useProjectManagement();
@@ -576,9 +578,12 @@ const AppContent: React.FC<{
     // Sprint 1: 기존 수동 대본 플로우로 위임 (스크립트 생성)
     await handleGenerate(topic, refImgs, sourceText);
 
+    // handleGenerate가 정상 완료(SCRIPT_REVIEW)했는지 확인
+    // 인증 실패, 크레딧 부족, 중단 등으로 조기 리턴 시 파싱 스킵
+    if (!pendingGenContextRef.current || assetsRef.current.length === 0) return;
+
     // 스크립트 생성 완료 후, 각 씬의 narration에서 디렉티브 파싱
-    // handleGenerate가 assetsRef를 채운 후 SCRIPT_REVIEW 단계에서 실행됨
-    if (assetsRef.current.length > 0) {
+    {
       const updated = assetsRef.current.map(asset => {
         const { cleanNarration, directives, rawDirectives } = parseDirectives(asset.narration);
         if (rawDirectives.length === 0) return asset; // 디렉티브 없으면 원본 유지

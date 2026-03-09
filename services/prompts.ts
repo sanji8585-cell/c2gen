@@ -126,8 +126,8 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
     : `STYLE: 16:9, 2D hand-drawn, crayon texture.`;
 
   const char = hasCharacterRef
-    ? `CHARACTER: Match reference image.${styleNote}`
-    : `CHARACTER: ${VAR_BASE_CHAR}${styleNote}`;
+    ? `CHARACTER: Match reference image.`
+    : `CHARACTER: ${VAR_BASE_CHAR}`;
 
   const sections = [
     `[SCENE INTENT]\n${basePrompt}`,

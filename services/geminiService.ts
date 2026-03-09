@@ -267,7 +267,8 @@ export const generateAdvancedScript = async (
   },
   language: string = 'ko',
 ): Promise<string> => {
-  return callGeminiProxy('generateAdvancedScript', { userIntent, settings, language });
+  const result = await callGeminiProxy('generateAdvancedScript', { userIntent, settings, language });
+  return result?.script ?? (typeof result === 'string' ? result : '');
 };
 
 /** 분위기 분석 (BGM 자동 선택용) */

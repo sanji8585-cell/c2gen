@@ -43,11 +43,11 @@ export function parseDirectives(narration: string): ParseResult {
       value = value.replace(/^["']|["']$/g, '');
     } else {
       // 플래그 (값 없음): (이전씬유지), (같은장소), (시간경과)
-      key = inner.trim();
+      key = inner.trim().toLowerCase();
       value = '';
     }
 
-    // DIRECTIVE_KEY_MAP에서 내부 키 조회 (대소문자 무시용으로 lowercase 시도)
+    // DIRECTIVE_KEY_MAP에서 내부 키 조회 (원본 키 → lowercase 키 순서)
     const internalKey = DIRECTIVE_KEY_MAP[key] || DIRECTIVE_KEY_MAP[inner.trim()];
 
     if (!internalKey) {
@@ -99,36 +99,37 @@ export function propagateSceneContext(scenes: Array<{ visualPrompt: string; anal
   return scenes.map((scene, idx) => {
     const directives = scene.analysis?.directives;
 
-    // 현재 씬에 BACKGROUND 디렉티브가 있으면 배경 정보 업데이트
+    // 이전 씬 배경을 스냅샷 (현재 씬 업데이트 전에 캡처)
+    const prevBgSnapshot = prevBackground;
+
+    // 현재 씬의 배경 정보를 다음 씬용으로 업데이트
     if (directives?.BACKGROUND) {
       prevBackground = directives.BACKGROUND;
     } else if (idx === 0 || (!directives?.KEEP_PREV && !directives?.SAME_PLACE && !directives?.TIME_PASS)) {
-      // 첫 씬이거나 연결 디렉티브 없으면 visualPrompt에서 배경 추출 시도
-      // 간단한 휴리스틱: visualPrompt 전체를 배경 컨텍스트로 보존
       prevBackground = scene.visualPrompt || '';
     }
 
     if (idx === 0) return scene;
 
-    // 연결 디렉티브 처리
-    if (directives?.KEEP_PREV && prevBackground) {
+    // 연결 디렉티브 처리 (스냅샷 사용 — 이전 씬의 배경)
+    if (directives?.KEEP_PREV && prevBgSnapshot) {
       return {
         ...scene,
-        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same setting as previous scene: ${prevBackground}`,
+        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same setting as previous scene: ${prevBgSnapshot}`,
       };
     }
 
-    if (directives?.SAME_PLACE && prevBackground) {
+    if (directives?.SAME_PLACE && prevBgSnapshot) {
       return {
         ...scene,
-        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same location: ${prevBackground}`,
+        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same location: ${prevBgSnapshot}`,
       };
     }
 
-    if (directives?.TIME_PASS && prevBackground) {
+    if (directives?.TIME_PASS && prevBgSnapshot) {
       return {
         ...scene,
-        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same location but different time/lighting: ${prevBackground}. Show passage of time with changed lighting and atmosphere.`,
+        visualPrompt: `${scene.visualPrompt}\n[CONTINUITY] Same location but different time/lighting: ${prevBgSnapshot}. Show passage of time with changed lighting and atmosphere.`,
       };
     }
 

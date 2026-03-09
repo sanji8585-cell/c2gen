@@ -412,7 +412,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         onGenerateAdvanced(autoTopic, refImages, advancedScript);
       }
     }
-  }, [isDisabled, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, advancedScript, onGenerate, onGenerateAdvanced, onAiAssist]);
+  }, [isDisabled, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, advancedScript, onGenerate, onGenerateAdvanced]);
 
   // --- Accordion summaries ---
   const imageSummary = useMemo(() => {
