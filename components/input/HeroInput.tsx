@@ -45,7 +45,7 @@ const HeroInput: React.FC<HeroInputProps> = ({
   const [btnHovered, setBtnHovered] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isDisabled = step !== GenerationStep.IDLE && step !== GenerationStep.ERROR;
+  const isDisabled = step !== GenerationStep.IDLE && step !== GenerationStep.ERROR && step !== GenerationStep.COMPLETED;
   const isProcessing = step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS;
   const isReviewing = step === GenerationStep.SCRIPT_REVIEW;
 
