@@ -1017,7 +1017,7 @@ const AppContent: React.FC<{
   const handleGenerateAnimation = useCallback(async (idx: number) => {
     if (animatingIndices.has(idx)) return; // 이 씬은 이미 변환 중
     if (!assetsRef.current[idx]?.imageData) {
-      alert('이미지가 먼저 생성되어야 합니다.');
+      setToastMessage('이미지가 먼저 생성되어야 합니다.'); setTimeout(() => setToastMessage(null), 3000);
       return;
     }
 
