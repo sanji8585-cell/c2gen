@@ -4,6 +4,8 @@ import HeroSection from './HeroSection';
 import WorkflowSection from './WorkflowSection';
 import FeaturesSection from './FeaturesSection';
 import GallerySection from './GallerySection';
+import VisionSection from './VisionSection';
+import CTAFooterSection from './CTAFooterSection';
 
 interface LandingPageProps {
   isDark: boolean;
@@ -19,6 +21,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, onToggleTheme, onOpen
       <WorkflowSection />
       <FeaturesSection />
       <GallerySection />
+      <VisionSection />
+      <CTAFooterSection onOpenAuth={onOpenAuth} />
     </div>
   );
 };
