@@ -56,6 +56,37 @@ export const SYSTEM_INSTRUCTIONS = {
 };
 
 /**
+ * 색상 팔레트 힌트 생성
+ * - 금융 컨텍스트: 한국 금융 규칙 (상승=빨강, 하락=파랑)
+ * - 일반 컨텍스트: 감정 기반 색상 팔레트
+ */
+const FINANCIAL_REGEX = /주식|투자|금융|경제|증시|코스피|나스닥|stock|invest|financ|market|GDP|금리|환율|부동산/i;
+
+export function getColorPaletteHint(sentiment: string, narration: string): string {
+  const isFinancial = FINANCIAL_REGEX.test(narration);
+
+  if (isFinancial) {
+    switch (sentiment) {
+      case 'POSITIVE':
+        return 'COLOR PALETTE: Red and gold tones (Korean financial convention: red = gains/growth). Warm reds, bright golds, energetic orange accents.';
+      case 'NEGATIVE':
+        return 'COLOR PALETTE: Blue and cool tones (Korean financial convention: blue = losses/decline). Deep blues, cool grays, muted steel.';
+      default:
+        return 'COLOR PALETTE: Neutral financial tones. Clean whites, medium grays, subtle blue-gray accents.';
+    }
+  }
+
+  switch (sentiment) {
+    case 'POSITIVE':
+      return 'COLOR PALETTE: Warm golds, bright cyans, vibrant greens. High saturation, optimistic feel.';
+    case 'NEGATIVE':
+      return 'COLOR PALETTE: Deep blues, cool grays, muted purples. Lower saturation, somber atmosphere.';
+    default:
+      return 'COLOR PALETTE: Balanced mid-tones. Natural colors, moderate saturation.';
+  }
+}
+
+/**
  * 최종 이미지 프롬프트 생성
  */
 export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = false, artStylePrompt?: string, suppressKorean?: boolean) => {
@@ -74,6 +105,9 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
   const mood = sentiment === 'NEGATIVE' ? 'Dark, cold lighting.'
     : sentiment === 'POSITIVE' ? 'Bright, warm lighting.'
     : 'Balanced lighting.';
+
+  // 색상 팔레트 힌트
+  const colorHint = getColorPaletteHint(sentiment, scene.narration || '');
 
   // 캐릭터 (화풍 적용)
   const styleNote = artStylePrompt ? ` Render in ${artStylePrompt} style.` : '';
@@ -96,6 +130,7 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
 ${koreanRule ? koreanRule + '\n\n' : ''}${basePrompt}
 
 MOOD: ${mood}
+${colorHint}
 ${charPrompt}
 ${keywords ? `TEXT: "${keywords}"` : ''}
 
