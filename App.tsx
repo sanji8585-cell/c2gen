@@ -147,7 +147,7 @@ const AppContent: React.FC<{
 
   // BGM 관련
   const [bgmData, setBgmData] = useState<string | null>(null);
-  const [bgmVolume, setBgmVolume] = useState(0.25);
+  const [bgmVolume, setBgmVolume] = useState(0.6);
   const [bgmDuckingEnabled, setBgmDuckingEnabled] = useState(true);
   const [bgmDuckingAmount, setBgmDuckingAmount] = useState(0.3);
 
