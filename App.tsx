@@ -5,7 +5,7 @@ import AuthGate from './components/AuthGate';
 import AuthModal from './components/AuthModal';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
-import ResultTable from './components/ResultTable';
+import ResultCards from './components/ResultCards';
 import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig } from './types';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useTheme } from './hooks/useTheme';
@@ -1708,7 +1708,7 @@ const AppContent: React.FC<{
           );
         })()}
 
-        <ResultTable
+        <ResultCards
             data={generatedData}
             editingIndex={editingIndex}
             onEditToggle={setEditingIndex}
