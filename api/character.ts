@@ -4,6 +4,26 @@ import { GoogleGenAI, Modality } from '@google/genai';
 
 // ── Shared utilities (inlined for Vercel serverless compatibility) ──
 
+async function uploadToStorage(
+  supabase: ReturnType<typeof createClient>,
+  base64DataUrl: string,
+  path: string
+): Promise<string | null> {
+  try {
+    const match = base64DataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    const buffer = Buffer.from(match[2], 'base64');
+    const ext = match[1].split('/')[1] || 'png';
+    const fullPath = `${path}.${ext}`;
+    const { error } = await supabase.storage
+      .from('preset-images')
+      .upload(fullPath, buffer, { contentType: match[1], upsert: true });
+    if (error) { console.error('[uploadToStorage]', error.message); return null; }
+    const { data: urlData } = supabase.storage.from('preset-images').getPublicUrl(fullPath);
+    return urlData?.publicUrl || null;
+  } catch (err) { console.error('[uploadToStorage]', err); return null; }
+}
+
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
@@ -138,16 +158,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const owned = await verifyPresetOwnership(supabase, brand_preset_id, email);
         if (!owned) return res.status(403).json({ error: 'Access denied' });
 
-        // Handle original_upload from reference_sheet if provided
-        let originalUploadUrl = params.original_upload_url;
-        if (!originalUploadUrl && params.reference_sheet?.original_upload) {
-          originalUploadUrl = params.reference_sheet.original_upload;
+        // Handle original_upload — upload to Storage if base64
+        let originalUploadUrl = params.original_upload_url || params.reference_sheet?.original_upload || null;
+        if (originalUploadUrl?.startsWith('data:')) {
+          const storageUrl = await uploadToStorage(supabase, originalUploadUrl, `characters/${brand_preset_id}/${Date.now()}-original`);
+          if (storageUrl) originalUploadUrl = storageUrl;
         }
 
         const insertData: Record<string, unknown> = {
           brand_preset_id,
           name,
-          type: charType,  // DB column is `type`, not `image_type`
+          type: charType,
         };
 
         if (originalUploadUrl) {
@@ -367,7 +388,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const responseParts = response.candidates?.[0]?.content?.parts || [];
             for (const part of responseParts) {
               if (part.inlineData) {
-                referenceSheet[angle.key] = `data:image/${part.inlineData.mimeType?.split('/')[1] || 'png'};base64,${part.inlineData.data}`;
+                const base64Url = `data:image/${part.inlineData.mimeType?.split('/')[1] || 'png'};base64,${part.inlineData.data}`;
+                // Upload to Supabase Storage
+                const storageUrl = await uploadToStorage(supabase, base64Url, `characters/${character_id}/${angle.key}-${Date.now()}`);
+                referenceSheet[angle.key] = storageUrl || base64Url;
                 break;
               }
             }
@@ -383,11 +407,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Update character record in DB — preserve existing original_upload
         const existingSheet = character.reference_sheet || {};
+        let origUpload = existingSheet.original_upload || character.original_upload_url || undefined;
+        // Upload original to Storage if still base64
+        if (origUpload?.startsWith('data:')) {
+          const storageUrl = await uploadToStorage(supabase, origUpload, `characters/${character_id}/original-${Date.now()}`);
+          if (storageUrl) origUpload = storageUrl;
+        }
         const mergedSheet = {
           ...existingSheet,
           ...referenceSheet,
-          // Keep original_upload from existing data
-          original_upload: existingSheet.original_upload || character.original_upload_url || undefined,
+          original_upload: origUpload,
         };
         const updatePayload: Record<string, unknown> = {
           reference_sheet: mergedSheet,
