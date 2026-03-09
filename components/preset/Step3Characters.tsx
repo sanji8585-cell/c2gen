@@ -451,8 +451,28 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
                         )}
                         {char.voice_id && (
                           <div>
-                            <p className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>음성 ID</p>
-                            <p className="text-[10px] font-mono" style={{ color: 'var(--text-secondary)' }}>{char.voice_id}</p>
+                            <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>음성</p>
+                            <audio
+                              controls
+                              preload="none"
+                              className="w-full"
+                              style={{ height: 28 }}
+                              onPlay={(e) => {
+                                const audio = e.currentTarget;
+                                if (!audio.src || audio.src === window.location.href) {
+                                  const token = localStorage.getItem('c2gen_session_token') || '';
+                                  fetch('/api/elevenlabs', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', ...(token ? { 'x-session-token': token } : {}) },
+                                    body: JSON.stringify({ action: 'generatePreview', voiceId: char.voice_id, text: '안녕하세요, 저는 이 캐릭터의 음성입니다. 이 음성이 마음에 드시나요?' }),
+                                  })
+                                    .then(r => r.json())
+                                    .then(d => { if (d.audio_base64) { audio.src = `data:audio/mpeg;base64,${d.audio_base64}`; audio.play(); } })
+                                    .catch(() => {});
+                                }
+                              }}
+                            />
+                            <p className="text-[9px] font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>{char.voice_id.slice(0, 20)}...</p>
                           </div>
                         )}
                       </div>
@@ -700,9 +720,31 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
             <div id="voice-design-section" style={{ display: 'none' }} className="px-4 pb-4 flex flex-col gap-3">
               {/* Show existing voice ID if editing */}
               {form.selected_voice_id && (
-                <div className="p-2 rounded-lg" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
-                  <p className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>현재 음성 ID</p>
-                  <p className="text-[12px] font-mono" style={{ color: '#06b6d4' }}>{form.selected_voice_id}</p>
+                <div className="p-3 rounded-lg" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>현재 음성</p>
+                    <p className="text-[10px] font-mono" style={{ color: '#06b6d4' }}>{form.selected_voice_id.slice(0, 16)}...</p>
+                  </div>
+                  <audio
+                    controls
+                    preload="none"
+                    className="w-full"
+                    style={{ height: 32 }}
+                    src={`/api/elevenlabs?action=preview&voiceId=${form.selected_voice_id}`}
+                    onError={(e) => {
+                      // Fallback: generate preview via TTS
+                      const audio = e.currentTarget;
+                      const token = localStorage.getItem('c2gen_session_token') || '';
+                      fetch('/api/elevenlabs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(token ? { 'x-session-token': token } : {}) },
+                        body: JSON.stringify({ action: 'generatePreview', voiceId: form.selected_voice_id, text: '안녕하세요, 저는 이 캐릭터의 음성입니다.' }),
+                      })
+                        .then(r => r.json())
+                        .then(d => { if (d.audio_base64) audio.src = `data:audio/mpeg;base64,${d.audio_base64}`; })
+                        .catch(() => {});
+                    }}
+                  />
                 </div>
               )}
               <div>
