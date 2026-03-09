@@ -6,6 +6,7 @@ import { downloadSrt } from '../services/srtService';
 import { exportAssetsToZip } from '../services/exportService';
 import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier, canAccessResolution, getVideoResolution, setVideoResolution } from '../config';
 import PreviewPlayer from './PreviewPlayer';
+import LazyImage from './shared/LazyImage';
 
 // base64 이미지 MIME 타입 감지 (PNG는 iVBOR로 시작)
 const getImageMime = (b64: string) => b64.startsWith('iVBOR') ? 'image/png' : 'image/jpeg';
@@ -68,35 +69,6 @@ async function decodeAudio(base64: string, ctx: AudioContext): Promise<AudioBuff
     return buffer;
   }
 }
-
-// Lazy Image 컴포넌트
-const LazyImage: React.FC<{ src: string; alt: string; className?: string }> = memo(({ src, alt, className }) => {
-  const imgRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); observer.disconnect(); } },
-      { rootMargin: '100px' }
-    );
-    if (imgRef.current) observer.observe(imgRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div ref={imgRef} className="w-full h-full">
-      {isVisible ? (
-        <img src={src} alt={alt}
-          className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
-          onLoad={() => setIsLoaded(true)} loading="lazy" />
-      ) : (
-        <div className="w-full h-full animate-pulse" style={{ backgroundColor: 'var(--bg-elevated)' }} />
-      )}
-    </div>
-  );
-});
-LazyImage.displayName = 'LazyImage';
 
 // 오디오 플레이어
 const AudioPlayer: React.FC<{ base64: string }> = memo(({ base64 }) => {
