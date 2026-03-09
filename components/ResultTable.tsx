@@ -7,6 +7,8 @@ import { exportAssetsToZip } from '../services/exportService';
 import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier, canAccessResolution, getVideoResolution, setVideoResolution } from '../config';
 import PreviewPlayer from './PreviewPlayer';
 import LazyImage from './shared/LazyImage';
+import { decodeAudio } from './shared/audioUtils';
+import AudioPlayer from './shared/AudioPlayer';
 
 // base64 이미지 MIME 타입 감지 (PNG는 iVBOR로 시작)
 const getImageMime = (b64: string) => b64.startsWith('iVBOR') ? 'image/png' : 'image/jpeg';
@@ -49,76 +51,6 @@ interface ResultTableProps {
   onOpenThumbnail?: () => void;
   onSaveProject?: () => void;
 }
-
-// 오디오 디코딩 함수
-async function decodeAudio(base64: string, ctx: AudioContext): Promise<AudioBuffer> {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-
-  try {
-    return await ctx.decodeAudioData(bytes.buffer.slice(0));
-  } catch (e) {
-    const dataInt16 = new Int16Array(bytes.buffer);
-    const frameCount = dataInt16.length;
-    const buffer = ctx.createBuffer(1, frameCount, 24000);
-    const channelData = buffer.getChannelData(0);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i] / 32768.0;
-    }
-    return buffer;
-  }
-}
-
-// 오디오 플레이어
-const AudioPlayer: React.FC<{ base64: string }> = memo(({ base64 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-
-  const stopAudio = () => {
-    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (e) {} sourceRef.current = null; }
-    setIsPlaying(false);
-  };
-
-  const playAudio = async () => {
-    if (isPlaying) { stopAudio(); return; }
-    try {
-      setIsPlaying(true);
-      if (!audioContextRef.current) {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        audioContextRef.current = new AudioContextClass();
-      }
-      const ctx = audioContextRef.current;
-      if (ctx.state === 'suspended') await ctx.resume();
-      const audioBuffer = await decodeAudio(base64, ctx);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      source.onended = () => setIsPlaying(false);
-      source.start();
-      sourceRef.current = source;
-    } catch (error) { console.error(error); setIsPlaying(false); }
-  };
-
-  useEffect(() => {
-    return () => {
-      stopAudio();
-      audioContextRef.current?.close();
-      audioContextRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <button onClick={playAudio} className={`p-2.5 rounded-full border transition-all ${isPlaying ? 'bg-brand-600 border-brand-500 text-white animate-pulse' : 'hover:text-[var(--text-primary)]'}`} style={isPlaying ? undefined : { backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
-      {isPlaying
-        ? <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-        : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-    </button>
-  );
-});
-AudioPlayer.displayName = 'AudioPlayer';
 
 // TableRow Props
 interface TableRowProps {
