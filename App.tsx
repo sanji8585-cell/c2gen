@@ -1248,19 +1248,23 @@ const AppContent: React.FC<{
         case 'sentiment': {
           const asset = assetsRef.current[i];
           const sentiment = asset.analysis?.sentiment;
-          const motionType = asset.analysis?.motion_type;
-          if (sentiment === 'POSITIVE' && motionType === '동적') {
-            effect = 'zoomIn';           // 희망, 성장, 에너지
-          } else if (sentiment === 'POSITIVE' && motionType === '정적') {
-            effect = 'zoomIn';           // 잔잔한 희망, 부드러운 접근
-          } else if (sentiment === 'NEGATIVE' && motionType === '정적') {
-            effect = 'none';             // 고요한 무거움, 정적 긴장
-          } else if (sentiment === 'NEGATIVE' && motionType === '동적') {
-            effect = i % 2 === 0 ? 'panLeft' : 'panRight'; // 불안, 긴장감
-          } else if (motionType === '동적') {
-            effect = i % 2 === 0 ? 'panLeft' : 'panRight'; // NEUTRAL 동적
+          const motionType = asset.analysis?.motion_type; // 스크립트에서 미제공 시 undefined
+          if (sentiment === 'POSITIVE') {
+            // 희망, 성장 → zoomIn (동적이든 정적이든)
+            effect = 'zoomIn';
+          } else if (sentiment === 'NEGATIVE') {
+            if (motionType === '동적') {
+              effect = i % 2 === 0 ? 'panLeft' : 'panRight'; // 불안, 긴장감
+            } else {
+              effect = 'none';             // 고요한 무거움, 정적 긴장 (motionType 없어도)
+            }
           } else {
-            effect = 'zoomIn';           // NEUTRAL 기본
+            // NEUTRAL 또는 undefined
+            if (motionType === '동적') {
+              effect = i % 2 === 0 ? 'panLeft' : 'panRight';
+            } else {
+              effect = 'zoomIn';           // 기본
+            }
           }
           break;
         }

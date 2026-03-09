@@ -126,26 +126,16 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
     ? `CHARACTER: Match reference image.${styleNote}`
     : `CHARACTER: ${VAR_BASE_CHAR}${styleNote}`;
 
-  return `
-[SCENE INTENT]
-${basePrompt}
+  const sections = [
+    `[SCENE INTENT]\n${basePrompt}`,
+    `[EMOTION & ATMOSPHERE]\nMOOD: ${mood}\n${colorHint}`,
+    `[CHARACTER]\n${charPrompt}\n${char}`,
+    keywords ? `[ON-SCREEN TEXT]\nTEXT: "${keywords}"` : '',
+    `[STYLE]\n${style}`,
+    `[RULES]${koreanRule ? `\n${koreanRule}` : ''}\nMOOD: NEGATIVE=dark/cold, POSITIVE=bright/warm, NEUTRAL=balanced.`,
+  ].filter(Boolean);
 
-[EMOTION & ATMOSPHERE]
-MOOD: ${mood}
-${colorHint}
-
-[CHARACTER]
-${charPrompt}
-${char}
-${keywords ? `\n[ON-SCREEN TEXT]\nTEXT: "${keywords}"` : ''}
-
-[STYLE]
-${style}
-
-[RULES]
-${koreanRule || ''}
-${VAR_MOOD_ENFORCER}
-`.trim();
+  return sections.join('\n\n').trim();
 };
 
 // 트렌드 검색 프롬프트
