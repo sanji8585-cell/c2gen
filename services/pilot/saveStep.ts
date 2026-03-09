@@ -205,10 +205,26 @@ export async function runSaveStep(
   current++;
   ctx.onProgress({ step: 'save', current, total, message: 'Finalizing...' });
 
-  // 6. Update queue entry with final URLs
+  // 6. Update queue entry with final URLs (strip large data to avoid 413)
+  const finalContentData = {
+    ...initialContentData,
+    // Replace emotionCurve with lightweight summary
+    emotionCurve: emotionCurve ? {
+      story_arc: emotionCurve.story_arc,
+      platform_variant: emotionCurve.platform_variant,
+      total_duration: emotionCurve.total_duration,
+      point_count: emotionCurve.curve_points?.length || 0,
+    } : null,
+    // Strip subtitleData from assets (too large for JSON payload)
+    assets: initialContentData.assets.map(a => ({
+      ...a,
+      subtitleData: a.subtitleData ? { wordCount: (a.subtitleData as any)?.words?.length || 0 } : null,
+    })),
+  };
+
   await callSaveApi('update-queue', {
     id: queueId,
-    contentData: initialContentData,
+    contentData: finalContentData,
   });
 
   current++;
