@@ -127,15 +127,23 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
     : `CHARACTER: ${VAR_BASE_CHAR}${styleNote}`;
 
   return `
-${koreanRule ? koreanRule + '\n\n' : ''}${basePrompt}
+[SCENE INTENT]
+${basePrompt}
 
+[EMOTION & ATMOSPHERE]
 MOOD: ${mood}
 ${colorHint}
-${charPrompt}
-${keywords ? `TEXT: "${keywords}"` : ''}
 
-${style}
+[CHARACTER]
+${charPrompt}
 ${char}
+${keywords ? `\n[ON-SCREEN TEXT]\nTEXT: "${keywords}"` : ''}
+
+[STYLE]
+${style}
+
+[RULES]
+${koreanRule || ''}
 ${VAR_MOOD_ENFORCER}
 `.trim();
 };
