@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GenerationStep } from '../../types';
 
 interface HeroInputProps {
-  activeTab: 'auto' | 'manual';
-  onTabChange: (tab: 'auto' | 'manual') => void;
+  activeTab: 'auto' | 'manual' | 'advanced';
+  onTabChange: (tab: 'auto' | 'manual' | 'advanced') => void;
   topic: string;
   onTopicChange: (v: string) => void;
   manualScript: string;
   onManualScriptChange: (v: string) => void;
+  advancedScript: string;
+  onAdvancedScriptChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   step: GenerationStep;
 }
@@ -35,6 +37,8 @@ const HeroInput: React.FC<HeroInputProps> = ({
   onTopicChange,
   manualScript,
   onManualScriptChange,
+  advancedScript,
+  onAdvancedScriptChange,
   onSubmit,
   step,
 }) => {
@@ -50,7 +54,9 @@ const HeroInput: React.FC<HeroInputProps> = ({
   const isReviewing = step === GenerationStep.SCRIPT_REVIEW;
 
   const canSubmit = !isDisabled && (
-    activeTab === 'auto' ? topic.trim().length > 0 : manualScript.trim().length > 0
+    activeTab === 'auto' ? topic.trim().length > 0
+    : activeTab === 'manual' ? manualScript.trim().length > 0
+    : advancedScript.trim().length > 0
   );
 
   const buttonText = isProcessing ? '생성 중' : isReviewing ? '검토 중' : '시작 →';
@@ -115,7 +121,8 @@ const HeroInput: React.FC<HeroInputProps> = ({
               : '0 4px 20px rgba(0,0,0,0.08)',
           }}
         >
-        {/* Top row: icon + input */}
+        {/* Top row: icon + input (자동 모드) */}
+        {activeTab === 'auto' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 20, opacity: 0.6, flexShrink: 0 }}>🔍</span>
           <input
@@ -148,6 +155,7 @@ const HeroInput: React.FC<HeroInputProps> = ({
             }
           `}</style>
         </div>
+        )}
 
         {/* Bottom row: tabs + button */}
         <div
@@ -155,7 +163,8 @@ const HeroInput: React.FC<HeroInputProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginTop: 16,
+            marginTop: activeTab === 'auto' ? 16 : 0,
+            marginBottom: activeTab !== 'auto' ? 16 : 0,
           }}
         >
           {/* Tab switch */}
@@ -168,9 +177,9 @@ const HeroInput: React.FC<HeroInputProps> = ({
               gap: 2,
             }}
           >
-            {(['auto', 'manual'] as const).map(tab => {
+            {(['auto', 'manual', 'advanced'] as const).map(tab => {
               const isActive = activeTab === tab;
-              const label = tab === 'auto' ? '자동' : '수동';
+              const label = tab === 'auto' ? '자동' : tab === 'manual' ? '수동' : '🎬 고급';
               return (
                 <button
                   key={tab}
@@ -221,42 +230,94 @@ const HeroInput: React.FC<HeroInputProps> = ({
           </button>
         </div>
 
-        {/* Manual textarea */}
+        {/* Manual textarea (수동 모드) */}
         {activeTab === 'manual' && (
-          <div style={{ marginTop: 16 }}>
-            <textarea
-              value={manualScript}
-              onChange={e => onManualScriptChange(e.target.value)}
-              disabled={isDisabled}
-              placeholder="대본을 직접 입력하세요..."
-              style={{
-                width: '100%',
-                minHeight: 200,
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-default)',
-                borderRadius: 12,
-                padding: 16,
-                fontSize: 14,
-                lineHeight: 1.7,
-                color: 'var(--text-primary)',
-                caretColor: '#38bdf8',
-                outline: 'none',
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                boxSizing: 'border-box',
-              }}
-            />
-            <div
-              style={{
-                textAlign: 'right',
-                marginTop: 6,
-                fontSize: 12,
-                fontWeight: 500,
-                color: charCountColor,
-                transition: 'color 0.2s ease',
-              }}
-            >
-              {charCount.toLocaleString()}자
+          <div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span style={{ fontSize: 20, opacity: 0.6, flexShrink: 0, marginTop: 2 }}>📝</span>
+              <div style={{ flex: 1 }}>
+                <textarea
+                  value={manualScript}
+                  onChange={e => onManualScriptChange(e.target.value)}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  disabled={isDisabled}
+                  placeholder="대본을 직접 입력하세요..."
+                  style={{
+                    width: '100%',
+                    minHeight: 200,
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    color: 'var(--text-primary)',
+                    caretColor: '#38bdf8',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <div
+                  style={{
+                    textAlign: 'right',
+                    marginTop: 6,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: charCountColor,
+                    transition: 'color 0.2s ease',
+                  }}
+                >
+                  {charCount.toLocaleString()}자
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Advanced textarea (고급 모드) */}
+        {activeTab === 'advanced' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span style={{ fontSize: 20, opacity: 0.6, flexShrink: 0, marginTop: 2 }}>🎬</span>
+              <div style={{ flex: 1 }}>
+                <textarea
+                  value={advancedScript}
+                  onChange={e => onAdvancedScriptChange(e.target.value)}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  disabled={isDisabled}
+                  placeholder={"고급 대본을 입력하세요...\n\n디렉티브 예시:\n투자자가 모니터를 본다. (배경: 어두운 사무실)(구도: 클로즈업)\n동료가 말한다. (화자: 여자)(이전씬유지)"}
+                  style={{
+                    width: '100%',
+                    minHeight: 200,
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    color: 'var(--text-primary)',
+                    caretColor: '#38bdf8',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <div style={{
+                  textAlign: 'right',
+                  marginTop: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: advancedScript.length >= 10000 ? '#f59e0b' : advancedScript.length >= 3000 ? '#60a5fa' : 'var(--text-tertiary)',
+                  transition: 'color 0.2s ease',
+                }}>
+                  {advancedScript.length.toLocaleString()}자
+                </div>
+              </div>
             </div>
           </div>
         )}
