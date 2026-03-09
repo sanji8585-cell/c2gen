@@ -1,7 +1,7 @@
 // services/pilot/saveStep.ts
 // C2 PILOT — Save Step
-// Uploads assets to Supabase Storage via /api/pilot/save-content
-// and creates an approval queue entry with final URLs.
+// 1) Upload assets to Storage (individual API calls per asset)
+// 2) Create lightweight approval queue entry with URLs only
 
 import type { EmotionCurve } from '../../types';
 import type {
@@ -12,11 +12,7 @@ import type {
 } from './types';
 import { generateMetadata } from '../metadataEngine';
 
-// ── Constants ──
-
 const API_URL = '/api/pilot/save-content';
-
-// ── Auth helper ──
 
 function getToken(): string {
   const token = localStorage.getItem('c2gen_session_token');
@@ -24,31 +20,25 @@ function getToken(): string {
   return token;
 }
 
-// ── API call helper ──
-
 async function callSaveApi<T = Record<string, unknown>>(
   action: string,
   params: Record<string, unknown>,
 ): Promise<T> {
   const token = getToken();
-
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, token, ...params }),
   });
-
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(errorBody.error || `save-content ${action} failed (${res.status})`);
   }
-
   return res.json() as Promise<T>;
 }
 
-// ── Upload helpers ──
-
-async function uploadSceneAsset(
+// Upload a single base64 asset to Storage via API
+async function uploadAsset(
   queueId: string,
   sceneNumber: number,
   assetType: 'image' | 'audio',
@@ -56,10 +46,7 @@ async function uploadSceneAsset(
 ): Promise<string | null> {
   try {
     const { url } = await callSaveApi<{ url: string }>('upload-asset', {
-      queueId,
-      sceneNumber,
-      assetType,
-      base64Data,
+      queueId, sceneNumber, assetType, base64Data,
     });
     return url;
   } catch (err) {
@@ -68,14 +55,10 @@ async function uploadSceneAsset(
   }
 }
 
-async function uploadBgm(
-  queueId: string,
-  base64Data: string,
-): Promise<string | null> {
+async function uploadBgm(queueId: string, base64Data: string): Promise<string | null> {
   try {
     const { url } = await callSaveApi<{ url: string }>('upload-bgm', {
-      queueId,
-      base64Data,
+      queueId, base64Data,
     });
     return url;
   } catch (err) {
@@ -83,8 +66,6 @@ async function uploadBgm(
     return null;
   }
 }
-
-// ── Main Export ──
 
 export async function runSaveStep(
   ctx: PipelineContext,
@@ -95,151 +76,94 @@ export async function runSaveStep(
   costs: { script: number; images: number; tts: number; bgm: number; total: number },
   durationMs: number,
 ): Promise<PipelineResult> {
-  const total = assets.length + (bgmData ? 1 : 0) + 2; // assets uploads + bgm + create + update
+  const totalSteps = assets.length + (bgmData ? 1 : 0) + 1; // uploads + queue create
   let current = 0;
 
-  ctx.onProgress({ step: 'save', current, total, message: 'Saving to approval queue...' });
+  ctx.onProgress({ step: 'save', current, total: totalSteps, message: '에셋 업로드 중...' });
 
-  // 1. Generate metadata
+  // Generate metadata
   const contentMetadata = generateMetadata(ctx.topic, scenes, emotionCurve);
 
-  // 2. Build initial content_data (with base64 still inline for the queue record)
-  const initialContentData = {
+  // ── Step 1: Create a placeholder queue entry to get an ID for Storage paths ──
+  const placeholderData = {
+    topic: ctx.topic,
+    presetId: ctx.preset.id,
+    presetName: ctx.preset.name,
+    status: 'uploading',
+  };
+
+  const { item } = await callSaveApi<{ item: { id: string } }>('save-to-queue', {
+    campaignId: ctx.campaignId || null,
+    contentData: placeholderData,
+    estimatedCredits: costs.total,
+    metadata: { generated_at: new Date().toISOString() },
+  });
+  const queueId = item.id;
+
+  // ── Step 2: Upload all assets (image + audio per scene) ──
+  const assetResults: Array<{
+    sceneNumber: number;
+    narration: string;
+    imageUrl: string | null;
+    audioUrl: string | null;
+    audioDuration: number | null;
+    status: string;
+    creditCost: number;
+  }> = [];
+
+  for (const asset of assets) {
+    let imageUrl = asset.imageUrl;
+    let audioUrl = asset.audioUrl;
+
+    // Upload image
+    if (imageUrl && imageUrl.startsWith('data:')) {
+      const uploaded = await uploadAsset(queueId, asset.sceneNumber, 'image', imageUrl);
+      imageUrl = uploaded || imageUrl; // fallback to base64 if upload fails (won't display in queue though)
+    }
+
+    // Upload audio
+    if (audioUrl && audioUrl.startsWith('data:')) {
+      const uploaded = await uploadAsset(queueId, asset.sceneNumber, 'audio', audioUrl);
+      audioUrl = uploaded || audioUrl;
+    }
+
+    assetResults.push({
+      sceneNumber: asset.sceneNumber,
+      narration: asset.narration,
+      imageUrl: imageUrl?.startsWith('http') ? imageUrl : null, // only store URLs, not base64
+      audioUrl: audioUrl?.startsWith('http') ? audioUrl : null,
+      audioDuration: asset.audioDuration,
+      status: asset.status,
+      creditCost: asset.creditCost,
+    });
+
+    current++;
+    ctx.onProgress({ step: 'save', current, total: totalSteps, message: `씬 ${asset.sceneNumber} 업로드 완료` });
+  }
+
+  // ── Step 3: Upload BGM ──
+  let bgmUrl: string | null = null;
+  if (bgmData && bgmData.startsWith('data:')) {
+    bgmUrl = await uploadBgm(queueId, bgmData);
+    current++;
+    ctx.onProgress({ step: 'save', current, total: totalSteps, message: 'BGM 업로드 완료' });
+  }
+
+  // ── Step 4: Update queue with final lightweight content_data ──
+  const finalContentData = {
     topic: ctx.topic,
     presetId: ctx.preset.id,
     presetName: ctx.preset.name,
     platform: ctx.platform,
     language: ctx.language,
-    scenes: scenes.map((s) => ({
+    scenes: scenes.map(s => ({
       sceneNumber: s.sceneNumber,
       narration: s.narration,
-      visualPrompt: s.visualPrompt,
       speakerName: s.speakerName,
       emotionTag: s.emotionTag,
     })),
-    // Placeholder — will be replaced with URLs after upload
-    assets: assets.map((a) => ({
-      sceneNumber: a.sceneNumber,
-      narration: a.narration,
-      imageUrl: null as string | null,
-      audioUrl: null as string | null,
-      subtitleData: a.subtitleData,
-      audioDuration: a.audioDuration,
-      status: a.status,
-      creditCost: a.creditCost,
-    })),
-    bgmUrl: null as string | null,
-    emotionCurve,
-    costs,
-    generatedAt: new Date().toISOString(),
-    durationMs,
-  };
-
-  // 3. Create approval queue entry
-  const { item } = await callSaveApi<{ item: { id: string } }>('save-to-queue', {
-    campaignId: ctx.campaignId || null,
-    contentData: initialContentData,
-    emotionCurveUsed: true,
-    estimatedCredits: costs.total,
-    metadata: {
-      youtube: contentMetadata.youtube,
-      tiktok: contentMetadata.tiktok,
-    },
-  });
-
-  const queueId = item.id;
-  current++;
-  ctx.onProgress({ step: 'save', current, total, message: 'Uploading assets...' });
-
-  // 4. Upload each scene's image and audio in parallel
-  const uploadPromises: Promise<void>[] = [];
-
-  for (let i = 0; i < assets.length; i++) {
-    const asset = assets[i];
-    const sceneNumber = asset.sceneNumber;
-
-    uploadPromises.push(
-      (async () => {
-        // Upload image
-        if (asset.imageUrl && asset.imageUrl.startsWith('data:')) {
-          const imageStorageUrl = await uploadSceneAsset(queueId, sceneNumber, 'image', asset.imageUrl);
-          if (imageStorageUrl) {
-            initialContentData.assets[i].imageUrl = imageStorageUrl;
-            asset.imageUrl = imageStorageUrl;
-          }
-        } else {
-          // Already a URL (or null)
-          initialContentData.assets[i].imageUrl = asset.imageUrl;
-        }
-
-        // Upload audio
-        if (asset.audioUrl && asset.audioUrl.startsWith('data:')) {
-          const audioStorageUrl = await uploadSceneAsset(queueId, sceneNumber, 'audio', asset.audioUrl);
-          if (audioStorageUrl) {
-            initialContentData.assets[i].audioUrl = audioStorageUrl;
-            asset.audioUrl = audioStorageUrl;
-          }
-        } else {
-          initialContentData.assets[i].audioUrl = asset.audioUrl;
-        }
-
-        current++;
-        ctx.onProgress({
-          step: 'save',
-          current,
-          total,
-          message: `Uploaded scene ${sceneNumber} assets`,
-        });
-      })(),
-    );
-  }
-
-  await Promise.all(uploadPromises);
-
-  // 5. Upload BGM
-  let bgmUrl: string | null = null;
-  if (bgmData && bgmData.startsWith('data:')) {
-    bgmUrl = await uploadBgm(queueId, bgmData);
-    initialContentData.bgmUrl = bgmUrl;
-  }
-  current++;
-  ctx.onProgress({ step: 'save', current, total, message: 'Finalizing...' });
-
-  // 6. Update queue entry with final URLs (strip large data to avoid 413)
-  const finalContentData = {
-    ...initialContentData,
-    // Replace emotionCurve with lightweight summary
-    emotionCurve: emotionCurve ? {
-      story_arc: emotionCurve.story_arc,
-      platform_variant: emotionCurve.platform_variant,
-      total_duration: emotionCurve.total_duration,
-      point_count: emotionCurve.curve_points?.length || 0,
-    } : null,
-    // Strip subtitleData from assets (too large for JSON payload)
-    assets: initialContentData.assets.map(a => ({
-      ...a,
-      subtitleData: a.subtitleData ? { wordCount: (a.subtitleData as any)?.words?.length || 0 } : null,
-    })),
-  };
-
-  await callSaveApi('update-queue', {
-    id: queueId,
-    contentData: finalContentData,
-  });
-
-  current++;
-  ctx.onProgress({ step: 'save', current, total, message: 'Save complete' });
-
-  // 7. Build and return PipelineResult
-  const result: PipelineResult = {
-    success: true,
-    topic: ctx.topic,
-    presetId: ctx.preset.id,
-    presetName: ctx.preset.name,
-    scenes,
-    assets,
+    assets: assetResults,
     bgmUrl,
-    emotionCurve,
     metadata: {
       title: contentMetadata.youtube.titles[0]?.text || ctx.topic,
       description: contentMetadata.youtube.description,
@@ -247,9 +171,31 @@ export async function runSaveStep(
       thumbnailText: contentMetadata.youtube.thumbnail_text,
     },
     costs,
-    generatedAt: initialContentData.generatedAt,
+    generatedAt: new Date().toISOString(),
     durationMs,
   };
 
-  return result;
+  await callSaveApi('update-queue', { id: queueId, contentData: finalContentData });
+
+  ctx.onProgress({ step: 'save', current: totalSteps, total: totalSteps, message: '저장 완료' });
+
+  // ── Build result ──
+  return {
+    success: true,
+    topic: ctx.topic,
+    presetId: ctx.preset.id,
+    presetName: ctx.preset.name,
+    scenes,
+    assets: assets.map((a, i) => ({
+      ...a,
+      imageUrl: assetResults[i]?.imageUrl || a.imageUrl,
+      audioUrl: assetResults[i]?.audioUrl || a.audioUrl,
+    })),
+    bgmUrl,
+    emotionCurve,
+    metadata: finalContentData.metadata,
+    costs,
+    generatedAt: finalContentData.generatedAt,
+    durationMs,
+  };
 }
