@@ -139,15 +139,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const insertPayload: Record<string, unknown> = {
-          owner_email: email,
           content_data: contentData,
           estimated_credits: estimatedCredits,
+          platform_variants: {},
           status: 'pending',
         };
 
         if (campaignId) insertPayload.campaign_id = campaignId;
         if (emotionCurveUsed != null) insertPayload.emotion_curve_used = emotionCurveUsed;
         if (metadata) insertPayload.metadata = metadata;
+        // Store creator email in metadata for tracking
+        insertPayload.metadata = { ...(metadata || {}), creator_email: email };
 
         const { data, error } = await supabase
           .from('c2gen_approval_queue')
@@ -170,23 +172,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'id and contentData are required' });
         }
 
-        // Verify ownership before update
-        const { data: existing, error: fetchError } = await supabase
-          .from('c2gen_approval_queue')
-          .select('owner_email')
-          .eq('id', id)
-          .single();
-
-        if (fetchError || !existing) {
-          return res.status(404).json({ error: 'Queue item not found' });
-        }
-        if (existing.owner_email !== email) {
-          return res.status(403).json({ error: 'Not authorized to update this item' });
-        }
-
         const { data, error } = await supabase
           .from('c2gen_approval_queue')
-          .update({ content_data: contentData, updated_at: new Date().toISOString() })
+          .update({ content_data: contentData })
           .eq('id', id)
           .select()
           .single();
