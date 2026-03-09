@@ -4,11 +4,12 @@ import CampaignDashboard from './CampaignDashboard';
 import ApprovalQueue from './ApprovalQueue';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import PlatformUploader from './PlatformUploader';
+import ContentGenerator from './pilot/ContentGenerator';
 import { listPresets, deletePreset } from '../services/brandPresetService';
 import { listCampaigns } from '../services/campaignService';
 import type { BrandPreset, Campaign } from '../types';
 
-type PilotSection = 'overview' | 'presets' | 'campaigns' | 'approval' | 'analytics' | 'settings';
+type PilotSection = 'overview' | 'presets' | 'content_engine' | 'campaigns' | 'approval' | 'analytics' | 'settings';
 
 interface PilotDashboardProps {
   onClose: () => void;
@@ -17,6 +18,7 @@ interface PilotDashboardProps {
 const NAV_ITEMS: Array<{ key: PilotSection; label: string; icon: string }> = [
   { key: 'overview', label: '대시보드', icon: '◈' },
   { key: 'presets', label: '브랜드 프리셋', icon: '◇' },
+  { key: 'content_engine', label: '콘텐츠 엔진', icon: '◆' },
   { key: 'campaigns', label: '캠페인', icon: '▷' },
   { key: 'approval', label: '승인 대기열', icon: '☐' },
   { key: 'analytics', label: '성과 분석', icon: '◎' },
@@ -148,6 +150,14 @@ export default function PilotDashboard({ onClose }: PilotDashboardProps) {
                     <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{presets.length}개 프리셋</div>
                   </button>
 
+                  <button onClick={() => setSection('content_engine')}
+                    className="rounded-xl border p-5 text-left transition-all hover:shadow-lg group"
+                    style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+                    <div className="text-2xl mb-3">◆</div>
+                    <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>콘텐츠 엔진</div>
+                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>감정곡선 · 오디오 · 메타데이터</div>
+                  </button>
+
                   <button onClick={() => setSection('campaigns')}
                     className="rounded-xl border p-5 text-left transition-all hover:shadow-lg group"
                     style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
@@ -229,6 +239,14 @@ export default function PilotDashboard({ onClose }: PilotDashboardProps) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Content Engine */}
+          {section === 'content_engine' && (
+            <ContentGenerator
+              presets={presets}
+              onComplete={() => { loadData(); setSection('approval'); }}
+            />
           )}
 
           {/* Campaigns */}
