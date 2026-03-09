@@ -588,40 +588,53 @@ const AppContent: React.FC<{
     refImgs: ReferenceImages,
     sourceText: string,
   ) => {
-    // Sprint 1: 기존 수동 대본 플로우로 위임 (스크립트 생성)
+    // 원본 소스 텍스트에서 문장별 디렉티브를 미리 파싱 (Gemini가 제거할 수 있으므로)
+    const sourceLines = sourceText.split(/(?<=[.!?。])\s*/).filter(s => s.trim());
+    const preParseMap = sourceLines.map(line => parseDirectives(line));
+
+    // 기존 수동 대본 플로우로 위임 (스크립트 생성)
     await handleGenerate(topic, refImgs, sourceText);
 
     // handleGenerate가 정상 완료(SCRIPT_REVIEW)했는지 확인
-    // 인증 실패, 크레딧 부족, 중단 등으로 조기 리턴 시 파싱 스킵
     if (!pendingGenContextRef.current || assetsRef.current.length === 0) return;
 
-    // 스크립트 생성 완료 후, 각 씬의 narration에서 디렉티브 파싱
-    {
-      const updated = assetsRef.current.map(asset => {
-        const { cleanNarration, directives, rawDirectives } = parseDirectives(asset.narration);
-        if (rawDirectives.length === 0) return asset; // 디렉티브 없으면 원본 유지
+    // 각 씬에 디렉티브 적용: Gemini 응답에서 파싱 시도 → 실패 시 원본 매칭
+    const updated = assetsRef.current.map((asset, idx) => {
+      // 1차: Gemini 응답 narration에서 직접 파싱
+      const { cleanNarration, directives, rawDirectives } = parseDirectives(asset.narration);
+
+      if (rawDirectives.length > 0) {
+        // Gemini가 디렉티브를 유지한 경우 — 직접 파싱 결과 사용
         return {
           ...asset,
           narration: cleanNarration,
-          analysis: {
-            ...asset.analysis,
-            directives,
-          },
+          analysis: { ...asset.analysis, directives },
         };
-      });
-      // Sprint 3: 연결 디렉티브 처리 (프롬프트 레벨 일관성)
-      const renderMode = localStorage.getItem('tubegen_render_mode') || 'parallel';
-      const hasConnectionDirectives = updated.some(a =>
-        a.analysis?.directives?.KEEP_PREV || a.analysis?.directives?.SAME_PLACE || a.analysis?.directives?.TIME_PASS
-      );
-      if (renderMode === 'consistency' || hasConnectionDirectives) {
-        const propagated = propagateSceneContext(updated);
-        assetsRef.current = propagated as typeof assetsRef.current;
-        setGeneratedData([...propagated] as typeof assetsRef.current);
-      } else {
-        assetsRef.current = updated;
-        setGeneratedData([...updated]);
       }
+
+      // 2차: 원본 소스 텍스트의 같은 인덱스 문장에서 디렉티브 복원
+      if (idx < preParseMap.length && preParseMap[idx].rawDirectives.length > 0) {
+        return {
+          ...asset,
+          narration: asset.narration, // Gemini가 이미 정제한 나레이션 유지
+          analysis: { ...asset.analysis, directives: preParseMap[idx].directives },
+        };
+      }
+
+      return asset;
+    });
+
+    // 연결 디렉티브 처리 (프롬프트 레벨 일관성) — 항상 적용
+    const hasConnectionDirectives = updated.some(a =>
+      a.analysis?.directives?.KEEP_PREV || a.analysis?.directives?.SAME_PLACE || a.analysis?.directives?.TIME_PASS
+    );
+    if (hasConnectionDirectives) {
+      const propagated = propagateSceneContext(updated);
+      assetsRef.current = propagated as typeof assetsRef.current;
+      setGeneratedData([...propagated] as typeof assetsRef.current);
+    } else {
+      assetsRef.current = updated;
+      setGeneratedData([...updated]);
     }
   }, [handleGenerate]);
 
@@ -813,13 +826,34 @@ const AppContent: React.FC<{
               }
           };
 
-          // 동시성 풀: CONCURRENCY개씩 병렬 처리
-          const indices = initialAssets.map((_, i) => i);
-          for (let start = 0; start < indices.length; start += CONCURRENCY) {
+          // 연결 디렉티브가 있는 씬 확인 → 순차/병렬 하이브리드 결정
+          const hasSequentialNeeds = initialAssets.some(a =>
+            a.analysis?.directives?.KEEP_PREV || a.analysis?.directives?.SAME_PLACE || a.analysis?.directives?.TIME_PASS
+          );
+
+          if (hasSequentialNeeds) {
+            // 하이브리드: 연결 디렉티브 있는 씬은 이전 씬 완료 후 순차, 독립 씬은 즉시 생성
+            for (let i = 0; i < initialAssets.length; i++) {
+              if (isAbortedRef.current) break;
+              const d = initialAssets[i].analysis?.directives;
+              const needsPrev = d?.KEEP_PREV || d?.SAME_PLACE || d?.TIME_PASS;
+              if (needsPrev && i > 0) {
+                // 이전 씬 이미지 완료 대기 (이미 생성됨)
+                setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 생성 중... (일관성 모드 — 이전 씬 참조)`);
+              } else {
+                setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 생성 중...`);
+              }
+              await generateSingleImage(i);
+            }
+          } else {
+            // 기존 병렬 처리
+            const indices = initialAssets.map((_, i) => i);
+            for (let start = 0; start < indices.length; start += CONCURRENCY) {
               if (isAbortedRef.current) break;
               const batch = indices.slice(start, start + CONCURRENCY);
               setProgressMessage(t('progress.generatingImages', { range: `${start + 1}~${Math.min(start + CONCURRENCY, indices.length)}`, total: indices.length }));
               await Promise.all(batch.map(i => generateSingleImage(i)));
+            }
           }
       };
 
