@@ -164,26 +164,18 @@ const ImageSettingsGroup: React.FC<ImageSettingsGroupProps> = ({
     <div>
       {/* ===== 1. 모델 + 영상 방향 (한 줄 4칸) ===== */}
       <div style={{ marginBottom: 22 }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr auto 1fr 1fr',
-          gap: 8,
-          marginBottom: 8,
-        }}>
-          <div style={{ ...sectionLabelStyle, gridColumn: 'span 2', marginBottom: 0 }}>
+        {/* Labels row */}
+        <div className="grid grid-cols-2 lg:grid-cols-[1fr_1fr_auto_1fr_1fr] gap-2 lg:gap-x-8 mb-2">
+          <div className="col-span-2 lg:col-span-2" style={{ ...sectionLabelStyle, marginBottom: 0 }}>
             <span style={{ fontSize: 14 }}>🤖</span> 이미지 생성 모델
           </div>
-          <div />
-          <div style={{ ...sectionLabelStyle, gridColumn: 'span 2', marginBottom: 0 }}>
+          <div className="hidden lg:block" />
+          <div className="col-span-2 lg:col-span-2" style={{ ...sectionLabelStyle, marginBottom: 0 }}>
             <span style={{ fontSize: 14 }}>📐</span> 영상 방향
           </div>
         </div>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr auto 1fr 1fr',
-          gap: 8,
-          alignItems: 'stretch',
-        }}>
+        {/* Cards row */}
+        <div className="grid grid-cols-2 lg:grid-cols-[1fr_1fr_auto_1fr_1fr] gap-2" style={{ alignItems: 'stretch' }}>
           {/* 모델 카드들 */}
           {IMAGE_MODELS.map((model) => {
             const active = imageModelId === model.id;
@@ -215,7 +207,7 @@ const ImageSettingsGroup: React.FC<ImageSettingsGroupProps> = ({
           })}
 
           {/* 구분선 */}
-          <div style={{ width: 1, background: 'var(--border-subtle)', alignSelf: 'stretch', margin: '4px 0' }} />
+          <div className="hidden lg:block" style={{ width: 1, background: 'var(--border-subtle)', alignSelf: 'stretch', margin: '4px 0' }} />
 
           {/* 가로 */}
           <button

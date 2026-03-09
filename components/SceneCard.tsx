@@ -159,7 +159,7 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
   const renderImageArea = () => {
     if (isGenerating && !hasImage) {
       return (
-        <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: imgW, height: imgH, background: 'var(--bg-elevated)' }}>
+        <div className="relative flex-shrink-0 flex items-center justify-center w-full h-40 md:w-auto md:h-auto" style={{ ...(typeof window !== 'undefined' && window.innerWidth >= 768 ? { width: imgW, height: imgH } : {}), background: 'var(--bg-elevated)' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(96,165,250,0.05) 50%, transparent 100%)', animation: 'shimmer 2s infinite' }} />
           <div className="text-center">
             <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent animate-spin rounded-full mx-auto mb-2" />
@@ -171,7 +171,7 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
 
     if (isError && !hasImage) {
       return (
-        <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: imgW, height: imgH, background: 'rgba(239,68,68,0.05)', borderRight: '2px dashed rgba(239,68,68,0.3)' }}>
+        <div className="relative flex-shrink-0 flex items-center justify-center w-full h-40 md:w-auto md:h-auto" style={{ ...(typeof window !== 'undefined' && window.innerWidth >= 768 ? { width: imgW, height: imgH } : {}), background: 'rgba(239,68,68,0.05)', borderRight: '2px dashed rgba(239,68,68,0.3)' }}>
           <div className="text-center">
             <svg className="w-8 h-8 text-red-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             <div className="flex items-center justify-center gap-2">
@@ -184,7 +184,7 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
     }
 
     return (
-      <div className="relative flex-shrink-0 group/img" style={{ width: imgW, height: imgH }}>
+      <div className="relative flex-shrink-0 group/img w-full h-40 md:w-auto md:h-auto" style={typeof window !== 'undefined' && window.innerWidth >= 768 ? { width: imgW, height: imgH } : undefined}>
         {hasVideo ? (
           <>
             <video src={row.videoData!} autoPlay loop muted playsInline className="w-full h-full object-cover" />
@@ -339,7 +339,7 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
       </div>
 
       {/* ═══ Body ═══ */}
-      <div className="flex">
+      <div className="flex flex-col md:flex-row">
         {renderImageArea()}
 
         <div className="flex-1 min-w-0 flex flex-col p-4 gap-3">
@@ -367,7 +367,7 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
           )}
 
           {/* Footer controls */}
-          <div className="flex items-center gap-3 mt-auto flex-wrap">
+          <div className="flex items-center gap-2 md:gap-3 mt-auto flex-wrap">
             {renderAudioControls()}
 
             {isEditing && (
