@@ -6,7 +6,7 @@ import AuthModal from './components/AuthModal';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultCards from './components/ResultCards';
-import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig } from './types';
+import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig, SceneDirectives } from './types';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useTheme } from './hooks/useTheme';
 import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript } from './services/geminiService';
@@ -234,6 +234,7 @@ const AppContent: React.FC<{
 
   const usedTopicsRef = useRef<string[]>([]);
   const assetsRef = useRef<GeneratedAsset[]>([]);
+  const sceneDirectivesRef = useRef<Record<number, SceneDirectives>>({}); // V2.0: 씬별 디렉티브 독립 저장 (assetsRef 덮어쓰기 방어)
   const isAbortedRef = useRef(false);
   const isProcessingRef = useRef(false);
   const pendingGenContextRef = useRef<{
@@ -651,8 +652,14 @@ const AppContent: React.FC<{
     }
 
     // V2.0 디버그: 디렉티브 저장 직후 확인
-    console.log('[Advanced] 디렉티브 저장 완료. 씬별 SPEAKER:',
-      assetsRef.current.map((a, i) => `씬${i+1}=${a.analysis?.directives?.SPEAKER || 'NONE'}`).join(', '));
+    // 디렉티브를 독립 ref에도 저장 (assetsRef 덮어쓰기 방어)
+    const dirMap: Record<number, SceneDirectives> = {};
+    assetsRef.current.forEach((a, i) => {
+      const d = a.analysis?.directives;
+      if (d && Object.keys(d).length > 0) dirMap[i] = d;
+    });
+    sceneDirectivesRef.current = dirMap;
+    console.log('[Advanced] 디렉티브 저장 완료. sceneDirectivesRef:', dirMap);
   }, [handleGenerate]);
 
   // ── Engine V2.0: 고급 대본 전용 에셋 생성 ──
@@ -732,8 +739,8 @@ const AppContent: React.FC<{
                       const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
                       const elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
 
-                      // V2.0: 화자별 Voice ID 매핑
-                      const speakerDirective = assetsRef.current[i].analysis?.directives?.SPEAKER;
+                      // V2.0: 화자별 Voice ID 매핑 (독립 ref 우선, assetsRef 폴백)
+                      const speakerDirective = sceneDirectivesRef.current[i]?.SPEAKER || assetsRef.current[i].analysis?.directives?.SPEAKER;
                       let voiceIdForScene: string | undefined;
                       let matchedSpeakerName: string | undefined;
                       let matchedSpeakerColor: string | undefined;
@@ -755,7 +762,7 @@ const AppContent: React.FC<{
                           }
                           // 4차: 순서 기반 폴백 (첫번째 ≠ 현재 → 두번째 화자)
                           if (!matched && characterVoices.length >= 2) {
-                            const prevSpeaker = i > 0 ? assetsRef.current[i - 1].analysis?.directives?.SPEAKER : null;
+                            const prevSpeaker = i > 0 ? (sceneDirectivesRef.current[i - 1]?.SPEAKER || assetsRef.current[i - 1].analysis?.directives?.SPEAKER) : null;
                             if (prevSpeaker && prevSpeaker !== speakerDirective) {
                               // 이전 씬과 다른 화자 → 이전 씬에서 안 쓴 voice 선택
                               const prevMatched = characterVoices.find((v: any) => v.name === prevSpeaker || (prevSpeaker.includes(v.name) || v.name.includes(prevSpeaker)));
@@ -884,9 +891,10 @@ const AppContent: React.FC<{
           };
 
           // 연결 디렉티브가 있는 씬 확인 → 순차/병렬 하이브리드 결정
-          const hasSequentialNeeds = initialAssets.some(a =>
-            a.analysis?.directives?.KEEP_PREV || a.analysis?.directives?.SAME_PLACE || a.analysis?.directives?.TIME_PASS
-          );
+          const hasSequentialNeeds = initialAssets.some((a, idx) => {
+            const d = sceneDirectivesRef.current[idx] || a.analysis?.directives;
+            return d?.KEEP_PREV || d?.SAME_PLACE || d?.TIME_PASS;
+          });
 
           if (hasSequentialNeeds) {
             // 하이브리드: 연결 디렉티브 있는 씬은 이전 씬 완료 후 순차, 독립 씬은 즉시 생성
