@@ -71,6 +71,7 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [customPreviewImage, setCustomPreviewImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [randomSectionOpen, setRandomSectionOpen] = useState(false);
 
   // Initialize variants from saved data
   const initialVariants: PreviewVariant[] = savedImages.length > 0
@@ -142,9 +143,16 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
     setCustomGenerating(true);
     setError(null);
     try {
-      const result = await generateStylePreview(sceneDesc, presetId, [prompt]);
-      if (result[0]?.image_data) {
-        setCustomPreviewImage(toDisplayUrl(result[0].image_data));
+      const result = await generateStylePreview(sceneDesc, presetId, [prompt, prompt, prompt]);
+      const imgData = result[0]?.image_data;
+      if (imgData) {
+        // URL from Storage or base64
+        const displayUrl = imgData.startsWith('http') ? imgData : toDisplayUrl(imgData);
+        setCustomPreviewImage(displayUrl);
+        // Also update the art_style custom_prompt
+        updateArtStyle({ custom_prompt: prompt });
+      } else {
+        setError('이미지 생성에 실패했습니다.');
       }
     } catch {
       setError('커스텀 프리뷰 생성에 실패했습니다.');
@@ -189,12 +197,23 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
         </div>
       )}
 
-      {/* AI Preview Generation */}
-      <div className="rounded-xl p-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
-        <label style={labelStyle}>AI 랜덤 화풍 프리뷰</label>
-        <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>
-          테스트 씬을 입력하면 랜덤 3가지 화풍으로 프리뷰를 생성합니다.
-        </p>
+      {/* AI Preview Generation — Collapsible */}
+      <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+        <button
+          type="button"
+          onClick={() => setRandomSectionOpen(p => !p)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+        >
+          <div>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>AI 랜덤 화풍 프리뷰</span>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>랜덤 3가지 화풍으로 프리뷰 생성</p>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ transform: randomSectionOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        {randomSectionOpen && <div className="px-4 pb-4">
         <input
           type="text"
           value={sceneDesc}
@@ -248,6 +267,7 @@ export default function Step4ArtStyle({ data, onUpdate, presetId }: Step4Props) 
             </div>
           ))}
         </div>
+      </div>}
       </div>
 
       {/* Manual Style + Custom Prompt */}
