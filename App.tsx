@@ -9,7 +9,8 @@ import ResultCards from './components/ResultCards';
 import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig } from './types';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useTheme } from './hooks/useTheme';
-import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood } from './services/geminiService';
+import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript } from './services/geminiService';
+import type { AdvancedSettings } from './components/input/HeroInput';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import { generateImage, getSelectedImageModel } from './services/imageService';
 import { generateAudioWithElevenLabs, generateMusicWithElevenLabs } from './services/elevenLabsService';
@@ -595,6 +596,23 @@ const AppContent: React.FC<{
     }
   }, [handleGenerate]);
 
+  // ── AI Assist: 의도 → 고급 대본 생성 ──
+  const [isAiAssisting, setIsAiAssisting] = useState(false);
+  const [aiAssistResult, setAiAssistResult] = useState<string | null>(null);
+
+  const handleAiAssist = useCallback(async (intent: string, settings: AdvancedSettings) => {
+    setIsAiAssisting(true);
+    try {
+      const language = localStorage.getItem('tubegen_language') || 'ko';
+      const result = await generateAdvancedScript(intent, settings, language);
+      setAiAssistResult(typeof result === 'string' ? result : (result as any).script || String(result));
+    } catch (e) {
+      console.warn('[AI Assist] Failed:', e);
+    } finally {
+      setIsAiAssisting(false);
+    }
+  }, []);
+
   // ── Phase 2: 스크립트 승인 → 에셋 생성 ──
   const handleApproveScript = useCallback(async () => {
     if (isProcessingRef.current) return;
@@ -632,9 +650,27 @@ const AppContent: React.FC<{
 
                       const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
                       const elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
+
+                      // V2.0: 화자별 Voice ID 매핑
+                      const speakerDirective = assetsRef.current[i].analysis?.directives?.SPEAKER;
+                      let voiceIdForScene: string | undefined;
+                      let matchedSpeakerName: string | undefined;
+                      let matchedSpeakerColor: string | undefined;
+                      if (speakerDirective) {
+                        try {
+                          const characterVoices = JSON.parse(localStorage.getItem('tubegen_character_voices') || '[]');
+                          const matched = characterVoices.find((v: any) => v.name === speakerDirective);
+                          if (matched?.voiceId) {
+                            voiceIdForScene = matched.voiceId;
+                            matchedSpeakerName = matched.name;
+                            matchedSpeakerColor = matched.color;
+                          }
+                        } catch {}
+                      }
+
                       const elResult = await generateAudioWithElevenLabs(
                         assetsRef.current[i].narration,
-                        undefined, undefined, undefined,
+                        undefined, voiceIdForScene, undefined,
                         { speed: elSpeed, stability: elStability }
                       );
                       if (isAbortedRef.current) break;
@@ -645,6 +681,14 @@ const AppContent: React.FC<{
                           subtitleData: elResult.subtitleData,
                           audioDuration: elResult.estimatedDuration
                         });
+                        // V2.0: 화자 정보 저장
+                        if (matchedSpeakerName) {
+                          assetsRef.current[i] = {
+                            ...assetsRef.current[i],
+                            speakerName: matchedSpeakerName,
+                            speakerColor: matchedSpeakerColor,
+                          };
+                        }
                         const charCount = assetsRef.current[i].narration.length;
                         addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
                         success = true;
@@ -1510,6 +1554,10 @@ const AppContent: React.FC<{
           onBgmDuckingToggle={setBgmDuckingEnabled}
           bgmDuckingAmount={bgmDuckingAmount}
           onBgmDuckingAmountChange={setBgmDuckingAmount}
+          onAiAssist={handleAiAssist}
+          isAiAssisting={isAiAssisting}
+          aiAssistResult={aiAssistResult}
+          onAiAssistResultConsumed={() => setAiAssistResult(null)}
         />
 
         {step === GenerationStep.IDLE && generatedData.length === 0 && (

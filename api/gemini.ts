@@ -566,6 +566,54 @@ Return ONLY the motion prompt, no explanation.`;
         return res.json({ imageData: null });
       }
 
+      // ── AI 대본 어시스턴트 (고급 모드) ──
+      case 'generateAdvancedScript': {
+        const { userIntent, settings, language } = params;
+        const langName = language === 'en' ? 'English' : language === 'ja' ? '日本語' : '한국어';
+
+        const formatGuide = settings.format !== 'auto' ? `형식: ${settings.format === 'monologue' ? '독백' : settings.format === 'dialogue' ? '대화형' : '나레이션'}` : '';
+        const speakerGuide = settings.speakerCount !== 'auto' ? `화자 수: ${settings.speakerCount}명` : '';
+        const moodGuide = settings.mood !== 'auto' ? `분위기: ${settings.mood === 'bright' ? '밝고 희망적' : settings.mood === 'tense' ? '긴장감 있는' : '차분한'}` : '';
+        const connectionGuide = settings.sceneConnection !== 'auto' ? `씬 연결: ${settings.sceneConnection === 'connected' ? '이전 씬과 이어지게 (이전씬유지) 디렉티브 사용' : '각 씬 독립적'}` : '';
+
+        const settingsText = [formatGuide, speakerGuide, moodGuide, connectionGuide].filter(Boolean).join('\n');
+
+        const prompt = `당신은 영상 대본 작가입니다. 사용자의 의도를 바탕으로 디렉티브가 포함된 완성 대본을 ${langName}로 작성하세요.
+
+## 디렉티브 문법
+각 문장 끝에 괄호로 연출 지시를 넣을 수 있습니다:
+- (배경: 설명) — 배경 장면
+- (분위기: 밝음/어두움/중립) — 이미지 톤
+- (구도: 클로즈업/미디엄샷/와이드샷/캐릭터없음) — 카메라 구도
+- (화자: 이름) — 해당 씬의 화자 (대화형일 때)
+- (이전씬유지) — 이전 씬과 같은 배경 유지
+- (같은장소) — 이전 씬 배경만 유지
+- (시간경과) — 같은 장소 + 조명 변화
+- (텍스트: "표시할 내용") — 이미지 내 텍스트
+- (색상: 설명) — 색상 강조
+- (카메라: 설명) — 카메라 앵글
+
+## 규칙
+- 한 문장 = 1개 씬. 마침표로 구분
+- 최소 6씬 이상 작성
+- 나레이션은 ${langName}로, 디렉티브 값은 ${langName}로 작성
+- 자연스럽고 몰입감 있는 대본 작성
+- 디렉티브는 적절히 배치 (매 씬마다 넣을 필요 없음)
+${settingsText ? `\n## 사용자 설정\n${settingsText}` : ''}
+
+## 사용자 의도
+${userIntent}
+
+디렉티브가 포함된 완성 대본만 출력하세요. 설명이나 주석 없이 대본만 작성합니다.`;
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+        });
+
+        return res.json({ script: response.text ?? '' });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }

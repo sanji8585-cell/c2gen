@@ -255,6 +255,20 @@ export const generateMotionPrompt = async (
   }
 };
 
+/** AI 대본 어시스턴트 (고급 모드) */
+export const generateAdvancedScript = async (
+  userIntent: string,
+  settings: {
+    format: string;
+    speakerCount: string;
+    mood: string;
+    sceneConnection: string;
+  },
+  language: string = 'ko',
+): Promise<string> => {
+  return callGeminiProxy('generateAdvancedScript', { userIntent, settings, language });
+};
+
 /** 분위기 분석 (BGM 자동 선택용) */
 export const analyzeMood = async (narrations: string[]): Promise<{ mood: string; confidence: number }> => {
   return callGeminiProxy('analyzeMood', { narrations });

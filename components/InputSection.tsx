@@ -5,6 +5,8 @@ import { CONFIG, IMAGE_MODELS, ImageModelId, GEMINI_STYLE_CATEGORIES, GeminiStyl
 import { getElevenLabsModelId } from '../services/elevenLabsService';
 import { VoiceSettingsHandle } from './input/VoiceSettings';
 import HeroInput from './input/HeroInput';
+import { AdvancedSettings } from './input/HeroInput';
+import CharacterVoiceManager from './CharacterVoiceManager';
 import SettingsAccordion from './input/SettingsAccordion';
 import ImageSettingsGroup from './input/ImageSettingsGroup';
 import SoundSettingsGroup from './input/SoundSettingsGroup';
@@ -38,6 +40,10 @@ interface InputSectionProps {
   onBgmDuckingToggle: (v: boolean) => void;
   bgmDuckingAmount: number;
   onBgmDuckingAmountChange: (v: number) => void;
+  onAiAssist?: (intent: string, settings: AdvancedSettings) => void;
+  isAiAssisting?: boolean;
+  aiAssistResult?: string | null;
+  onAiAssistResultConsumed?: () => void;
 }
 
 const InputSection: React.FC<InputSectionProps> = ({
@@ -46,6 +52,8 @@ const InputSection: React.FC<InputSectionProps> = ({
   bgmVolume, onBgmVolumeChange,
   bgmDuckingEnabled, onBgmDuckingToggle,
   bgmDuckingAmount, onBgmDuckingAmountChange,
+  onAiAssist, isAiAssisting,
+  aiAssistResult, onAiAssistResultConsumed,
 }) => {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual' | 'advanced'>('auto');
   const [topic, setTopic] = useState('');
@@ -102,6 +110,20 @@ const InputSection: React.FC<InputSectionProps> = ({
   // 아코디언 그룹 상태
   const [openGroup, setOpenGroup] = useState<'image' | 'sound' | 'preset' | null>('image');
 
+  // AI Assist handler
+  const handleAiAssist = useCallback((settings: AdvancedSettings) => {
+    if (advancedScript.trim() && onAiAssist) {
+      onAiAssist(advancedScript, settings);
+    }
+  }, [advancedScript, onAiAssist]);
+
+  // AI Assist result consumer
+  useEffect(() => {
+    if (aiAssistResult) {
+      setAdvancedScript(aiAssistResult);
+      onAiAssistResultConsumed?.();
+    }
+  }, [aiAssistResult, onAiAssistResultConsumed]);
 
   // 컴포넌트 마운트 시 저장된 설정 로드
   useEffect(() => {
@@ -390,7 +412,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         onGenerateAdvanced(autoTopic, refImages, advancedScript);
       }
     }
-  }, [isDisabled, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, advancedScript, onGenerate, onGenerateAdvanced]);
+  }, [isDisabled, activeTab, topic, characterRefImages, styleRefImages, characterStrength, styleStrength, manualScript, advancedScript, onGenerate, onGenerateAdvanced, onAiAssist]);
 
   // --- Accordion summaries ---
   const imageSummary = useMemo(() => {
@@ -482,7 +504,13 @@ const InputSection: React.FC<InputSectionProps> = ({
         step={step}
         advancedScript={advancedScript}
         onAdvancedScriptChange={setAdvancedScript}
+        onAiAssist={handleAiAssist}
+        isAiAssisting={isAiAssisting}
       />
+
+      {activeTab === 'advanced' && (
+        <CharacterVoiceManager compact />
+      )}
 
       {/* Settings Divider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0 16px' }}>

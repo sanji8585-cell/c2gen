@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GenerationStep } from '../../types';
 
+export interface AdvancedSettings {
+  format: 'auto' | 'monologue' | 'dialogue' | 'narration';
+  speakerCount: 'auto' | '1' | '2' | '3+';
+  mood: 'auto' | 'bright' | 'tense' | 'calm';
+  sceneConnection: 'auto' | 'independent' | 'connected';
+}
+
 interface HeroInputProps {
   activeTab: 'auto' | 'manual' | 'advanced';
   onTabChange: (tab: 'auto' | 'manual' | 'advanced') => void;
@@ -12,6 +19,8 @@ interface HeroInputProps {
   onAdvancedScriptChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   step: GenerationStep;
+  onAiAssist?: (settings: AdvancedSettings) => void;
+  isAiAssisting?: boolean;
 }
 
 const PLACEHOLDER_EXAMPLES = [
@@ -41,6 +50,8 @@ const HeroInput: React.FC<HeroInputProps> = ({
   onAdvancedScriptChange,
   onSubmit,
   step,
+  onAiAssist,
+  isAiAssisting,
 }) => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [placeholderOpacity, setPlaceholderOpacity] = useState(1);
@@ -48,6 +59,9 @@ const HeroInput: React.FC<HeroInputProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [btnHovered, setBtnHovered] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [advSettings, setAdvSettings] = useState<AdvancedSettings>({
+    format: 'auto', speakerCount: 'auto', mood: 'auto', sceneConnection: 'auto',
+  });
 
   const isDisabled = step !== GenerationStep.IDLE && step !== GenerationStep.ERROR && step !== GenerationStep.COMPLETED;
   const isProcessing = step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS;
@@ -280,6 +294,61 @@ const HeroInput: React.FC<HeroInputProps> = ({
         {/* Advanced textarea (고급 모드) */}
         {activeTab === 'advanced' && (
           <div>
+            {/* AI 어시스턴트 설정 */}
+            <div style={{ marginBottom: 12 }}>
+              {/* Settings row */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                {[
+                  { label: '형식', key: 'format' as const, options: [
+                    { value: 'auto', label: '🤖 알아서' }, { value: 'monologue', label: '독백' },
+                    { value: 'dialogue', label: '대화형' }, { value: 'narration', label: '나레이션' }
+                  ]},
+                  { label: '화자', key: 'speakerCount' as const, options: [
+                    { value: 'auto', label: '🤖 알아서' }, { value: '1', label: '1명' },
+                    { value: '2', label: '2명' }, { value: '3+', label: '3명+' }
+                  ]},
+                  { label: '분위기', key: 'mood' as const, options: [
+                    { value: 'auto', label: '🤖 알아서' }, { value: 'bright', label: '밝음' },
+                    { value: 'tense', label: '긴장감' }, { value: 'calm', label: '차분' }
+                  ]},
+                  { label: '씬 연결', key: 'sceneConnection' as const, options: [
+                    { value: 'auto', label: '🤖 알아서' }, { value: 'independent', label: '독립' },
+                    { value: 'connected', label: '이어지게' }
+                  ]},
+                ].map(group => (
+                  <div key={group.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, minWidth: 40 }}>{group.label}</span>
+                    <div style={{ display: 'flex', gap: 2, background: 'var(--bg-elevated)', borderRadius: 6, padding: 2 }}>
+                      {group.options.map(opt => (
+                        <button key={opt.value} type="button"
+                          onClick={() => setAdvSettings(prev => ({ ...prev, [group.key]: opt.value }))}
+                          style={{
+                            padding: '3px 8px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                            fontSize: 11, fontWeight: 500, transition: 'all 0.15s',
+                            background: advSettings[group.key] === opt.value ? 'linear-gradient(135deg, #60a5fa, #818cf8)' : 'transparent',
+                            color: advSettings[group.key] === opt.value ? '#fff' : 'var(--text-secondary)',
+                          }}
+                        >{opt.label}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* AI Assist button */}
+              <button type="button"
+                onClick={() => onAiAssist?.(advSettings)}
+                disabled={isDisabled || isAiAssisting || !advancedScript.trim()}
+                style={{
+                  width: '100%', padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.3)',
+                  background: isAiAssisting ? 'var(--bg-elevated)' : 'linear-gradient(135deg, rgba(96,165,250,0.1), rgba(129,140,248,0.1))',
+                  color: isAiAssisting ? 'var(--text-muted)' : '#60a5fa',
+                  fontSize: 13, fontWeight: 600, cursor: isAiAssisting ? 'wait' : 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {isAiAssisting ? '✨ AI가 대본 작성 중...' : '✨ AI가 대본 완성해주기'}
+              </button>
+            </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <span style={{ fontSize: 20, opacity: 0.6, flexShrink: 0, marginTop: 2 }}>🎬</span>
               <div style={{ flex: 1 }}>
