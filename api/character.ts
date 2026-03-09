@@ -129,14 +129,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const owned = await verifyPresetOwnership(supabase, brand_preset_id, email);
         if (!owned) return res.status(403).json({ error: 'Access denied' });
 
+        // Exclude original_upload_url (large base64) — use original_upload from reference_sheet instead
         const { data, error } = await supabase
           .from('c2gen_character_references')
-          .select('*')
+          .select('id, brand_preset_id, name, type, char_role, species, personality, appearance_description, distinction_tags, speech_style, voice_id, original_upload_url, reference_sheet, style_analysis, created_at')
           .eq('brand_preset_id', brand_preset_id)
           .order('created_at', { ascending: true });
 
         if (error) return res.status(500).json({ error: error.message });
-        return res.json({ characters: data });
+
+        // Strip ALL base64 data from response — keep only URLs
+        const safeData = (data || []).map((c: any) => {
+          const sheet = c.reference_sheet || {};
+          const safeSheet: Record<string, any> = {};
+          for (const [key, val] of Object.entries(sheet)) {
+            if (typeof val === 'string' && val.startsWith('data:')) {
+              safeSheet[key] = '[base64]'; // Mark as exists but don't send
+            } else {
+              safeSheet[key] = val;
+            }
+          }
+          return {
+            ...c,
+            original_upload_url: c.original_upload_url?.startsWith('http') ? c.original_upload_url : undefined,
+            reference_sheet: safeSheet,
+          };
+        });
+        return res.json({ characters: safeData });
       }
 
       // ── 캐릭터 생성 ──
@@ -388,9 +407,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const responseParts = response.candidates?.[0]?.content?.parts || [];
             for (const part of responseParts) {
               if (part.inlineData) {
-                const base64Url = `data:image/${part.inlineData.mimeType?.split('/')[1] || 'png'};base64,${part.inlineData.data}`;
+                const mimeType = part.inlineData.mimeType || 'image/png';
+                const base64Url = `data:image/${mimeType.split('/')[1] || 'png'};base64,${part.inlineData.data}`;
                 // Upload to Supabase Storage
-                const storageUrl = await uploadToStorage(supabase, base64Url, `characters/${character_id}/${angle.key}-${Date.now()}`);
+                const storagePath = `characters/${character_id}/${angle.key}-${Date.now()}`;
+                console.log(`[generate-sheet] Uploading ${angle.key} to storage: ${storagePath} (${Math.round(part.inlineData.data.length / 1024)}KB)`);
+                const storageUrl = await uploadToStorage(supabase, base64Url, storagePath);
+                console.log(`[generate-sheet] ${angle.key} storage result:`, storageUrl ? 'URL OK' : 'FAILED - using base64 fallback');
                 referenceSheet[angle.key] = storageUrl || base64Url;
                 break;
               }
@@ -418,6 +441,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...referenceSheet,
           original_upload: origUpload,
         };
+        // Log what's being saved
+        const sheetSummary = Object.entries(mergedSheet).map(([k, v]) => `${k}: ${typeof v === 'string' ? (v.startsWith('http') ? 'URL' : v.startsWith('data:') ? 'base64' : v?.slice(0, 20)) : v}`);
+        console.log('[generate-sheet] Saving reference_sheet:', sheetSummary);
+
         const updatePayload: Record<string, unknown> = {
           reference_sheet: mergedSheet,
         };

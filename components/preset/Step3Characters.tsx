@@ -302,15 +302,22 @@ export default function Step3Characters({ data, onUpdate, presetId }: Step3Props
         <div className="flex flex-col gap-3">
           {characters.map((char) => {
             // Check both reference_sheet.original_upload AND original_upload_url DB column
-            const originalImage = (char.reference_sheet?.original_upload && char.reference_sheet.original_upload !== '[uploaded]')
-              ? char.reference_sheet.original_upload
-              : (char as any).original_upload_url || '';
+            const rawOriginal = char.reference_sheet?.original_upload || (char as any).original_upload_url || '';
+            const originalImage = (rawOriginal && rawOriginal !== '[uploaded]' && rawOriginal !== '[base64]') ? rawOriginal : '';
             const hasOriginalUpload = !!originalImage;
             const isSheetLoading = sheetLoading[char.id] || false;
             // Reference sheet may be flat { front, angle_45, ... } or nested { multi_angle: { front, ... } }
             const sheet = char.reference_sheet || {};
-            const multiAngle = sheetImages[char.id] || sheet.multi_angle || { front: sheet.front, angle_45: sheet.angle_45, side: sheet.side, full_body: sheet.full_body };
-            const hasSheetImages = Object.keys(multiAngle).length > 0 && Object.values(multiAngle).some(Boolean);
+            const rawAngles = sheetImages[char.id] || sheet.multi_angle || { front: sheet.front, angle_45: sheet.angle_45, side: sheet.side, full_body: sheet.full_body };
+            // Filter: only keep URLs (http) or data: URLs, exclude [base64] markers
+            const multiAngle: Record<string, string> = {};
+            for (const [k, v] of Object.entries(rawAngles)) {
+              const s = v as string;
+              if (s && s !== '[base64]' && s !== 'null' && s !== 'undefined' && (s.startsWith('http') || s.startsWith('data:'))) {
+                multiAngle[k] = s;
+              }
+            }
+            const hasSheetImages = Object.keys(multiAngle).length > 0;
             const ANGLE_LABELS: Record<string, string> = {
               front: '정면',
               angle_45: '45도',
