@@ -92,7 +92,7 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
 
   const [scenarioStates, setScenarioStates] = useState<ScenarioState>(initStates);
   const [allGenerating, setAllGenerating] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmed, setConfirmed] = useState(!!(data.art_style as any)?.gallery_confirmed);
   const [error, setError] = useState<string | null>(null);
 
   const styleName = data.art_style?.style_id || '선택된 스타일 없음';
@@ -151,7 +151,12 @@ export default function Step5SituationGallery({ data, onUpdate, presetId }: Step
 
   const handleConfirm = () => {
     setConfirmed(true);
-    onUpdate({ style_preview_images: SCENARIOS.map((s) => s.id) });
+    // Gallery images are already saved to DB by the API during generation.
+    // This button just marks user confirmation in the art_style JSONB.
+    const currentArtStyle = data.art_style || {};
+    onUpdate({
+      art_style: { ...currentArtStyle, gallery_confirmed: true },
+    });
   };
 
   return (

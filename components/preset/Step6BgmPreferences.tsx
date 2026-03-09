@@ -44,11 +44,12 @@ const inputStyle: React.CSSProperties = {
 const moodKeys = Object.keys(BGM_MOODS) as BgmMood[];
 
 export default function Step6BgmPreferences({ data, onUpdate, presetId: _presetId }: Step6Props) {
-  const prefs: BgmPreferences = data.bgm_preferences || {
-    genre: '',
-    mood: '',
-    tempo_range: { min: 80, max: 120 },
-    custom_prompt: '',
+  const raw = data.bgm_preferences || {};
+  const prefs: BgmPreferences = {
+    genre: raw.genre || '',
+    mood: raw.mood || '',
+    tempo_range: { min: raw.tempo_range?.min ?? 80, max: raw.tempo_range?.max ?? 120 },
+    custom_prompt: raw.custom_prompt || '',
   };
   const [bgmSamples, setBgmSamples] = useState<Array<{ audio: string; prompt: string }>>([]);
   const [bgmLoading, setBgmLoading] = useState(false);
