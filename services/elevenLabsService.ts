@@ -123,6 +123,12 @@ export const generateAudioWithElevenLabs = async (
   const stability = options?.stability ?? 0.6;
   const processedText = preprocessTtsText(text);
 
+  // 빈 텍스트 가드 — ElevenLabs API는 빈 텍스트 시 400 에러 반환
+  if (!processedText || processedText.trim().length === 0) {
+    console.warn('[ElevenLabs] 빈 텍스트 — TTS 생성 스킵');
+    return { audioData: null, subtitleData: null, estimatedDuration: 0 } as any;
+  }
+
   try {
     const headers = buildElevenLabsHeaders();
     const response = await fetch('/api/elevenlabs', {
