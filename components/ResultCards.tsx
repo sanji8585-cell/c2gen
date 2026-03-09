@@ -155,6 +155,8 @@ const ResultCards: React.FC<ResultCardsProps> = ({
     textColor: subtitleTextColor,
   };
 
+  if (data.length === 0) return null;
+
   return (
     <div className="w-full max-w-[98%] mx-auto pb-32">
       <SceneToolbar
