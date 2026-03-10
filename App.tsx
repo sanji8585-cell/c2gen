@@ -685,8 +685,15 @@ const AppContent: React.FC<{
       } catch {}
       const result = await generateAdvancedScript(intent, { ...settings, characterNames } as any, language);
       setAiAssistResult(typeof result === 'string' ? result : (result as any).script || String(result));
-    } catch (e) {
-      console.warn('[AI Assist] Failed:', e);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn('[AI Assist] Failed:', msg);
+      if (msg.includes('insufficient_credits') || msg.includes('402')) {
+        setToastMessage('크레딧이 부족합니다. 충전 후 다시 시도하세요.');
+      } else {
+        setToastMessage('AI 대본 생성에 실패했습니다. 다시 시도해주세요.');
+      }
+      setTimeout(() => setToastMessage(null), 4000);
     } finally {
       setIsAiAssisting(false);
     }
@@ -831,7 +838,10 @@ const AppContent: React.FC<{
 
               if (!success && !isAbortedRef.current) {
                   try {
-                      const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration);
+                      // V2.0: 폴백 시 화자 성별/언어 전달
+                      const fallbackGender = speakerDirective ? (/남자|남성|남|male|man/i.test(speakerDirective) ? 'male' : /여자|여성|여|female|woman/i.test(speakerDirective) ? 'female' : undefined) : undefined;
+                      const fallbackLang = (localStorage.getItem('tubegen_language') as string) || 'ko';
+                      const fallbackAudio = await generateAudioForScene(assetsRef.current[i].narration, fallbackGender, fallbackLang);
                       updateAssetAt(i, { audioData: fallbackAudio });
                       completedCount++;
                   } catch (fallbackError) {
@@ -856,6 +866,7 @@ const AppContent: React.FC<{
           const CONCURRENCY = 10; // 동시 이미지 생성 수 (Gemini 10개 가능)
           const imageModel = getSelectedImageModel();
           const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
+          const renderMode = localStorage.getItem('tubegen_render_mode') || 'parallel';
 
           const generateSingleImage = async (i: number) => {
               if (isAbortedRef.current) return;
@@ -873,7 +884,9 @@ const AppContent: React.FC<{
                           await wait(2000);
                       }
 
-                      const img = await generateImage(assetsRef.current[i], refImgs);
+                      // V2.0: 일관성 모드 시 이전 씬 이미지 참조 전달
+                      const prevImg = (renderMode === 'consistency' && i > 0) ? assetsRef.current[i - 1]?.imageData : undefined;
+                      const img = await generateImage(assetsRef.current[i], refImgs, prevImg ? { prevSceneImage: prevImg } : undefined);
                       if (isAbortedRef.current) break;
 
                       if (img) {
@@ -902,21 +915,11 @@ const AppContent: React.FC<{
               }
           };
 
-          // 이미지 모드 확인: "빠른 생성"이면 디렉티브와 무관하게 항상 병렬
-          const renderMode = localStorage.getItem('tubegen_render_mode') || 'parallel';
-          const hasSequentialNeeds = renderMode === 'consistency' && initialAssets.some((a, idx) => {
-            const d = sceneDirectivesRef.current[idx] || a.analysis?.directives;
-            return d?.KEEP_PREV || d?.SAME_PLACE || d?.TIME_PASS;
-          });
-
-          if (hasSequentialNeeds) {
-            // 하이브리드: 연결 디렉티브 있는 씬은 이전 씬 완료 후 순차, 독립 씬은 즉시 생성
+          // V2.0 일관성 모드: 순차 생성 + 이전 씬 이미지 참조
+          if (renderMode === 'consistency') {
             for (let i = 0; i < initialAssets.length; i++) {
               if (isAbortedRef.current) break;
-              const d = initialAssets[i].analysis?.directives;
-              const needsPrev = d?.KEEP_PREV || d?.SAME_PLACE || d?.TIME_PASS;
-              if (needsPrev && i > 0) {
-                // 이전 씬 이미지 완료 대기 (이미 생성됨)
+              if (i > 0) {
                 setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 생성 중... (일관성 모드 — 이전 씬 참조)`);
               } else {
                 setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 생성 중...`);

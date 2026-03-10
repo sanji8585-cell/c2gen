@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GenerationStep } from '../../types';
+import DirectiveGuideModal from '../DirectiveGuideModal';
 
 export interface AdvancedSettings {
   format: 'auto' | 'monologue' | 'dialogue' | 'narration';
@@ -62,6 +63,7 @@ const HeroInput: React.FC<HeroInputProps> = ({
   const [advSettings, setAdvSettings] = useState<AdvancedSettings>({
     format: 'auto', speakerCount: 'auto', mood: 'auto', sceneConnection: 'auto',
   });
+  const [showDirectiveGuide, setShowDirectiveGuide] = useState(false);
   const [renderMode, setRenderMode] = useState<'parallel' | 'consistency'>(() => {
     return (localStorage.getItem('tubegen_render_mode') as 'parallel' | 'consistency') || 'parallel';
   });
@@ -351,6 +353,22 @@ const HeroInput: React.FC<HeroInputProps> = ({
               >
                 {isAiAssisting ? '✨ AI가 대본 작성 중...' : '✨ AI가 대본 완성해주기'}
               </button>
+              {/* Directive Guide button */}
+              <button type="button"
+                onClick={() => setShowDirectiveGuide(true)}
+                style={{
+                  width: '100%', padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border-default)',
+                  background: 'var(--bg-elevated)',
+                  color: 'var(--text-secondary)',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  marginTop: 4,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#818cf8'; e.currentTarget.style.borderColor = 'rgba(129,140,248,0.4)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-default)'; }}
+              >
+                📖 디렉티브 가이드
+              </button>
             </div>
             {/* 렌더링 모드 선택 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -418,6 +436,7 @@ const HeroInput: React.FC<HeroInputProps> = ({
         )}
       </div>
       </div>
+      <DirectiveGuideModal isOpen={showDirectiveGuide} onClose={() => setShowDirectiveGuide(false)} />
     </form>
   );
 };

@@ -86,7 +86,7 @@ function createSrtChunks(
  * - videoService.ts와 100% 동일한 타임라인 계산 방식 사용
  * - 실제 오디오 파일을 디코딩해서 정확한 길이 사용
  */
-export async function generateSrtContent(assets: GeneratedAsset[]): Promise<string> {
+export async function generateSrtContent(assets: GeneratedAsset[], speakerNames?: (string | undefined)[]): Promise<string> {
   const allChunks: SrtChunk[] = [];
   let timelinePointer = 0;
   let globalIndex = 1;
@@ -94,10 +94,14 @@ export async function generateSrtContent(assets: GeneratedAsset[]): Promise<stri
   // videoService와 동일: 이미지가 있는 씬만 포함
   const validAssets = assets.filter(a => a.imageData);
 
+  // speakerNames가 없으면 각 에셋의 speakerName 필드를 사용
+  const resolvedSpeakers = speakerNames ?? validAssets.map(a => a.speakerName);
+
   // 각 씬의 오디오 길이 계산을 위한 기본값 (videoService와 동일)
   const DEFAULT_DURATION = 3;
 
-  for (const asset of validAssets) {
+  for (let sceneIdx = 0; sceneIdx < validAssets.length; sceneIdx++) {
+    const asset = validAssets[sceneIdx];
     // videoService와 100% 동일한 duration 계산 로직
     // 오디오가 있으면 디코딩해서 실제 길이 사용, 없으면 기본 3초
     let sceneDuration = DEFAULT_DURATION;
@@ -126,9 +130,13 @@ export async function generateSrtContent(assets: GeneratedAsset[]): Promise<stri
       DEFAULT_SUBTITLE_CONFIG.wordsPerLine
     );
 
-    // 인덱스 재할당
+    // 스피커 라벨 추가 + 인덱스 재할당
+    const speaker = resolvedSpeakers[sceneIdx];
     for (const chunk of sceneChunks) {
       chunk.index = globalIndex++;
+      if (speaker) {
+        chunk.text = `[${speaker}] ${chunk.text}`;
+      }
       allChunks.push(chunk);
     }
 
@@ -159,8 +167,8 @@ export async function generateSrtContent(assets: GeneratedAsset[]): Promise<stri
 /**
  * SRT 파일 다운로드 (기존 방식 - 비동기 계산)
  */
-export async function downloadSrt(assets: GeneratedAsset[], filename: string = 'subtitles.srt'): Promise<void> {
-  const srtContent = await generateSrtContent(assets);
+export async function downloadSrt(assets: GeneratedAsset[], filename: string = 'subtitles.srt', speakerNames?: (string | undefined)[]): Promise<void> {
+  const srtContent = await generateSrtContent(assets, speakerNames);
 
   if (!srtContent.trim()) {
     alert('자막 데이터가 없습니다. ElevenLabs로 오디오를 생성해주세요.');
@@ -184,7 +192,7 @@ export async function downloadSrt(assets: GeneratedAsset[], filename: string = '
  * - videoService에서 기록한 정확한 타이밍 사용
  * - 영상과 100% 동일한 자막 타이밍 보장
  */
-export function generateSrtFromRecorded(recordedSubtitles: RecordedSubtitleEntry[]): string {
+export function generateSrtFromRecorded(recordedSubtitles: RecordedSubtitleEntry[], speakerNames?: (string | undefined)[]): string {
   if (recordedSubtitles.length === 0) {
     return '';
   }
@@ -193,11 +201,12 @@ export function generateSrtFromRecorded(recordedSubtitles: RecordedSubtitleEntry
 
   for (let i = 0; i < recordedSubtitles.length; i++) {
     const entry = recordedSubtitles[i];
+    const speaker = speakerNames?.[i];
 
     srtLines.push((i + 1).toString());
     srtLines.push(`${formatSrtTime(entry.startTime)} --> ${formatSrtTime(entry.endTime)}`);
     // 줄바꿈 문자를 SRT 형식에 맞게 유지
-    srtLines.push(entry.text);
+    srtLines.push(speaker ? `[${speaker}] ${entry.text}` : entry.text);
     srtLines.push(''); // 빈 줄
   }
 
@@ -209,9 +218,10 @@ export function generateSrtFromRecorded(recordedSubtitles: RecordedSubtitleEntry
  */
 export function downloadSrtFromRecorded(
   recordedSubtitles: RecordedSubtitleEntry[],
-  filename: string = 'subtitles.srt'
+  filename: string = 'subtitles.srt',
+  speakerNames?: (string | undefined)[]
 ): void {
-  const srtContent = generateSrtFromRecorded(recordedSubtitles);
+  const srtContent = generateSrtFromRecorded(recordedSubtitles, speakerNames);
 
   if (!srtContent.trim()) {
     alert('자막 데이터가 없습니다.');

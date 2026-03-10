@@ -224,10 +224,10 @@ export const generateImageForScene = async (
   return result?.imageData || null;
 };
 
-/** Gemini TTS */
-export const generateAudioForScene = async (text: string) => {
+/** Gemini TTS (성별/언어 라우팅 지원) */
+export const generateAudioForScene = async (text: string, gender?: string, language?: string) => {
   return retryGeminiRequest("TTS Generation", async () => {
-    const result = await callGeminiProxy('generateAudio', { text });
+    const result = await callGeminiProxy('generateAudio', { text, gender, language });
     return result?.audioData || null;
   });
 };

@@ -108,8 +108,8 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
     : sentiment === 'POSITIVE' ? 'Bright, warm lighting.'
     : 'Balanced lighting.';
 
-  // 색상 팔레트 힌트
-  const colorHint = getColorPaletteHint(sentiment, scene.narration || '');
+  // 색상 팔레트 힌트 (COLOR 디렉티브 시 자동 팔레트 억제 — 충돌 방지)
+  const colorHint = directives?.COLOR ? '' : getColorPaletteHint(sentiment, scene.narration || '');
 
   // 캐릭터 (화풍 적용)
   const effectiveStyle = directives?.STYLE || artStylePrompt;

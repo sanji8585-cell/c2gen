@@ -127,7 +127,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         : 0;
       drawSceneFrame(ctx, canvas.width, canvas.height, activeScene, Math.min(1, Math.max(0, sceneProgress)));
       const sceneElapsed = time - activeScene.startTime;
-      renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config);
+      renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config, activeScene.speakerColor);
     }
 
     return { sceneIdx };
@@ -430,6 +430,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
             zoomEffect: (asset.zoomEffect || 'zoomIn') as ZoomEffect,
             transition: (asset.transition || 'none') as TransitionType,
             startTime, endTime, duration,
+            speakerColor: asset.speakerColor,
           });
 
           timeline = endTime + sceneGap;

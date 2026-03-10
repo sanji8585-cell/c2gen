@@ -24,6 +24,7 @@ export interface PreparedScene {
   startTime: number;
   endTime: number;
   duration: number;
+  speakerColor?: string;
 }
 
 /**
@@ -124,7 +125,8 @@ export function renderSubtitle(
   canvas: HTMLCanvasElement,
   chunks: SubtitleChunk[],
   sceneElapsed: number,
-  config: SubtitleConfig
+  config: SubtitleConfig,
+  speakerColor?: string
 ) {
   const currentChunk = getCurrentChunk(chunks, sceneElapsed);
   if (!currentChunk) return;
@@ -171,7 +173,7 @@ export function renderSubtitle(
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.lineWidth = 4;
     ctx.strokeText(line, canvas.width / 2, textY, textMaxWidth);
-    ctx.fillStyle = config.textColor;
+    ctx.fillStyle = speakerColor || config.textColor;
     ctx.fillText(line, canvas.width / 2, textY, textMaxWidth);
   });
 }

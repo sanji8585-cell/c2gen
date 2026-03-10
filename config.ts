@@ -490,40 +490,82 @@ export const CONFIG = {
 /** 다국어 디렉티브 키 → 내부 키 */
 export const DIRECTIVE_KEY_MAP: Record<string, string> = {
   // 한국어
-  '구도': 'COMPOSITION', '분위기': 'MOOD', '배경': 'BACKGROUND',
-  '스타일': 'STYLE', '텍스트': 'TEXT', '카메라': 'CAMERA',
-  '색상': 'COLOR', '화자': 'SPEAKER',
+  '구도': 'COMPOSITION', '샷': 'COMPOSITION',
+  '분위기': 'MOOD',
+  '배경': 'BACKGROUND', '화면': 'BACKGROUND', '배경색': 'BACKGROUND',
+  '스타일': 'STYLE', '화풍': 'STYLE',
+  '텍스트': 'TEXT',
+  '카메라': 'CAMERA', '앵글': 'CAMERA',
+  '색상': 'COLOR', '색깔': 'COLOR', '색조': 'COLOR',
+  '화자': 'SPEAKER', '나레이터': 'SPEAKER',
   '이전씬유지': 'KEEP_PREV', '같은장소': 'SAME_PLACE', '시간경과': 'TIME_PASS',
   // English
-  'composition': 'COMPOSITION', 'mood': 'MOOD', 'background': 'BACKGROUND',
-  'style': 'STYLE', 'text': 'TEXT', 'camera': 'CAMERA',
-  'color': 'COLOR', 'speaker': 'SPEAKER',
-  'keep-prev': 'KEEP_PREV', 'same-place': 'SAME_PLACE', 'time-pass': 'TIME_PASS',
+  'composition': 'COMPOSITION', 'shot': 'COMPOSITION',
+  'mood': 'MOOD', 'tone': 'MOOD',
+  'background': 'BACKGROUND', 'bg': 'BACKGROUND', 'scene': 'BACKGROUND',
+  'style': 'STYLE',
+  'text': 'TEXT',
+  'camera': 'CAMERA', 'angle': 'CAMERA',
+  'color': 'COLOR', 'colour': 'COLOR',
+  'speaker': 'SPEAKER', 'narrator': 'SPEAKER',
+  'keep-prev': 'KEEP_PREV', 'keep': 'KEEP_PREV', 'continue': 'KEEP_PREV',
+  'same-place': 'SAME_PLACE', 'time-pass': 'TIME_PASS',
   // 日本語
-  '構図': 'COMPOSITION', '雰囲気': 'MOOD', '背景': 'BACKGROUND',
-  'スタイル': 'STYLE', 'テキスト': 'TEXT', 'カメラ': 'CAMERA',
-  '色': 'COLOR', '話者': 'SPEAKER',
+  '構図': 'COMPOSITION', 'ショット': 'COMPOSITION',
+  '雰囲気': 'MOOD',
+  '背景': 'BACKGROUND', '場面': 'BACKGROUND',
+  'スタイル': 'STYLE',
+  'テキスト': 'TEXT',
+  'カメラ': 'CAMERA',
+  '色': 'COLOR', '色合い': 'COLOR',
+  '話者': 'SPEAKER', 'ナレーター': 'SPEAKER',
   '前シーン維持': 'KEEP_PREV', '同じ場所': 'SAME_PLACE', '時間経過': 'TIME_PASS',
 };
 
 /** 다국어 구도 값 → 내부 값 */
 export const COMPOSITION_VALUE_MAP: Record<string, string> = {
-  '클로즈업': 'MACRO', 'close-up': 'MACRO', 'クローズアップ': 'MACRO',
-  '미디엄샷': 'STANDARD', 'medium': 'STANDARD', 'ミディアム': 'STANDARD',
-  '와이드샷': 'MICRO', 'wide': 'MICRO', 'ワイド': 'MICRO',
-  '캐릭터없음': 'NO_CHAR', 'no-char': 'NO_CHAR', 'キャラなし': 'NO_CHAR',
+  // 한국어
+  '클로즈업': 'MACRO', '클로즈 업': 'MACRO', '익스트림 클로즈업': 'MACRO',
+  '미디엄샷': 'STANDARD', '미디엄': 'STANDARD', '바스트샷': 'STANDARD',
+  '와이드샷': 'MICRO', '와이드': 'MICRO', '풀샷': 'MICRO', '전신샷': 'MICRO',
+  '캐릭터없음': 'NO_CHAR',
+  // English
+  'close-up': 'MACRO', 'close up': 'MACRO', 'closeup': 'MACRO', 'cu': 'MACRO', 'extreme close-up': 'MACRO', 'ecu': 'MACRO',
+  'medium': 'STANDARD', 'medium shot': 'STANDARD', 'mid shot': 'STANDARD', 'ms': 'STANDARD',
+  'wide': 'MICRO', 'wide shot': 'MICRO', 'full shot': 'MICRO', 'ws': 'MICRO', 'fs': 'MICRO',
+  'no-char': 'NO_CHAR', 'none': 'NO_CHAR', 'no char': 'NO_CHAR', 'object only': 'NO_CHAR',
+  // 日本語
+  'クローズアップ': 'MACRO', 'ミディアム': 'STANDARD', 'ワイド': 'MICRO', 'フルショット': 'MICRO',
+  'キャラなし': 'NO_CHAR',
 };
 
 /** 다국어 분위기 값 → 내부 값 */
 export const MOOD_VALUE_MAP: Record<string, string> = {
-  '밝음': 'POSITIVE', 'bright': 'POSITIVE', '明るい': 'POSITIVE',
-  '어두움': 'NEGATIVE', 'dark': 'NEGATIVE', '暗い': 'NEGATIVE',
-  '중립': 'NEUTRAL', 'neutral': 'NEUTRAL', '中立': 'NEUTRAL',
+  // 한국어 POSITIVE
+  '밝음': 'POSITIVE', '희망적': 'POSITIVE', '희망': 'POSITIVE', '설렘': 'POSITIVE',
+  '신나는': 'POSITIVE', '경쾌한': 'POSITIVE', '활기찬': 'POSITIVE', '따뜻한': 'POSITIVE',
+  // 한국어 NEGATIVE
+  '어두움': 'NEGATIVE', '긴장': 'NEGATIVE', '긴장감': 'NEGATIVE', '무거움': 'NEGATIVE',
+  '공포': 'NEGATIVE', '슬픔': 'NEGATIVE', '우울': 'NEGATIVE', '불안': 'NEGATIVE', '극적인': 'NEGATIVE',
+  // 한국어 NEUTRAL
+  '중립': 'NEUTRAL', '차분한': 'NEUTRAL', '잔잔한': 'NEUTRAL', '진지한': 'NEUTRAL',
+  // English POSITIVE
+  'bright': 'POSITIVE', 'hopeful': 'POSITIVE', 'happy': 'POSITIVE', 'warm': 'POSITIVE',
+  'energetic': 'POSITIVE', 'exciting': 'POSITIVE', 'positive': 'POSITIVE',
+  // English NEGATIVE
+  'dark': 'NEGATIVE', 'tense': 'NEGATIVE', 'dramatic': 'NEGATIVE', 'anxious': 'NEGATIVE',
+  'sad': 'NEGATIVE', 'gloomy': 'NEGATIVE', 'melancholy': 'NEGATIVE', 'negative': 'NEGATIVE',
+  // English NEUTRAL
+  'neutral': 'NEUTRAL', 'calm': 'NEUTRAL', 'serious': 'NEUTRAL',
+  // 日本語
+  '明るい': 'POSITIVE', '希望': 'POSITIVE',
+  '暗い': 'NEGATIVE', '緊張': 'NEGATIVE', '恐怖': 'NEGATIVE', '悲しい': 'NEGATIVE', 'ドラマティック': 'NEGATIVE',
+  '中立': 'NEUTRAL', '穏やか': 'NEUTRAL',
 };
 
 /** Gemini TTS 폴백 음성 매핑 */
 export const GEMINI_VOICE_MAP: Record<string, Record<string, string>> = {
   ko: { male: 'Charon', female: 'Kore' },
   en: { male: 'Fenrir', female: 'Aoede' },
-  ja: { male: 'Charon', female: 'Kore' },
+  ja: { male: 'Iapetus', female: 'Despina' },
 };
