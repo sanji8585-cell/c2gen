@@ -420,7 +420,12 @@ const en = {
   // ── Gamification ──
   game: {
     pullGacha: '1x Pull',
+    pullGacha5: '5x Pull',
     pulling: 'Pulling...',
+    multiPulling: '5x Pull in progress...',
+    multiPullSlot: 'Revealing {{current}}/5...',
+    multiPullComplete: '5x Pull Complete!',
+    multiPullSummary: 'Summary',
     noTickets: 'No tickets. Earn tickets from leveling up, achievements, and daily rewards.',
     ticketsOwned: 'Tickets Owned',
     ticketUnit: '',

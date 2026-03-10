@@ -2238,6 +2238,16 @@ const AppContent: React.FC<{
               Promise.all([game.recordAction('gacha_pull', 1), game.refreshState()]).catch(() => {});
             }
           }}
+          onPullGachaMulti={async () => {
+            const result = await game.pullGacha();
+            if (result?.item) {
+              // 5연뽑은 GameOverlay 없이 인라인으로 표시, 퀘스트 기록은 백그라운드
+              game.recordAction('gacha_pull', 1).catch(() => {});
+            }
+            // 매 뽑기마다 상태 갱신 (티켓 수 등)
+            game.refreshState().catch(() => {});
+            return result;
+          }}
           isDark={isDark}
         />
       )}

@@ -420,7 +420,12 @@ const ko = {
   // ── 게이미피케이션 ──
   game: {
     pullGacha: '1회 뽑기',
+    pullGacha5: '5연뽑',
     pulling: '뽑는 중...',
+    multiPulling: '5연뽑 진행 중...',
+    multiPullSlot: '{{current}}/5 공개 중...',
+    multiPullComplete: '5연뽑 완료!',
+    multiPullSummary: '결과 요약',
     noTickets: '뽑기권이 부족합니다. 레벨업, 업적 달성, 출석 보상으로 획득할 수 있습니다.',
     ticketsOwned: '보유 뽑기권',
     ticketUnit: '장',

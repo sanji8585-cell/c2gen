@@ -420,7 +420,12 @@ const ja = {
   // ── ゲーミフィケーション ──
   game: {
     pullGacha: '1回ガチャ',
+    pullGacha5: '5連ガチャ',
     pulling: '引き中...',
+    multiPulling: '5連ガチャ中...',
+    multiPullSlot: '{{current}}/5 公開中...',
+    multiPullComplete: '5連ガチャ完了！',
+    multiPullSummary: '結果まとめ',
     noTickets: 'チケットがありません。レベルアップ、実績達成、出席報酬で獲得できます。',
     ticketsOwned: '所持チケット',
     ticketUnit: '枚',

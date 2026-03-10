@@ -124,6 +124,31 @@ const SOUNDS: Record<SoundType, () => void> = {
     playTone(440, 0.3, 'sine', 0.05, 1.2);
   },
 
+  // 5연뽑 슬롯머신 회전 사운드
+  gachaMultiSpin: () => {
+    const ctx = getCtx();
+    // 카지노 느낌의 연속 틱
+    for (let i = 0; i < 20; i++) {
+      const freq = 600 + Math.sin(i * 0.5) * 200;
+      playTone(freq, 0.03, 'square', 0.025, i * 0.05);
+    }
+  },
+
+  // 5연뽑 개별 슬롯 공개 사운드
+  gachaMultiSlotReveal: () => {
+    playTone(880, 0.08, 'triangle', 0.06);
+    playTone(1100, 0.12, 'sine', 0.05, 0.06);
+  },
+
+  // 5연뽑 전체 완료 팡파레
+  gachaMultiComplete: () => {
+    playArpeggio([523.25, 659.25, 783.99, 1046.50, 1318.51], 0.1, 'square', 0.05);
+    setTimeout(() => {
+      playTone(1046.50, 0.4, 'sine', 0.06);
+      playTone(1318.51, 0.4, 'sine', 0.04);
+    }, 400);
+  },
+
   // 콤보: 짧은 펀치 (피치 상승)
   combo: () => {
     playTone(523.25, 0.08, 'square', 0.06);

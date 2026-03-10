@@ -403,4 +403,5 @@ export type SoundType =
   | 'levelUp' | 'achievement' | 'questComplete'
   | 'gachaCommon' | 'gachaUncommon' | 'gachaRare' | 'gachaEpic' | 'gachaLegendary'
   | 'gachaSpin' | 'gachaRevealDrum'
+  | 'gachaMultiSpin' | 'gachaMultiSlotReveal' | 'gachaMultiComplete'
   | 'combo' | 'prestige' | 'milestone';
