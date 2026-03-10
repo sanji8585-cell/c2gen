@@ -14,8 +14,10 @@ interface DirectiveDebugPanelProps {
   suppressKorean?: boolean;
 }
 
-const DirectiveDebugPanel: React.FC<DirectiveDebugPanelProps> = ({ assets, artStylePrompt, suppressKorean }) => {
+const DirectiveDebugPanel: React.FC<DirectiveDebugPanelProps> = ({ assets, artStylePrompt, suppressKorean: suppressKoreanProp }) => {
   const [isOpen, setIsOpen] = useState(false);
+  // suppressKorean: props 우선, 없으면 localStorage에서 읽기
+  const suppressKorean = suppressKoreanProp ?? (localStorage.getItem('tubegen_suppress_korean') === 'true');
   const [expandedScene, setExpandedScene] = useState<number | null>(null);
 
   const scenesWithDirectives = assets.filter(a => a.analysis?.directives && Object.keys(a.analysis.directives).length > 0);

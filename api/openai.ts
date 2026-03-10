@@ -131,7 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const size = getImageSize(orientation || 'landscape');
 
         // 프롬프트 구성 - stylePrompt를 artStylePrompt로 통합 (STYLE 섹션 교체)
-        const prompt = getFinalVisualPrompt(scene, false, stylePrompt || undefined, suppressKorean);
+        const prompt = getFinalVisualPrompt(scene, false, stylePrompt || undefined, suppressKorean, scene?.analysis?.directives);
 
         const response = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',

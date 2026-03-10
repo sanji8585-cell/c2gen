@@ -493,6 +493,7 @@ const AppContent: React.FC<{
 
       setGeneratedData([]);
       assetsRef.current = [];
+      sceneDirectivesRef.current = {};
       setCurrentReferenceImages(refImgs);
       setCurrentTopic(topic); // 저장용 토픽 기록
       resetCost(); // 비용 초기화
@@ -805,13 +806,12 @@ const AppContent: React.FC<{
                           subtitleData: elResult.subtitleData,
                           audioDuration: elResult.estimatedDuration
                         });
-                        // V2.0: 화자 정보 저장
+                        // V2.0: 화자 정보 저장 (ref + React 상태 동기화)
                         if (matchedSpeakerName) {
-                          assetsRef.current[i] = {
-                            ...assetsRef.current[i],
+                          updateAssetAt(i, {
                             speakerName: matchedSpeakerName,
                             speakerColor: matchedSpeakerColor,
-                          };
+                          });
                         }
                         const charCount = assetsRef.current[i].narration.length;
                         addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);

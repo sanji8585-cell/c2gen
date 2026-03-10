@@ -587,6 +587,18 @@ Return ONLY the motion prompt, no explanation.`;
       // ── AI 대본 어시스턴트 (고급 모드) ──
       case 'generateAdvancedScript': {
         const { userIntent, settings, language } = params;
+        if (!settings) return res.status(400).json({ error: 'settings required' });
+
+        // 크레딧 차감 (AI 어시스턴트: 5크레딧 — 스크립트 생성과 동일)
+        const advCreditResult = await checkAndDeductCredits(req, 5, 'AI 대본 어시스턴트');
+        if (!advCreditResult.ok) {
+          return res.status(402).json({
+            error: 'insufficient_credits',
+            message: advCreditResult.error,
+            balance: advCreditResult.balance,
+          });
+        }
+
         const langName = language === 'en' ? 'English' : language === 'ja' ? '日本語' : '한국어';
 
         const formatGuide = settings.format !== 'auto' ? `형식: ${settings.format === 'monologue' ? '독백' : settings.format === 'dialogue' ? '대화형' : '나레이션'}` : '';
@@ -630,7 +642,8 @@ ${userIntent}
           contents: prompt,
         });
 
-        return res.json({ script: response.text ?? '' });
+        logUsage(req, 'advanced_script', 0);
+        return res.json({ script: response.text ?? '', creditBalance: advCreditResult.balance });
       }
 
       default:
