@@ -211,8 +211,12 @@ const Header: React.FC<HeaderProps> = ({
     { key: 'main', label: t('header.storyboard') },
     { key: 'gallery', label: t('header.savedProjects'), count: projectCount },
     { key: 'playground', label: t('header.playground') },
-    { key: 'pilot', label: 'PILOT' },
   ];
+
+  // PILOT 탭은 ?tab=pilot URL로만 접근 가능
+  if (activeTab === 'pilot') {
+    tabs.push({ key: 'pilot', label: 'PILOT' });
+  }
 
   const lv = levelInfo?.level;
   const lColor = levelInfo?.color || '#06b6d4';

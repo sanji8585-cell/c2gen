@@ -1028,7 +1028,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                   <input
                     type="range"
                     min="0.7"
-                    max="1.3"
+                    max="1.5"
                     step="0.05"
                     value={elSpeed}
                     onChange={(e) => setElSpeed(parseFloat(e.target.value))}
@@ -1037,7 +1037,7 @@ const VoiceSettings = forwardRef<VoiceSettingsHandle, VoiceSettingsProps>(({ isD
                   <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
                     <span>0.7x (느림)</span>
                     <span>1.0x (기본)</span>
-                    <span>1.3x (빠름)</span>
+                    <span>1.5x (빠름)</span>
                   </div>
                 </div>
 

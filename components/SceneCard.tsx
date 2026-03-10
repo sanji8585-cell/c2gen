@@ -184,38 +184,68 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
     }
 
     return (
-      <div className="relative flex-shrink-0 group/img w-full h-40 md:w-auto md:h-auto" style={typeof window !== 'undefined' && window.innerWidth >= 768 ? { width: imgW, height: imgH } : undefined}>
-        {hasVideo ? (
-          <>
-            <video src={row.videoData!} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-            <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-extrabold" style={{ background: 'rgba(6,182,212,0.2)', color: '#22d3ee', border: '1px solid rgba(6,182,212,0.3)' }}>VIDEO</div>
-          </>
-        ) : hasImage ? (
-          <LazyImage src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`} alt={`Scene ${sceneNum}`} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--bg-elevated)' }}>
-            <div className="flex items-center gap-2">
-              <button onClick={() => onRegenerateImage?.(index)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>{'\ud83d\udd04'} {t('regenerate', '\uc7ac\uc0dd\uc131')}</button>
-              <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>{'\ud83d\udce4'} {t('upload', '\uc5c5\ub85c\ub4dc')}</button>
+      <div className="flex items-stretch gap-1 flex-shrink-0 w-full md:w-auto">
+        <div className="relative group/img w-full h-40 md:w-auto md:h-auto rounded-xl overflow-hidden" style={typeof window !== 'undefined' && window.innerWidth >= 768 ? { width: imgW, height: imgH } : undefined}>
+          {isGenerating && hasImage ? (
+            <>
+              <LazyImage src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`} alt={`Scene ${sceneNum}`} className="w-full h-full object-cover" style={{ filter: 'brightness(0.4)' }} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent animate-spin rounded-full"></div>
+                <span className="text-[8px] text-blue-400 font-black uppercase tracking-widest">{t('imageGenerating', '\uc7ac\uc0dd\uc131\uc911')}</span>
+              </div>
+            </>
+          ) : isAnimating ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ background: 'var(--bg-base)' }}>
+              <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent animate-spin rounded-full"></div>
+              <span className="text-[8px] text-cyan-400 font-black uppercase tracking-widest">{t('convertingVideo', '\ubcc0\ud658\uc911')}</span>
             </div>
-          </div>
-        )}
+          ) : hasVideo ? (
+            <>
+              <video src={row.videoData!} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+              <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-extrabold" style={{ background: 'rgba(6,182,212,0.2)', color: '#22d3ee', border: '1px solid rgba(6,182,212,0.3)' }}>VIDEO</div>
+            </>
+          ) : hasImage ? (
+            <LazyImage src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`} alt={`Scene ${sceneNum}`} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--bg-elevated)' }}>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onRegenerateImage?.(index)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>{'\ud83d\udd04'} {t('regenerate', '\uc7ac\uc0dd\uc131')}</button>
+                <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>{'\ud83d\udce4'} {t('upload', '\uc5c5\ub85c\ub4dc')}</button>
+              </div>
+            </div>
+          )}
 
-        {/* Hover overlay */}
-        {(hasImage || hasVideo) && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-3 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200">
-            <button onClick={() => onRegenerateImage?.(index)} className="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all flex items-center gap-1.5">{'\ud83d\udd04'} {t('regenerate', '\uc7ac\uc0dd\uc131')}</button>
-            <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all flex items-center gap-1.5">{'\ud83d\udce4'} {t('upload', '\uc5c5\ub85c\ub4dc')}</button>
-            {!isEditing && (
-              <button onClick={() => onGenerateAnimation?.(index)} className="px-3 py-2 rounded-lg text-xs font-bold bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 transition-all flex items-center gap-1.5">{'\ud83c\udfac'} {t('video', '\uc601\uc0c1')}</button>
+          {/* Duration badge */}
+          {duration > 0 && !isAnimating && (
+            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ background: 'rgba(0,0,0,0.7)', color: 'white' }}>
+              {'\u23f1'} {duration.toFixed(1)}s
+            </div>
+          )}
+        </div>
+
+        {/* 사이드 버튼 바 (이미지 옆 세로) */}
+        {(hasImage || hasVideo || row.status === 'error') && (
+          <div className={`hidden md:flex flex-col justify-center gap-1 ${isAnimating || isGenerating ? 'opacity-30 pointer-events-none' : ''}`}>
+            <button onClick={() => onRegenerateImage?.(index)}
+              className="w-7 h-7 rounded-md flex items-center justify-center border transition-all hover:bg-white/10 hover:text-white"
+              style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}
+              title={t('regenerateImage', '\uc774\ubbf8\uc9c0 \uc7ac\uc0dd\uc131')}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
+            <button onClick={() => fileInputRef.current?.click()}
+              className="w-7 h-7 rounded-md flex items-center justify-center border transition-all hover:bg-white/10 hover:text-white"
+              style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}
+              title={t('uploadImage', '\uc774\ubbf8\uc9c0 \uc5c5\ub85c\ub4dc')}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            </button>
+            {hasImage && !isEditing && (
+              <button onClick={() => onGenerateAnimation?.(index)}
+                className={`w-7 h-7 rounded-md flex items-center justify-center border transition-all ${hasVideo ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25 hover:bg-cyan-500/20' : 'hover:bg-white/10 hover:text-white'}`}
+                style={hasVideo ? undefined : { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}
+                title={hasVideo ? t('regenerateVideo', '\uc601\uc0c1 \uc7ac\uc0dd\uc131') : t('convertVideo', '\uc601\uc0c1 \ubcc0\ud658')}>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </button>
             )}
-          </div>
-        )}
-
-        {/* Duration badge */}
-        {duration > 0 && (
-          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ background: 'rgba(0,0,0,0.7)', color: 'white' }}>
-            {'\u23f1'} {duration.toFixed(1)}s
           </div>
         )}
       </div>

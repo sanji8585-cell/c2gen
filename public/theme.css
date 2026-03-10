@@ -154,9 +154,14 @@
   0%, 100% { box-shadow: 0 0 8px #f59e0b66, 0 0 16px #f59e0b33; filter: hue-rotate(0deg); }
   50% { box-shadow: 0 0 12px #f59e0b88, 0 0 20px #f59e0b44; filter: hue-rotate(20deg); }
 }
+@property --frame-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
 @keyframes frame-legendary-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% { --frame-angle: 0deg; }
+  100% { --frame-angle: 360deg; }
 }
 @keyframes frame-legendary-glow {
   0%, 100% { box-shadow: 0 0 10px #ef444488, 0 0 20px #f59e0b44, 0 0 30px #ef444422; }
