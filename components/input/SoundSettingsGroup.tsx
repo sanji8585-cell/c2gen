@@ -304,7 +304,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
           )}
         </div>
 
-        {/* BGM 라이브러리 */}
+        {/* BGM 라이브러리 — 일시 비활성화 (필요 시 복원)
         <div style={{ ...cardBox, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
             BGM 라이브러리
@@ -345,6 +345,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
             1클릭: 선택+미리듣기 → 2클릭: 정지 → 3클릭: 선택 해제
           </div>
         </div>
+        */}
 
         {/* 직접 업로드 */}
         <div style={{ ...cardBox, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -375,7 +376,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
           >
             🎧 파일 업로드
           </button>
-          {bgmData && uploadedFileName ? (
+          {bgmData ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
               <button
                 type="button"
@@ -401,7 +402,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}>
-                {uploadedFileName}
+                {uploadedFileName || 'AI BGM 생성됨'}
               </span>
               <button
                 type="button"
