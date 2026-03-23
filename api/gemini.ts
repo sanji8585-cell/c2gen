@@ -561,7 +561,7 @@ Return ONLY the motion prompt, no explanation.`;
         const aspectRatio = platform === 'tiktok' ? '9:16' : platform === 'instagram' ? '1:1' : '16:9';
 
         const response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-preview-image',
+          model: 'gemini-3.1-flash-image-preview',
           contents: { parts: [{ text: thumbnailPromptText }] },
           config: {
             responseModalities: [Modality.IMAGE],

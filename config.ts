@@ -16,7 +16,7 @@ export const IMAGE_MODELS = [
     speed: '보통'
   },
   {
-    id: 'gemini-3.1-flash-image',
+    id: 'gemini-3.1-flash-image-preview',
     name: 'Gemini 3.1 Flash',
     provider: 'Google',
     pricePerImage: 0.067,   // $0.067/image (1024px)
@@ -175,7 +175,7 @@ export const PRICING = {
   // 이미지 생성 (Gemini만 지원)
   IMAGE: {
     'gemini-2.5-flash-image': 0.039,    // $0.039/image (실제 가격 보정)
-    'gemini-3.1-flash-image': 0.067,   // $0.067/image (1024px)
+    'gemini-3.1-flash-image-preview': 0.067,   // $0.067/image (1024px)
   },
   // TTS (ElevenLabs) - 글자당 가격
   TTS: {
@@ -196,7 +196,7 @@ export const CREDIT_CONFIG = {
   // 원가율 = API원가 / 판매가, 판매가 = 크레딧 × 10원
   COSTS: {
     'gemini-2.5-flash-image': 16,      // 원가 $0.039(57원) → 160원 판매 → 원가율 35%
-    'gemini-3.1-flash-image': 33,     // 원가 $0.067(97원) → 330원 판매 → 원가율 29%
+    'gemini-3.1-flash-image-preview': 33,     // 원가 $0.067(97원) → 330원 판매 → 원가율 29%
     tts_per_1000_chars: 15,        // 원가 $0.03(44원) → 150원 판매 → 원가율 29%
     video: 73,                     // 원가 $0.15(218원) → 730원 판매 → 원가율 30%
     script: 15,                    // 원가 ~$0.04(58원) → 150원 판매 → 원가율 39% (Pro 모델)
