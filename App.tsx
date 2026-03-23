@@ -15,6 +15,7 @@ import { useSceneEditor } from './hooks/useSceneEditor';
 import { useUserAccount } from './hooks/useUserAccount';
 import { useTheme } from './hooks/useTheme';
 import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript } from './services/geminiService';
+import { getDominantMood } from './services/prompts';
 import type { AdvancedSettings } from './components/input/HeroInput';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import { generateImage, getSelectedImageModel } from './services/imageService';
@@ -834,7 +835,9 @@ const AppContent: React.FC<{
 
                       // V2.0: 일관성 모드 시 이전 씬 이미지 참조 전달
                       const prevImg = (renderMode === 'consistency' && i > 0) ? assetsRef.current[i - 1]?.imageData : undefined;
-                      const img = await generateImage(assetsRef.current[i], refImgs, prevImg ? { prevSceneImage: prevImg } : undefined);
+                      // 톤 일관성: 전체 씬의 지배적 분위기 계산
+                      const dominant = getDominantMood(assetsRef.current);
+                      const img = await generateImage(assetsRef.current[i], refImgs, { prevSceneImage: prevImg, dominantMood: dominant });
                       if (isAbortedRef.current) break;
 
                       if (img) {
@@ -1170,7 +1173,7 @@ const AppContent: React.FC<{
           await wait(2000);
         }
 
-        const img = await generateImage(assetsRef.current[idx], currentReferenceImages);
+        const img = await generateImage(assetsRef.current[idx], currentReferenceImages, { dominantMood: getDominantMood(assetsRef.current) });
 
         if (img && !isAbortedRef.current) {
           updateAssetAt(idx, { imageData: img, status: 'completed', errorMessage: undefined });

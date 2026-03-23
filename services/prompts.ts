@@ -122,9 +122,87 @@ export function getColorPaletteHint(sentiment: string, narration: string): strin
 }
 
 /**
- * 최종 이미지 프롬프트 생성
+ * 전체 영상의 지배적 분위기 계산 (씬 배열에서 sentiment 비율 분석)
+ * → getFinalVisualPrompt에 dominantMood로 전달하여 톤 일관성 유지
  */
-export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = false, artStylePrompt?: string, suppressKorean?: boolean, directives?: SceneDirectives) => {
+export function getDominantMood(scenes: { analysis?: { sentiment?: string } }[]): 'NEGATIVE' | 'POSITIVE' | 'NEUTRAL' {
+  if (!scenes || scenes.length === 0) return 'NEUTRAL';
+  const counts = { POSITIVE: 0, NEGATIVE: 0, NEUTRAL: 0 };
+  for (const s of scenes) {
+    const sent = s.analysis?.sentiment || 'NEUTRAL';
+    if (sent in counts) counts[sent as keyof typeof counts]++;
+    else counts.NEUTRAL++;
+  }
+  if (counts.NEGATIVE >= counts.POSITIVE && counts.NEGATIVE >= counts.NEUTRAL) return 'NEGATIVE';
+  if (counts.POSITIVE >= counts.NEGATIVE && counts.POSITIVE >= counts.NEUTRAL) return 'POSITIVE';
+  return 'NEUTRAL';
+}
+
+/**
+ * 톤 일관성 시스템: 씬별 mood를 전체 톤 기반으로 dampening
+ * - dominantMood와 같으면 → 풀 적용
+ * - dominantMood와 다르면 → 부드럽게 변조 (극단적 전환 방지)
+ */
+function getMoodWithConsistency(sentiment: string, dominantMood?: string): string {
+  // dominantMood 없으면 기존 방식 (하위 호환)
+  if (!dominantMood) {
+    return sentiment === 'NEGATIVE' ? 'Dark, cold lighting.'
+      : sentiment === 'POSITIVE' ? 'Bright, warm lighting.'
+      : 'Balanced lighting.';
+  }
+
+  // 지배적 톤별 베이스 + 씬별 미세 변조
+  if (dominantMood === 'NEGATIVE') {
+    // 어두운 영상: 전체적으로 어둡게 유지, POSITIVE 씬만 약간 밝게
+    return sentiment === 'NEGATIVE' ? 'Dark, moody atmosphere with cold undertones.'
+      : sentiment === 'POSITIVE' ? 'Slightly warmer tone within an overall dark atmosphere. Still moody but with a hint of hope.'
+      : 'Dim, muted atmosphere. Cool neutral tones.';
+  } else if (dominantMood === 'POSITIVE') {
+    // 밝은 영상: 전체적으로 밝게 유지, NEGATIVE 씬만 약간 어둡게
+    return sentiment === 'POSITIVE' ? 'Bright, warm atmosphere with optimistic energy.'
+      : sentiment === 'NEGATIVE' ? 'Slightly subdued tone within an overall bright atmosphere. Still warm but with subtle tension.'
+      : 'Clean, balanced atmosphere. Warm neutral tones.';
+  } else {
+    // 중립 영상: 중간 톤 유지, 변화폭 최소화
+    return sentiment === 'NEGATIVE' ? 'Slightly cooler tone within a balanced atmosphere. Subtle tension, not dramatic.'
+      : sentiment === 'POSITIVE' ? 'Slightly warmer tone within a balanced atmosphere. Gentle optimism, not overly bright.'
+      : 'Balanced, natural atmosphere. Moderate lighting.';
+  }
+}
+
+/**
+ * 색상 팔레트도 톤 일관성 적용
+ */
+function getColorPaletteWithConsistency(sentiment: string, narration: string, dominantMood?: string): string {
+  // dominantMood 없으면 기존 방식
+  if (!dominantMood) return getColorPaletteHint(sentiment, narration);
+
+  const isFinancial = FINANCIAL_REGEX.test(narration);
+
+  // 금융 컨텍스트는 한국 규칙 그대로 유지 (빨강=상승, 파랑=하락은 의미가 있으므로)
+  if (isFinancial) return getColorPaletteHint(sentiment, narration);
+
+  // 비금융: 전체 톤 기반 팔레트
+  if (dominantMood === 'NEGATIVE') {
+    return sentiment === 'NEGATIVE' ? 'COLOR PALETTE: Deep blues, dark grays, muted purples. Low saturation, somber.'
+      : sentiment === 'POSITIVE' ? 'COLOR PALETTE: Muted warm tones within a cool base. Desaturated golds, soft amber hints.'
+      : 'COLOR PALETTE: Cool neutral grays with subtle blue undertones. Muted and cohesive.';
+  } else if (dominantMood === 'POSITIVE') {
+    return sentiment === 'POSITIVE' ? 'COLOR PALETTE: Warm golds, soft cyans, gentle greens. Moderate-high saturation.'
+      : sentiment === 'NEGATIVE' ? 'COLOR PALETTE: Slightly cooled warm tones. Desaturated amber, muted teal.'
+      : 'COLOR PALETTE: Warm neutral tones. Soft beige, gentle gold accents.';
+  } else {
+    return sentiment === 'NEGATIVE' ? 'COLOR PALETTE: Cool mid-tones. Soft blues, medium grays. Not too dark.'
+      : sentiment === 'POSITIVE' ? 'COLOR PALETTE: Warm mid-tones. Soft golds, gentle greens. Not too bright.'
+      : 'COLOR PALETTE: Balanced mid-tones. Natural colors, moderate saturation.';
+  }
+}
+
+/**
+ * 최종 이미지 프롬프트 생성
+ * @param dominantMood - 전체 영상의 지배적 분위기 (getDominantMood로 계산). 톤 일관성 유지용.
+ */
+export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = false, artStylePrompt?: string, suppressKorean?: boolean, directives?: SceneDirectives, dominantMood?: string) => {
   const basePrompt = scene.visualPrompt || "";
   const analysis = scene.analysis || {};
   const keywords = directives?.TEXT || scene.visual_keywords || "";
@@ -136,13 +214,11 @@ export const getFinalVisualPrompt = (scene: any, hasCharacterRef: boolean = fals
     ? 'LANGUAGE RULE: Do NOT render any Korean/Hangul characters (한글) in the image. All visible text must be in English/Latin script only. Translate any Korean text to English before rendering.'
     : '';
 
-  // 분위기
-  const mood = sentiment === 'NEGATIVE' ? 'Dark, cold lighting.'
-    : sentiment === 'POSITIVE' ? 'Bright, warm lighting.'
-    : 'Balanced lighting.';
+  // 분위기 (톤 일관성 적용)
+  const mood = getMoodWithConsistency(sentiment, dominantMood);
 
-  // 색상 팔레트 힌트 (COLOR 디렉티브 시 자동 팔레트 억제 — 충돌 방지)
-  const colorHint = directives?.COLOR ? '' : getColorPaletteHint(sentiment, scene.narration || '');
+  // 색상 팔레트 힌트 (톤 일관성 + COLOR 디렉티브 시 억제)
+  const colorHint = directives?.COLOR ? '' : getColorPaletteWithConsistency(sentiment, scene.narration || '', dominantMood);
 
   // 캐릭터 (화풍 적용)
   const effectiveStyle = directives?.STYLE || artStylePrompt;

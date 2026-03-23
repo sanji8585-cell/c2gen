@@ -199,7 +199,7 @@ function optimizeReferenceImages(refImages: ReferenceImages): ReferenceImages {
 export const generateImageForScene = async (
   scene: ScriptScene,
   referenceImages: ReferenceImages,
-  options?: { isPreview?: boolean; prevSceneImage?: string }
+  options?: { isPreview?: boolean; prevSceneImage?: string; dominantMood?: string }
 ): Promise<string | null> => {
   const { styleId, customStylePrompt } = getGeminiStyleInfo();
   const orientation = getVideoOrientation();
@@ -211,7 +211,7 @@ export const generateImageForScene = async (
 
   const result = await retryGeminiRequest("Image Generation", () =>
     callGeminiProxy('generateImage', {
-      scene: { visualPrompt: scene.visualPrompt, analysis: scene.analysis, visual_keywords: (scene as any).visual_keywords || '' },
+      scene: { visualPrompt: scene.visualPrompt, analysis: scene.analysis, visual_keywords: (scene as any).visual_keywords || '', narration: scene.narration || '' },
       referenceImages: optimizedRefs,
       styleId,
       customStylePrompt,
@@ -219,6 +219,7 @@ export const generateImageForScene = async (
       isPreview: options?.isPreview || undefined,
       suppressKorean: suppressKorean || undefined,
       prevSceneImage: options?.prevSceneImage || undefined,
+      dominantMood: options?.dominantMood || undefined,
     }), 2, 3000
   );
   return result?.imageData || null;

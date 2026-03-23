@@ -182,7 +182,7 @@ async function generateWithOpenAI(scene: ScriptScene, options?: { isPreview?: bo
 export async function generateImage(
   scene: ScriptScene,
   referenceImages: ReferenceImages,
-  options?: { isPreview?: boolean; prevSceneImage?: string }
+  options?: { isPreview?: boolean; prevSceneImage?: string; dominantMood?: string }
 ): Promise<string | null> {
   const modelId = getSelectedImageModel();
   const hasCharacterRef = referenceImages.character && referenceImages.character.length > 0;
