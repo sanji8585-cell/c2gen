@@ -242,6 +242,7 @@ const AppContent: React.FC<{
       window.history.replaceState({}, '', window.location.pathname);
     }
 
+    isAbortedRef.current = false; // 마운트 시 초기화
     return () => { isAbortedRef.current = true; };
   }, [checkApiKeyStatus, fetchCredits]);
 
