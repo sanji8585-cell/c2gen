@@ -7,6 +7,7 @@ import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultCards from './components/ResultCards';
 import ScriptReviewBanner from './components/ScriptReviewBanner';
+import GameUI from './components/GameUI';
 import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig, SceneDirectives } from './types';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useCostTracker } from './hooks/useCostTracker';
@@ -25,14 +26,7 @@ import { parseDirectives, propagateSceneContext } from './services/directivePars
 import { useGameState } from './hooks/useGameState';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useProjectManagement } from './hooks/useProjectManagement';
-import GameOverlay from './components/GameOverlay';
-import DailyQuestPanel from './components/DailyQuestPanel';
-import EventBanner from './components/EventBanner';
-import AchievementShowcase from './components/AchievementShowcase';
-import InventoryModal from './components/InventoryModal';
-import LeaderboardWidget from './components/LeaderboardWidget';
 // AvatarFrame moved into Header component
-import CompletionScreen from './components/CompletionScreen';
 import { useTranslation } from 'react-i18next';
 
 import { SavedProject } from './types';
@@ -1817,102 +1811,18 @@ const AppContent: React.FC<{
       )}
 
       {/* ── 게이미피케이션 v2 UI ── */}
-
-      {/* 이벤트 배너 (활성 이벤트가 있을 때 상단 표시) */}
-      <EventBanner events={game.activeEvents} isDark={isDark} />
-
-      {/* 일일 퀘스트 패널 (플로팅 버튼) */}
-      {game.synced && (
-        <DailyQuestPanel
-          quests={game.quests}
-          onClaimReward={game.claimQuestReward}
-          isDark={isDark}
-        />
-      )}
-
-      {/* 게임 오버레이 (레벨업/업적/뽑기/마일스톤) */}
-      {(overlayLevelUp || overlayAchievement || overlayGacha || overlayMilestone) && (
-        <GameOverlay
-          levelUp={overlayLevelUp}
-          achievementUnlock={overlayAchievement}
-          gachaResult={overlayGacha}
-          milestone={overlayMilestone}
-          gachaSettings={game.config?.gachaSettings}
-          onDismiss={() => { setOverlayLevelUp(null); setOverlayAchievement(null); setOverlayGacha(null); setOverlayMilestone(null); }}
-        />
-      )}
-
-      {/* 생성 완료 결과 화면 */}
-      {completionData && (
-        <CompletionScreen
-          {...completionData}
-          onClose={() => setCompletionData(null)}
-          onOpenThumbnail={() => { setCompletionData(null); setShowThumbnailGenerator(true); }}
-        />
-      )}
-
-      {/* 업적 쇼케이스 모달 */}
-      {showAchievements && game.achievements && (
-        <AchievementShowcase
-          isOpen={showAchievements}
-          onClose={() => setShowAchievements(false)}
-          achievements={game.achievements}
-          isDark={isDark}
-        />
-      )}
-
-      {/* 인벤토리 모달 */}
-      {showInventory && game.inventory && (
-        <InventoryModal
-          isOpen={showInventory}
-          onClose={() => setShowInventory(false)}
-          inventory={game.inventory}
-          equipped={game.equipped}
-          gachaTickets={game.userState?.gachaTickets ?? 0}
-          onEquipItem={game.equipItem}
-          onUseConsumable={async (inventoryItemId: string) => {
-            const result = await game.useConsumable(inventoryItemId);
-            if (result?.success) {
-              if (result.effect?.type === 'credit_voucher') {
-                await fetchCredits();
-                setConsumablePopup({ type: 'credit_voucher', credits: result.effect.credits });
-                setTimeout(() => setConsumablePopup(null), 3500);
-              } else if (result.effect?.type === 'xp_booster') {
-                setConsumablePopup({ type: 'xp_booster', multiplier: result.effect.multiplier, until: result.effect.until });
-                setTimeout(() => setConsumablePopup(null), 4000);
-              }
-            }
-          }}
-          onPullGacha={async () => {
-            const result = await game.pullGacha();
-            if (result?.item) {
-              setOverlayGacha({ item: result.item, isNew: result.isNew });
-              // 뽑기 퀘스트 + 상태 새로고침을 병렬 & 백그라운드 처리
-              Promise.all([game.recordAction('gacha_pull', 1), game.refreshState()]).catch(() => {});
-            }
-          }}
-          onPullGachaMulti={async () => {
-            const result = await game.pullGacha();
-            if (result?.item) {
-              // 5연뽑은 GameOverlay 없이 인라인으로 표시, 퀘스트 기록은 백그라운드
-              game.recordAction('gacha_pull', 1).catch(() => {});
-            }
-            // 매 뽑기마다 상태 갱신 (티켓 수 등)
-            game.refreshState().catch(() => {});
-            return result;
-          }}
-          isDark={isDark}
-        />
-      )}
-
-      {/* 리더보드 모달 */}
-      <LeaderboardWidget
-        isOpen={showLeaderboard}
-        onClose={() => setShowLeaderboard(false)}
-        userLevel={game.levelInfo.level}
-        userXp={game.levelInfo.currentXp}
-        userStreak={game.userState?.streakCount ?? 0}
-        isDark={isDark}
+      <GameUI
+        game={game} isDark={isDark}
+        overlayLevelUp={overlayLevelUp} overlayAchievement={overlayAchievement}
+        overlayGacha={overlayGacha} overlayMilestone={overlayMilestone}
+        setOverlayLevelUp={setOverlayLevelUp} setOverlayAchievement={setOverlayAchievement}
+        setOverlayGacha={setOverlayGacha} setOverlayMilestone={setOverlayMilestone}
+        completionData={completionData} setCompletionData={setCompletionData}
+        setShowThumbnailGenerator={setShowThumbnailGenerator}
+        showAchievements={showAchievements} setShowAchievements={setShowAchievements}
+        showInventory={showInventory} setShowInventory={setShowInventory}
+        showLeaderboard={showLeaderboard} setShowLeaderboard={setShowLeaderboard}
+        setConsumablePopup={setConsumablePopup} fetchCredits={fetchCredits}
       />
     </div>
   );
