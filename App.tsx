@@ -1155,7 +1155,8 @@ const AppContent: React.FC<{
 
   // 이미지 재생성 핸들러 (useCallback으로 메모이제이션)
   const handleRegenerateImage = useCallback(async (idx: number) => {
-    if (isProcessingRef.current) return;
+    // 메인 생성 중(SCRIPTING/ASSETS)에만 블록, 완료 후 재생성은 허용
+    if (isProcessingRef.current && step !== GenerationStep.COMPLETED) return;
 
     const MAX_RETRIES = 2;
     updateAssetAt(idx, { status: 'generating' });
