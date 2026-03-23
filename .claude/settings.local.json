@@ -1,6 +1,15 @@
 {
   "permissions": {
     "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "Agent",
       "Bash(npx tsc:*)",
       "Bash(ls:*)",
       "Bash(npm run dev)",
@@ -65,7 +74,25 @@
       "Bash(start \"\" \"c:/Users/최천둥/Desktop/c2gen/docs/mockup-c.html\")",
       "Bash(git add components/input/HeroInput.tsx components/input/ImageSettingsGroup.tsx components/input/PresetGroup.tsx components/input/SettingsAccordion.tsx components/input/SoundSettingsGroup.tsx components/InputSection.tsx components/input/VoiceSettings.tsx components/ResultTable.tsx public/bgm/ docs/plans/2026-03-09-input-ui-redesign-design.md docs/plans/2026-03-09-input-ui-redesign.md)",
       "Bash(git add components/input/ImageSettingsGroup.tsx)",
-      "Bash(npx vercel inspect tubegen-o9ft1wx0b-sanji8585-cells-projects.vercel.app --logs)"
+      "Bash(npx vercel inspect tubegen-o9ft1wx0b-sanji8585-cells-projects.vercel.app --logs)",
+      "Bash(npm install:*)",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && npm install 2>&1 | tail -30\")",
+      "Bash(wsl -e bash -c \"ls -la /home/choi/c2gen/node_modules/ 2>&1 | head -5\")",
+      "Bash(wsl -e bash -c \"sudo rm -rf /home/choi/c2gen/node_modules && cd /home/choi/c2gen && npm install 2>&1 | tail -10\")",
+      "Bash(timeout 180 wsl -e bash -c \"sudo rm -rf /home/choi/c2gen/node_modules && cd /home/choi/c2gen && npm install 2>&1 | tail -15\")",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && ls -la node_modules/ 2>&1 | head -3\")",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && npm install 2>&1\")",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && npm install 2>&1 | tail -15\")",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && npx vite --port 3001 --host 2>&1 &\")",
+      "Bash(wsl -e bash -c \"npm install -g vercel 2>&1 | tail -10\")",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && npx tsc --noEmit 2>&1 | tail -20\")",
+      "Bash(wsl -e bash -c \"cat /home/choi/c2gen/.claude/settings.json 2>/dev/null || echo ''FILE_NOT_FOUND''\")",
+      "Bash(wsl -e bash -c \"cat /home/choi/.claude/settings.json 2>/dev/null || echo ''FILE_NOT_FOUND''\")",
+      "Bash(wsl -e bash -c \"head -10 /home/choi/c2gen/.claude/settings.json\")",
+      "Bash(wsl -e bash -c \"tail -10 /home/choi/c2gen/.claude/settings.json\")",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && npx vite build 2>&1 | tail -10\")",
+      "Bash(wsl -e bash -c \"cd /home/choi/c2gen && npx vite build 2>&1 | tail -15\")",
+      "Bash(wsl -e bash -c \"wc -l /home/choi/c2gen/App.tsx\")"
     ]
   }
 }
