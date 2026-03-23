@@ -11,6 +11,7 @@ import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceIm
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useCostTracker } from './hooks/useCostTracker';
 import { useSceneEditor } from './hooks/useSceneEditor';
+import { useUserAccount } from './hooks/useUserAccount';
 import { useTheme } from './hooks/useTheme';
 import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript } from './services/geminiService';
 import type { AdvancedSettings } from './components/input/HeroInput';
@@ -154,12 +155,10 @@ const AppContent: React.FC<{
   const [bgmDuckingEnabled, setBgmDuckingEnabled] = useState(true);
   const [bgmDuckingAmount, setBgmDuckingAmount] = useState(0.3);
 
-  // 크레딧 시스템
-  const [userCredits, setUserCredits] = useState<number>(0);
-  const [userPlan, setUserPlan] = useState<string>('free');
+  // 크레딧 시스템 (useUserAccount hook)
+  const { userCredits, setUserCredits, userPlan, setUserPlan, userAvatarUrl, setUserAvatarUrl, fetchCredits } = useUserAccount();
   const [showCreditShop, setShowCreditShop] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
-  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
 
   // RPG 게이미피케이션 (v2 — 서버 기반)
@@ -196,7 +195,6 @@ const AppContent: React.FC<{
   // Konami
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiRef = useRef<string[]>([]);
-  const avatarLoadedRef = useRef(false);
   const sessionComboRef = useRef(0);
   // 항상 최신 game 상태를 ref로 유지 (stale closure 방지)
   const gameRef = useRef({ isAuthenticated, synced: game.synced, recordAction: game.recordAction, setOverlayAchievement });
@@ -204,26 +202,6 @@ const AppContent: React.FC<{
     gameRef.current = { isAuthenticated, synced: game.synced, recordAction: game.recordAction, setOverlayAchievement };
   });
   useEffect(() => { sessionComboRef.current = sessionCombo; }, [sessionCombo]);
-
-  const fetchCredits = useCallback(async () => {
-    const token = localStorage.getItem('c2gen_session_token');
-    if (!token) return;
-    try {
-      const r = await fetch('/api/user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'getCredits', token }),
-      });
-      const d = await r.json();
-      if (d.credits !== undefined) setUserCredits(d.credits);
-      if (d.plan) setUserPlan(d.plan);
-      // 아바타 URL 로드 (프로필 API)
-      if (!avatarLoadedRef.current) {
-        fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getProfile', token }) })
-          .then(r => r.json()).then(p => { if (p.avatarUrl) { setUserAvatarUrl(p.avatarUrl); avatarLoadedRef.current = true; } }).catch(() => {});
-      }
-    } catch { /* ignore */ }
-  }, []);
 
   // 비용 추적
   const { costRef, addCost, resetCost } = useCostTracker();
