@@ -1,6 +1,7 @@
 
 import { ScriptScene, ReferenceImages } from "../types";
 import { CONFIG, GeminiStyleId, getVideoOrientation, type Language } from "../config";
+import { getSelectedImageModel } from "./imageService";
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -209,6 +210,7 @@ export const generateImageForScene = async (
 
   const suppressKorean = localStorage.getItem(CONFIG.STORAGE_KEYS.SUPPRESS_KOREAN) === 'true';
 
+  const imageModelId = getSelectedImageModel();
   const result = await retryGeminiRequest("Image Generation", () =>
     callGeminiProxy('generateImage', {
       scene: { visualPrompt: scene.visualPrompt, analysis: scene.analysis, visual_keywords: (scene as any).visual_keywords || '', narration: scene.narration || '' },
@@ -220,6 +222,7 @@ export const generateImageForScene = async (
       suppressKorean: suppressKorean || undefined,
       prevSceneImage: options?.prevSceneImage || undefined,
       dominantMood: options?.dominantMood || undefined,
+      imageModelId,
     }), 2, 3000
   );
   return result?.imageData || null;

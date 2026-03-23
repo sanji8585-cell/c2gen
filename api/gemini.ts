@@ -286,7 +286,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`${chunkLabel}[Script] 입력: ${inputLength}자, 예상 씬: ${estimatedSceneCount}개, maxOutputTokens: ${maxOutputTokens}, lang: ${language || 'ko'}`);
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.5-pro',
           contents: getScriptGenerationPrompt(topic, sourceContext, language),
           config: {
             thinkingConfig: { thinkingBudget: 24576 },
@@ -307,7 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }));
 
         // 크레딧 차감 (스크립트: 5크레딧)
-        const scriptCreditResult = await checkAndDeductCredits(req, 5, '스크립트 생성');
+        const scriptCreditResult = await checkAndDeductCredits(req, 15, '스크립트 생성 (Pro)');
         if (!scriptCreditResult.ok) {
           return res.status(402).json({
             error: 'insufficient_credits',
@@ -381,8 +381,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             parts.push({ text: `[SCENE PROMPT]\n${sanitizedPrompt}` });
 
+            // 이미지 모델 동적 선택 (클라이언트에서 전달, 기본 gemini-2.5-flash-image)
+            const imageModelId = params.imageModelId || 'gemini-2.5-flash-image';
             const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash-image',
+              model: imageModelId,
               contents: { parts },
               config: {
                 responseModalities: [Modality.IMAGE],
@@ -534,7 +536,7 @@ ${(visualPrompt || '').slice(0, 300)}
 Return ONLY the motion prompt, no explanation.`;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.5-pro',
           contents: prompt,
         });
         return res.json({ motionPrompt: response.text?.trim() || '' });
@@ -559,7 +561,7 @@ Return ONLY the motion prompt, no explanation.`;
         const aspectRatio = platform === 'tiktok' ? '9:16' : platform === 'instagram' ? '1:1' : '16:9';
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: 'gemini-3.1-flash-preview-image',
           contents: { parts: [{ text: thumbnailPromptText }] },
           config: {
             responseModalities: [Modality.IMAGE],
@@ -591,7 +593,7 @@ Return ONLY the motion prompt, no explanation.`;
         if (!settings) return res.status(400).json({ error: 'settings required' });
 
         // 크레딧 차감 (AI 어시스턴트: 5크레딧 — 스크립트 생성과 동일)
-        const advCreditResult = await checkAndDeductCredits(req, 5, 'AI 대본 어시스턴트');
+        const advCreditResult = await checkAndDeductCredits(req, 15, 'AI 대본 어시스턴트 (Pro)');
         if (!advCreditResult.ok) {
           return res.status(402).json({
             error: 'insufficient_credits',
