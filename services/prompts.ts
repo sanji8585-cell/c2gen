@@ -54,7 +54,40 @@ export const SYSTEM_INSTRUCTIONS = {
 - 같은 개념은 같은 모습으로 그려라
 `,
 
-  REFERENCE_MATCH: `참조 이미지의 화풍과 캐릭터 스타일을 따르라.`
+  REFERENCE_MATCH: `참조 이미지의 화풍과 캐릭터 스타일을 따르라.`,
+
+  SCRIPT_DIRECTOR: `당신은 바이럴 영상 대본과 스토리보드를 만드는 전문 스크립트 디렉터입니다.
+
+## 핵심 원칙: 시청자가 끝까지 보게 만들어라
+- 씬 1은 반드시 강력한 훅으로 시작 (충격 통계, 반전 질문, 긴급성, 리스트 예고 중 택1)
+- 씬 1 나레이션은 30자 이내. 첫 문장이 길면 시청자가 이탈한다.
+- 매 3번째 씬에 패턴 인터럽트 (시점 전환, 반전 정보, 톤 변화)
+- 연속 3개 씬이 같은 감정 톤(sentiment) 금지. 감정의 파동을 만들어라.
+- 씬 2 끝에 오픈 루프 ("그런데 진짜 문제는 따로 있었습니다")
+- 전체 40% 지점에 가장 큰 클리프행어 배치
+- 마지막 씬 직전에 감정 저점(위기/경고), 마지막 씬에 해결/행동 유도
+- 1씬 = 1메시지. 한 씬에 여러 정보 넣지 마라.
+- 문장 길이를 짧음-중간-짧음 리듬으로 배치
+
+## 시각화 규칙
+- 문장의 의미를 그대로 시각화하라
+- 수식어 반영: "거대한"→크게, "빛나는"→광택
+- 물리적 형태 있으면 그대로 그려라
+- 숫자/데이터 → 그래프, 화살표, 숫자 텍스트
+- 추상 개념 → 관련 사물로 표현
+- 패턴 인터럽트 씬은 이전 씬과 다른 구도(composition_type) 사용
+- 감정 피크 씬은 dramatic lighting, high contrast 사용
+
+## 캐릭터 등장 규칙
+- 주어가 사람 → 캐릭터 등장 (STANDARD)
+- 주어가 데이터/시스템 → 캐릭터 없음 (NO_CHAR)
+
+## 구도
+- NO_CHAR: 캐릭터 없음
+- MICRO (5-15%): 작은 캐릭터 + 큰 사물
+- STANDARD (30-40%): 캐릭터와 사물 상호작용
+- MACRO (60-80%): 캐릭터 클로즈업
+`,
 };
 
 /**
@@ -183,7 +216,10 @@ export const getScriptGenerationPrompt = (topic: string, sourceContext?: string 
 ## 씬 분할 규칙 / Scene Split Rules
 ${isManual ? `- 1 sentence = 1 scene
 - Input sentence count = Output scene count` : `- MINIMUM 6 scenes required
-- Expand the topic into a full narrative: introduction → background → development → details → implications → conclusion
+- Expand the topic with VIRAL STRUCTURE: hook(충격/질문) → problem(문제제기) → tension(긴장고조) → reveal(핵심정보) → resolution(해결) → CTA(행동유도)
+- Scene 1 MUST start with a powerful hook: shocking stat, counter-intuitive claim, or urgent question (under 30 chars)
+- Include at least 1 cliffhanger or open loop in the middle scenes ("그런데 여기서 반전이 있습니다")
+- Final scene: clear conclusion + call to action (좋아요/구독/댓글 유도)
 - Each scene should have a distinct narration sentence and unique visual`}
 - No content repetition
 - ${lang.narrationRule}
@@ -212,7 +248,8 @@ ${content}
     "visual_keywords": "${language === 'ko' ? '이미지에 표시할 텍스트 (없으면 빈 문자열)' : language === 'ja' ? '画像に表示するテキスト（なければ空文字列）' : 'Text to display on image (empty string if none)'}",
     "analysis": {
       "sentiment": "POSITIVE or NEGATIVE or NEUTRAL",
-      "composition_type": "MICRO or STANDARD or MACRO or NO_CHAR"
+      "composition_type": "MICRO or STANDARD or MACRO or NO_CHAR",
+      "scene_role": "hook or build or tension or climax or resolution or cta"
     },
     "image_prompt_english": "English visual prompt describing the scene"
   }]

@@ -269,7 +269,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const baseInstruction =
           topic === 'Manual Script Input' ? SYSTEM_INSTRUCTIONS.MANUAL_VISUAL_MATCHER
           : hasReferenceImage ? SYSTEM_INSTRUCTIONS.REFERENCE_MATCH
-          : SYSTEM_INSTRUCTIONS.CHIEF_ART_DIRECTOR;
+          : SYSTEM_INSTRUCTIONS.SCRIPT_DIRECTOR;
 
         const inputText = sourceContext || topic;
         const inputLength = inputText.length;
@@ -628,6 +628,9 @@ Return ONLY the motion prompt, no explanation.`;
 - 최소 6씬 이상 작성
 - 나레이션은 ${langName}로, 디렉티브 값은 ${langName}로 작성
 - 자연스럽고 몰입감 있는 대본 작성
+- 첫 씬은 반드시 강력한 훅으로 시작 (충격 통계, 반전 질문, "당신이 모르는 사실...")
+- 3씬마다 패턴 인터럽트 또는 반전 ("그런데 여기서 반전이 있습니다...")
+- 마지막 씬은 행동 유도 문장으로 마무리 (좋아요, 구독, 댓글 유도)
 - 디렉티브는 적절히 배치 (매 씬마다 넣을 필요 없음)
 ${settingsText ? `\n## 사용자 설정\n${settingsText}` : ''}
 ${settings.characterNames?.length ? `\n## 화자 이름 (반드시 이 이름만 사용)\n${settings.characterNames.map((n: string, i: number) => `- ${n}`).join('\n')}\n⚠️ (화자: ) 디렉티브에 위 이름을 정확히 그대로 사용하세요. 다른 이름을 만들지 마세요.` : ''}
