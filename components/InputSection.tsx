@@ -40,7 +40,7 @@ interface InputSectionProps {
   onBgmDuckingToggle: (v: boolean) => void;
   bgmDuckingAmount: number;
   onBgmDuckingAmountChange: (v: number) => void;
-  onAiAssist?: (intent: string, settings: AdvancedSettings) => void;
+  onAiAssist?: (intent: string, settings: AdvancedSettings, assistMode?: 'create' | 'refine' | 'viral') => void;
   isAiAssisting?: boolean;
   aiAssistResult?: string | null;
   onAiAssistResultConsumed?: () => void;
@@ -110,10 +110,10 @@ const InputSection: React.FC<InputSectionProps> = ({
   // 아코디언 그룹 상태
   const [openGroup, setOpenGroup] = useState<'image' | 'sound' | 'preset' | null>('image');
 
-  // AI Assist handler
-  const handleAiAssist = useCallback((settings: AdvancedSettings) => {
+  // AI Assist handler (3가지 모드)
+  const handleAiAssist = useCallback((settings: AdvancedSettings, assistMode: 'create' | 'refine' | 'viral' = 'create') => {
     if (advancedScript.trim() && onAiAssist) {
-      onAiAssist(advancedScript, settings);
+      onAiAssist(advancedScript, settings, assistMode);
     }
   }, [advancedScript, onAiAssist]);
 

@@ -7,7 +7,7 @@
       "Bash(grep -n \"\\\\.map\\(\" components/*.tsx)",
       "Bash(grep -n \"key={idx}\" components/*.tsx)",
       "Bash(grep -n \"eslint-disable\" components/*.tsx components/admin/*.tsx)",
-      "Read(//c/Users/USER/Desktop/자동화컨텐츠AI/자동화컨텐츠/**)",
+      "Read(//c/Users/USER/Desktop/\uc790\ub3d9\ud654\ucee8\ud150\uce20AI/\uc790\ub3d9\ud654\ucee8\ud150\uce20/**)",
       "Bash(grep -c \"import.*from.*config\\\\|import.*CONFIG\" ./components/*.tsx)",
       "Bash(node scripts/generate-samples.mjs)",
       "Bash(xargs grep -l \"like\\\\|comment\\\\|reaction\")",
@@ -26,13 +26,18 @@
       "Bash(node -e \"const d = new Date\\(\\); const kst = new Date\\(d.getTime\\(\\) + 9*60*60*1000\\); console.log\\(''UTC:'', d.toISOString\\(\\).slice\\(0,10\\)\\); console.log\\(''KST:'', kst.toISOString\\(\\).slice\\(0,10\\)\\);\")",
       "Bash(npx vercel logs tubegen-6g3fkkc0t-sanji8585-cells-projects.vercel.app)",
       "Bash(node -e \"const d = new Date\\(\\); const kst = new Date\\(d.getTime\\(\\) + 9*60*60*1000\\); console.log\\(''UTC:'', d.toISOString\\(\\).slice\\(0,10\\)\\); console.log\\(''KST:'', kst.toISOString\\(\\).slice\\(0,10\\)\\); console.log\\(''Same:'', d.toISOString\\(\\).slice\\(0,10\\) === kst.toISOString\\(\\).slice\\(0,10\\)\\);\")",
-      "Bash(grep -n \"ALTER TABLE c2gen_users\\\\|CREATE TABLE.*c2gen\" /c/Users/USER/Desktop/자동화컨텐츠AI/자동화컨텐츠/docs/*.sql)",
+      "Bash(grep -n \"ALTER TABLE c2gen_users\\\\|CREATE TABLE.*c2gen\" /c/Users/USER/Desktop/\uc790\ub3d9\ud654\ucee8\ud150\uce20AI/\uc790\ub3d9\ud654\ucee8\ud150\uce20/docs/*.sql)",
       "Bash(grep -c \"\\\\\\\\u[0-9A-Fa-f]\")",
-      "Bash(grep -n '\\\\\\\\�' components/UserProfile.tsx)",
-      "Bash(grep -c '\\\\\\\\�' components/UserProfile.tsx)",
+      "Bash(grep -n '\\\\\\\\\ufffd' components/UserProfile.tsx)",
+      "Bash(grep -c '\\\\\\\\\ufffd' components/UserProfile.tsx)",
       "Bash(xargs grep -l \"RecordActionResponse\")",
       "Bash(npm install mp4box)",
-      "Bash(npm ls mp4box)"
+      "Bash(npm ls mp4box)",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep"
     ]
   }
 }

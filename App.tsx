@@ -6,10 +6,16 @@ import AuthModal from './components/AuthModal';
 import Header from './components/Header';
 import InputSection from './components/InputSection';
 import ResultCards from './components/ResultCards';
+import ScriptReviewBanner from './components/ScriptReviewBanner';
+import GameUI from './components/GameUI';
 import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig, SceneDirectives } from './types';
 import { useUndoRedo } from './hooks/useUndoRedo';
+import { useCostTracker } from './hooks/useCostTracker';
+import { useSceneEditor } from './hooks/useSceneEditor';
+import { useUserAccount } from './hooks/useUserAccount';
 import { useTheme } from './hooks/useTheme';
 import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript } from './services/geminiService';
+import { getDominantMood } from './services/prompts';
 import type { AdvancedSettings } from './components/input/HeroInput';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import { generateImage, getSelectedImageModel } from './services/imageService';
@@ -21,14 +27,7 @@ import { parseDirectives, propagateSceneContext } from './services/directivePars
 import { useGameState } from './hooks/useGameState';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useProjectManagement } from './hooks/useProjectManagement';
-import GameOverlay from './components/GameOverlay';
-import DailyQuestPanel from './components/DailyQuestPanel';
-import EventBanner from './components/EventBanner';
-import AchievementShowcase from './components/AchievementShowcase';
-import InventoryModal from './components/InventoryModal';
-import LeaderboardWidget from './components/LeaderboardWidget';
 // AvatarFrame moved into Header component
-import CompletionScreen from './components/CompletionScreen';
 import { useTranslation } from 'react-i18next';
 
 import { SavedProject } from './types';
@@ -151,12 +150,10 @@ const AppContent: React.FC<{
   const [bgmDuckingEnabled, setBgmDuckingEnabled] = useState(true);
   const [bgmDuckingAmount, setBgmDuckingAmount] = useState(0.3);
 
-  // 크레딧 시스템
-  const [userCredits, setUserCredits] = useState<number>(0);
-  const [userPlan, setUserPlan] = useState<string>('free');
+  // 크레딧 시스템 (useUserAccount hook)
+  const { userCredits, setUserCredits, userPlan, setUserPlan, userAvatarUrl, setUserAvatarUrl, fetchCredits } = useUserAccount();
   const [showCreditShop, setShowCreditShop] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
-  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
 
   // RPG 게이미피케이션 (v2 — 서버 기반)
@@ -193,7 +190,6 @@ const AppContent: React.FC<{
   // Konami
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiRef = useRef<string[]>([]);
-  const avatarLoadedRef = useRef(false);
   const sessionComboRef = useRef(0);
   // 항상 최신 game 상태를 ref로 유지 (stale closure 방지)
   const gameRef = useRef({ isAuthenticated, synced: game.synced, recordAction: game.recordAction, setOverlayAchievement });
@@ -202,32 +198,8 @@ const AppContent: React.FC<{
   });
   useEffect(() => { sessionComboRef.current = sessionCombo; }, [sessionCombo]);
 
-  const fetchCredits = useCallback(async () => {
-    const token = localStorage.getItem('c2gen_session_token');
-    if (!token) return;
-    try {
-      const r = await fetch('/api/user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'getCredits', token }),
-      });
-      const d = await r.json();
-      if (d.credits !== undefined) setUserCredits(d.credits);
-      if (d.plan) setUserPlan(d.plan);
-      // 아바타 URL 로드 (프로필 API)
-      if (!avatarLoadedRef.current) {
-        fetch('/api/user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getProfile', token }) })
-          .then(r => r.json()).then(p => { if (p.avatarUrl) { setUserAvatarUrl(p.avatarUrl); avatarLoadedRef.current = true; } }).catch(() => {});
-      }
-    } catch { /* ignore */ }
-  }, []);
-
   // 비용 추적
-  const [, setCurrentCost] = useState<CostBreakdown | null>(null);
-  const costRef = useRef<CostBreakdown>({
-    images: 0, tts: 0, videos: 0, total: 0,
-    imageCount: 0, ttsCharacters: 0, videoCount: 0
-  });
+  const { costRef, addCost, resetCost } = useCostTracker();
 
   // Undo/Redo 시스템
   const { pushState: pushUndoState, undo: undoState, redo: redoState, canUndo, canRedo, clear: clearHistory } = useUndoRedo<GeneratedAsset[]>(30, 300);
@@ -270,6 +242,7 @@ const AppContent: React.FC<{
       window.history.replaceState({}, '', window.location.pathname);
     }
 
+    isAbortedRef.current = false; // 마운트 시 초기화
     return () => { isAbortedRef.current = true; };
   }, [checkApiKeyStatus, fetchCredits]);
 
@@ -385,30 +358,7 @@ const AppContent: React.FC<{
     }
   };
 
-  // 비용 추가 헬퍼
-  const addCost = (type: 'image' | 'tts' | 'video', amount: number, count: number = 1) => {
-    if (type === 'image') {
-      costRef.current.images += amount;
-      costRef.current.imageCount += count;
-    } else if (type === 'tts') {
-      costRef.current.tts += amount;
-      costRef.current.ttsCharacters += count;
-    } else if (type === 'video') {
-      costRef.current.videos += amount;
-      costRef.current.videoCount += count;
-    }
-    costRef.current.total = costRef.current.images + costRef.current.tts + costRef.current.videos;
-    setCurrentCost({ ...costRef.current });
-  };
-
-  // 비용 초기화
-  const resetCost = () => {
-    costRef.current = {
-      images: 0, tts: 0, videos: 0, total: 0,
-      imageCount: 0, ttsCharacters: 0, videoCount: 0
-    };
-    setCurrentCost(null);
-  };
+  // addCost, resetCost는 useCostTracker 훅에서 제공
 
   // Undo용 에셋 스냅샷 (얕은 복제 - base64 문자열은 참조 공유)
   const snapshotAssets = () => assetsRef.current.map(a => ({ ...a }));
@@ -673,7 +623,7 @@ const AppContent: React.FC<{
   const [isAiAssisting, setIsAiAssisting] = useState(false);
   const [aiAssistResult, setAiAssistResult] = useState<string | null>(null);
 
-  const handleAiAssist = useCallback(async (intent: string, settings: AdvancedSettings) => {
+  const handleAiAssist = useCallback(async (intent: string, settings: AdvancedSettings, assistMode: 'create' | 'refine' | 'viral' = 'create') => {
     setIsAiAssisting(true);
     try {
       const language = localStorage.getItem('tubegen_language') || 'ko';
@@ -683,7 +633,7 @@ const AppContent: React.FC<{
         const voices = JSON.parse(localStorage.getItem('tubegen_character_voices') || '[]');
         characterNames = voices.map((v: any) => v.name).filter(Boolean);
       } catch {}
-      const result = await generateAdvancedScript(intent, { ...settings, characterNames } as any, language);
+      const result = await generateAdvancedScript(intent, { ...settings, characterNames } as any, language, assistMode);
       setAiAssistResult(typeof result === 'string' ? result : (result as any).script || String(result));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -886,7 +836,9 @@ const AppContent: React.FC<{
 
                       // V2.0: 일관성 모드 시 이전 씬 이미지 참조 전달
                       const prevImg = (renderMode === 'consistency' && i > 0) ? assetsRef.current[i - 1]?.imageData : undefined;
-                      const img = await generateImage(assetsRef.current[i], refImgs, prevImg ? { prevSceneImage: prevImg } : undefined);
+                      // 톤 일관성: 전체 씬의 지배적 분위기 계산
+                      const dominant = getDominantMood(assetsRef.current);
+                      const img = await generateImage(assetsRef.current[i], refImgs, { prevSceneImage: prevImg, dominantMood: dominant });
                       if (isAbortedRef.current) break;
 
                       if (img) {
@@ -1204,7 +1156,8 @@ const AppContent: React.FC<{
 
   // 이미지 재생성 핸들러 (useCallback으로 메모이제이션)
   const handleRegenerateImage = useCallback(async (idx: number) => {
-    if (isProcessingRef.current) return;
+    // 메인 생성 중(SCRIPTING/ASSETS)에만 블록, 완료 후 재생성은 허용
+    if (isProcessingRef.current && step !== GenerationStep.COMPLETED) return;
 
     const MAX_RETRIES = 2;
     updateAssetAt(idx, { status: 'generating' });
@@ -1222,7 +1175,7 @@ const AppContent: React.FC<{
           await wait(2000);
         }
 
-        const img = await generateImage(assetsRef.current[idx], currentReferenceImages);
+        const img = await generateImage(assetsRef.current[idx], currentReferenceImages, { dominantMood: getDominantMood(assetsRef.current) });
 
         if (img && !isAbortedRef.current) {
           updateAssetAt(idx, { imageData: img, status: 'completed', errorMessage: undefined });
@@ -1392,147 +1345,15 @@ const AppContent: React.FC<{
     }
   }, []);
 
-  // 씬 순서 변경 핸들러
-  const handleReorderScenes = useCallback((fromIdx: number, toIdx: number) => {
-    if (fromIdx === toIdx) return;
-    pushUndoState(snapshotAssets());
-    const newAssets = [...assetsRef.current];
-    const [moved] = newAssets.splice(fromIdx, 1);
-    newAssets.splice(toIdx, 0, moved);
-    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
-    assetsRef.current = newAssets;
-    setGeneratedData([...newAssets]);
-  }, [pushUndoState]);
-
-  // 씬 삭제 핸들러
-  const handleDeleteScene = useCallback((idx: number) => {
-    pushUndoState(snapshotAssets());
-    const newAssets = assetsRef.current.filter((_, i) => i !== idx);
-    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
-    assetsRef.current = newAssets;
-    setGeneratedData([...newAssets]);
-    setEditingIndex(null);
-  }, [pushUndoState]);
-
-  // 씬 추가 핸들러 (afterIdx 위치 다음에 삽입, undefined면 맨 끝)
-  const handleAddScene = useCallback((afterIdx?: number) => {
-    pushUndoState(snapshotAssets());
-    const insertAt = afterIdx !== undefined ? afterIdx + 1 : assetsRef.current.length;
-    const newAsset: GeneratedAsset = {
-      sceneNumber: insertAt + 1,
-      narration: '',
-      visualPrompt: '',
-      imageData: null,
-      audioData: null,
-      audioDuration: null,
-      subtitleData: null,
-      videoData: null,
-      videoDuration: null,
-      status: 'pending',
-      customDuration: 5,
-    };
-    const newAssets = [...assetsRef.current];
-    newAssets.splice(insertAt, 0, newAsset);
-    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
-    assetsRef.current = newAssets;
-    setGeneratedData([...newAssets]);
-    setEditingIndex(insertAt);
-  }, [pushUndoState]);
-
-  // 씬 이미지 직접 업로드 핸들러
-  const handleUploadSceneImage = useCallback((idx: number, base64: string) => {
-    updateAssetAt(idx, { imageData: base64, videoData: null, status: 'completed' });
-  }, []);
-
-  // 씬 재생 시간 조절 핸들러
-  const handleSetCustomDuration = useCallback((idx: number, duration: number) => {
-    pushUndoState(snapshotAssets());
-    updateAssetAt(idx, { customDuration: duration });
-  }, [pushUndoState]);
-
-  // 씬별 줌/팬 효과 핸들러
-  const handleSetZoomEffect = useCallback((idx: number, effect: string) => {
-    pushUndoState(snapshotAssets());
-    updateAssetAt(idx, { zoomEffect: effect as GeneratedAsset['zoomEffect'] });
-  }, [pushUndoState]);
-
-  // 씬 복제 핸들러
-  const handleDuplicateScene = useCallback((idx: number) => {
-    pushUndoState(snapshotAssets());
-    const original = assetsRef.current[idx];
-    const insertAt = idx + 1;
-    const newAsset: GeneratedAsset = { ...original, sceneNumber: insertAt + 1 };
-    const newAssets = [...assetsRef.current];
-    newAssets.splice(insertAt, 0, newAsset);
-    newAssets.forEach((asset, i) => { asset.sceneNumber = i + 1; });
-    assetsRef.current = newAssets;
-    setGeneratedData([...newAssets]);
-  }, [pushUndoState]);
-
-  // 자동 줌 패턴 일괄 적용 핸들러
-  const handleAutoZoom = useCallback((pattern: string) => {
-    pushUndoState(snapshotAssets());
-    const len = assetsRef.current.length;
-    const dynamicCycle: GeneratedAsset['zoomEffect'][] = ['zoomIn', 'panLeft', 'zoomOut', 'panRight'];
-
-    for (let i = 0; i < len; i++) {
-      let effect: GeneratedAsset['zoomEffect'];
-      switch (pattern) {
-        case 'alternating':
-          effect = i % 2 === 0 ? 'zoomIn' : 'zoomOut';
-          break;
-        case 'dynamic':
-          effect = dynamicCycle[i % 4];
-          break;
-        case 'sentiment': {
-          const asset = assetsRef.current[i];
-          const sentiment = asset.analysis?.sentiment;
-          const motionType = asset.analysis?.motion_type; // 스크립트에서 미제공 시 undefined
-          if (sentiment === 'POSITIVE') {
-            // 희망, 성장 → zoomIn (동적이든 정적이든)
-            effect = 'zoomIn';
-          } else if (sentiment === 'NEGATIVE') {
-            if (motionType === '동적') {
-              effect = i % 2 === 0 ? 'panLeft' : 'panRight'; // 불안, 긴장감
-            } else {
-              effect = 'none';             // 고요한 무거움, 정적 긴장 (motionType 없어도)
-            }
-          } else {
-            // NEUTRAL 또는 undefined
-            if (motionType === '동적') {
-              effect = i % 2 === 0 ? 'panLeft' : 'panRight';
-            } else {
-              effect = 'zoomIn';           // 기본
-            }
-          }
-          break;
-        }
-        case 'static':
-          effect = 'none';
-          break;
-        default:
-          return;
-      }
-      assetsRef.current[i] = { ...assetsRef.current[i], zoomEffect: effect };
-    }
-    setGeneratedData([...assetsRef.current]);
-  }, [pushUndoState]);
-
-  // 씬별 전환 효과 핸들러
-  const handleSetTransition = useCallback((idx: number, transition: string) => {
-    pushUndoState(snapshotAssets());
-    updateAssetAt(idx, { transition: transition as GeneratedAsset['transition'] });
-  }, [pushUndoState]);
-
-  // 전체 씬 전환 효과 일괄 설정
-  const handleSetDefaultTransition = useCallback((transition: string) => {
-    pushUndoState(snapshotAssets());
-    assetsRef.current = assetsRef.current.map(a => ({
-      ...a,
-      transition: transition as GeneratedAsset['transition']
-    }));
-    setGeneratedData([...assetsRef.current]);
-  }, [pushUndoState]);
+  // 씬 편집 핸들러들 (useSceneEditor hook)
+  const {
+    handleReorderScenes, handleDeleteScene, handleAddScene,
+    handleUploadSceneImage, handleSetCustomDuration, handleSetZoomEffect,
+    handleDuplicateScene, handleAutoZoom, handleSetTransition, handleSetDefaultTransition
+  } = useSceneEditor({
+    assetsRef, setGeneratedData, setEditingIndex,
+    pushUndoState, snapshotAssets, updateAssetAt
+  });
 
   // 실패한 씬 일괄 재생성 핸들러
   const handleRegenerateFailedScenes = useCallback(async () => {
@@ -1788,197 +1609,25 @@ const AppContent: React.FC<{
         {/* 감정곡선 에디터는 C2 PILOT 안에서만 사용 */}
 
         {/* 스크립트 검토 배너 */}
-        {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (() => {
-          const sc = generatedData.length;
-          const imgModel = getSelectedImageModel();
-          const imgPer = imgModel === 'gpt-image-1' ? 21 : 16;
-          const totalChars = generatedData.reduce((s, d) => s + (d.narration?.length || 0), 0);
-          const scriptCost = 5;
-          const imgTotal = sc * imgPer;
-          const ttsTotal = Math.max(15, Math.ceil(totalChars / 1000) * 15);
-          const autoBgmEnabled = localStorage.getItem('tubegen_auto_bgm') === 'true';
-          const bgmCost = (autoBgmEnabled && !bgmData) ? 50 : 0;
-          const est = scriptCost + imgTotal + ttsTotal + bgmCost;
-          const isInsufficientCredits = userPlan !== 'operator' && userCredits < est;
-
-          return (
-          <div className="max-w-7xl mx-auto px-4 mb-6 text-center">
-              {/* 견적서 카드 */}
-              {(() => {
-                // 음식 비유 시스템
-                const krwEst = est * 10;
-                const foodTiers: { max: number; label: string; quotes: string[] }[] = [
-                  { max: 100, label: '콜라 한 캔 🥤', quotes: [
-                    '이거 콜라 한 캔도 안 하네 ㅋㅋ 🥤',
-                    '동전 몇 개로 콘텐츠를 만든다고? 🪙',
-                  ]},
-                  { max: 150, label: '삼각김밥 하나 🍙', quotes: [
-                    '삼각김밥 하나 참으면 되는 거잖아 🍙',
-                    '편의점 들를 뻔한 돈으로 뚝딱! 🏪',
-                  ]},
-                  { max: 200, label: '햄버거 반개 🍔', quotes: [
-                    '햄버거 반개 값이라니...! 살도 빼고 개이득! 🍔',
-                    '라면 보다도 싸다고?? 라면 다 먹기 전에 만들어 준다고!? 🍜',
-                  ]},
-                  { max: 300, label: '떡볶이 한 접시 🍢', quotes: [
-                    '떡볶이 한 접시 값이면 끝! 매운 건 참자 🍢',
-                    '분식집 한 번 안 가면 되는 거지 뭐~ 🍢',
-                  ]},
-                  { max: 400, label: '아메리카노 한 잔 ☕', quotes: [
-                    '아아 한 잔 참으면 되는 거잖아~ ☕',
-                    '오늘 커피 한 잔 스킵하면 콘텐츠 완성! ☕',
-                  ]},
-                  { max: 500, label: '컵라면 + 김밥 세트 🍜', quotes: [
-                    '편의점 세트 하나 아끼면 OK 🍜',
-                    '야식 한 번 참으면 되는 가격 🍜',
-                  ]},
-                  { max: 700, label: '볶음밥 한 그릇 🍳', quotes: [
-                    '볶음밥 한 그릇 포기하면... 충분해! 🍳',
-                    '김밥천국 한 끼면 해결되는 가격 🍳',
-                  ]},
-                  { max: 1000, label: '짜장면 한 그릇 🍜', quotes: [
-                    '짜장면 한 그릇이냐 콘텐츠냐, 고민할 것도 없지 🍜',
-                    '배달 한 번 안 시키면 되는 거지~ 🍜',
-                  ]},
-                  { max: 1500, label: '햄버거 세트 🍔', quotes: [
-                    '빅맥 세트 하나 참으면 프로 콘텐츠 완성! 🍔',
-                    '패스트푸드 한 끼 vs 콘텐츠 한 편... 현명한 선택 🍔',
-                  ]},
-                  { max: 2000, label: '치킨 한 마리 🍗', quotes: [
-                    '치킨 한 마리 vs 프로 콘텐츠... 어렵다 🍗',
-                    '오늘 치킨 대신 콘텐츠 어때? 🍗',
-                  ]},
-                  { max: 3000, label: '피자 라지 🍕', quotes: [
-                    '피자 한 판이면 콘텐츠가 나오는 세상 🍕',
-                    '배달 피자 한 판 vs 프로 영상... 고민되네 🍕',
-                  ]},
-                  { max: Infinity, label: '스시 오마카세 🍣', quotes: [
-                    '오마카세 한 끼 생각하면 오히려 싼 거 아냐? 🍣',
-                    '맛집 한 번 참으면 대작이 탄생! 🍣',
-                  ]},
-                ];
-                const tier = foodTiers.find(t => est <= t.max) || foodTiers[foodTiers.length - 1];
-                const quote = tier.quotes[Math.floor(Math.random() * tier.quotes.length)];
-                return (
-                  <div className="mx-auto max-w-lg mb-5 rounded-2xl overflow-hidden border" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(139,92,246,0.06) 100%)' }}>
-                    <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(245,158,11,0.15)' }}>
-                      <span className="text-base">📋</span>
-                      <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#f59e0b' }}>{t('scriptReview.estimatedCost')}</span>
-                      <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full font-bold" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
-                        {tier.label}
-                      </span>
-                    </div>
-                    <div className="px-5 py-2.5 text-center" style={{ borderBottom: '1px solid rgba(245,158,11,0.1)' }}>
-                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        {t('scriptReview.description', { count: sc })}
-                      </p>
-                    </div>
-                    <div className="px-5 py-3 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(139,92,246,0.15)' }}>📝</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>{t('scriptReview.scriptGeneration')}</span>
-                        </div>
-                        <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{scriptCost}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(96,165,250,0.15)' }}>🖼️</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>{t('scriptReview.imagesCount', { count: sc })} <span className="text-[10px] opacity-60">({imgModel === 'gpt-image-1' ? 'GPT' : 'Gemini'} @{imgPer})</span></span>
-                        </div>
-                        <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{imgTotal}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(34,197,94,0.15)' }}>🔊</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>{t('scriptReview.ttsChars')} <span className="text-[10px] opacity-60">({totalChars}{t('completion.unit.chars')})</span></span>
-                        </div>
-                        <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{ttsTotal}</span>
-                      </div>
-                      {bgmCost > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(168,85,247,0.15)' }}>🎵</span>
-                            <span style={{ color: 'var(--text-secondary)' }}>AI BGM <span className="text-[10px] opacity-60">({localStorage.getItem('tubegen_bgm_duration') || '30'}초)</span></span>
-                          </div>
-                          <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{bgmCost}</span>
-                        </div>
-                      )}
-                      {bgmData && !autoBgmEnabled && (
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]" style={{ backgroundColor: 'rgba(168,85,247,0.15)' }}>🎵</span>
-                            <span style={{ color: 'var(--text-secondary)' }}>BGM <span className="text-[10px] opacity-60">(선택됨)</span></span>
-                          </div>
-                          <span className="font-bold tabular-nums text-green-400" style={{}}>무료</span>
-                        </div>
-                      )}
-                      <div className="border-t pt-2 mt-1 flex items-center justify-between" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
-                        <span className="text-sm font-black" style={{ color: '#f59e0b' }}>{t('scriptReview.estimatedTotal')}</span>
-                        <span className="text-lg font-black tabular-nums" style={{ color: '#f59e0b' }}>{est} <span className="text-xs font-bold">{t('common.credits')}</span></span>
-                      </div>
-                    </div>
-                    <div className="px-5 py-2.5 text-center" style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderTop: '1px solid rgba(245,158,11,0.1)' }}>
-                      <p className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>
-                        "{quote}"
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
-              {/* 크레딧 부족 경고 */}
-              {isInsufficientCredits && (
-                <div className="mx-auto max-w-md mb-4 px-4 py-3 rounded-xl bg-red-900/30 border border-red-500/50 text-center">
-                  <p className="text-sm font-bold text-red-400 mb-1">
-                    {t('scriptReview.insufficientCredits')}
-                  </p>
-                  <p className="text-xs text-red-300/80">
-                    {t('scriptReview.insufficientDesc', { est, balance: userCredits.toLocaleString() })}
-                    <span className="ml-1 opacity-70">({t('scriptReview.insufficientShort', { amount: est - userCredits })})</span>
-                  </p>
-                  <button
-                    onClick={() => setShowCreditShop(true)}
-                    className="mt-2 px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors"
-                  >
-                    {t('scriptReview.chargeCredits')}
-                  </button>
-                </div>
-              )}
-              <div className="flex justify-center gap-3">
-                <button
-                  onClick={handleRegenerateScript}
-                  disabled={isProcessingRef.current}
-                  className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border hover:opacity-80"
-                  style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
-                >
-                  {t('scriptReview.regenerateScript')}
-                </button>
-                <button
-                  onClick={isInsufficientCredits ? () => setShowCreditShop(true) : handleApproveScript}
-                  className={isInsufficientCredits
-                    ? "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-black py-3 px-12 rounded-xl transition-all text-base shadow-lg shadow-red-500/40"
-                    : "bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-black py-3 px-12 rounded-xl transition-all text-base shadow-lg shadow-cyan-500/40 hover:shadow-cyan-400/60 hover:scale-105 animate-pulse"
-                  }
-                >
-                  {isInsufficientCredits ? `💳 ${t('scriptReview.chargeButton')}` : `🚀 ${t('scriptReview.startGeneration')}`}
-                </button>
-                <button
-                  onClick={() => {
-                    setStep(GenerationStep.IDLE);
-                    setGeneratedData([]);
-                    assetsRef.current = [];
-                    pendingGenContextRef.current = null;
-                    setProgressMessage('');
-                  }}
-                  className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-all hover:opacity-80"
-                  style={{ borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-          </div>
-          );
-        })()}
+        {step === GenerationStep.SCRIPT_REVIEW && generatedData.length > 0 && (
+          <ScriptReviewBanner
+            generatedData={generatedData}
+            bgmData={bgmData}
+            userCredits={userCredits}
+            userPlan={userPlan}
+            onApprove={handleApproveScript}
+            onRegenerate={handleRegenerateScript}
+            onCancel={() => {
+              setStep(GenerationStep.IDLE);
+              setGeneratedData([]);
+              assetsRef.current = [];
+              pendingGenContextRef.current = null;
+              setProgressMessage('');
+            }}
+            onOpenCreditShop={() => setShowCreditShop(true)}
+            isProcessingRef={isProcessingRef}
+          />
+        )}
 
         <ResultCards
             data={generatedData}
@@ -2167,102 +1816,18 @@ const AppContent: React.FC<{
       )}
 
       {/* ── 게이미피케이션 v2 UI ── */}
-
-      {/* 이벤트 배너 (활성 이벤트가 있을 때 상단 표시) */}
-      <EventBanner events={game.activeEvents} isDark={isDark} />
-
-      {/* 일일 퀘스트 패널 (플로팅 버튼) */}
-      {game.synced && (
-        <DailyQuestPanel
-          quests={game.quests}
-          onClaimReward={game.claimQuestReward}
-          isDark={isDark}
-        />
-      )}
-
-      {/* 게임 오버레이 (레벨업/업적/뽑기/마일스톤) */}
-      {(overlayLevelUp || overlayAchievement || overlayGacha || overlayMilestone) && (
-        <GameOverlay
-          levelUp={overlayLevelUp}
-          achievementUnlock={overlayAchievement}
-          gachaResult={overlayGacha}
-          milestone={overlayMilestone}
-          gachaSettings={game.config?.gachaSettings}
-          onDismiss={() => { setOverlayLevelUp(null); setOverlayAchievement(null); setOverlayGacha(null); setOverlayMilestone(null); }}
-        />
-      )}
-
-      {/* 생성 완료 결과 화면 */}
-      {completionData && (
-        <CompletionScreen
-          {...completionData}
-          onClose={() => setCompletionData(null)}
-          onOpenThumbnail={() => { setCompletionData(null); setShowThumbnailGenerator(true); }}
-        />
-      )}
-
-      {/* 업적 쇼케이스 모달 */}
-      {showAchievements && game.achievements && (
-        <AchievementShowcase
-          isOpen={showAchievements}
-          onClose={() => setShowAchievements(false)}
-          achievements={game.achievements}
-          isDark={isDark}
-        />
-      )}
-
-      {/* 인벤토리 모달 */}
-      {showInventory && game.inventory && (
-        <InventoryModal
-          isOpen={showInventory}
-          onClose={() => setShowInventory(false)}
-          inventory={game.inventory}
-          equipped={game.equipped}
-          gachaTickets={game.userState?.gachaTickets ?? 0}
-          onEquipItem={game.equipItem}
-          onUseConsumable={async (inventoryItemId: string) => {
-            const result = await game.useConsumable(inventoryItemId);
-            if (result?.success) {
-              if (result.effect?.type === 'credit_voucher') {
-                await fetchCredits();
-                setConsumablePopup({ type: 'credit_voucher', credits: result.effect.credits });
-                setTimeout(() => setConsumablePopup(null), 3500);
-              } else if (result.effect?.type === 'xp_booster') {
-                setConsumablePopup({ type: 'xp_booster', multiplier: result.effect.multiplier, until: result.effect.until });
-                setTimeout(() => setConsumablePopup(null), 4000);
-              }
-            }
-          }}
-          onPullGacha={async () => {
-            const result = await game.pullGacha();
-            if (result?.item) {
-              setOverlayGacha({ item: result.item, isNew: result.isNew });
-              // 뽑기 퀘스트 + 상태 새로고침을 병렬 & 백그라운드 처리
-              Promise.all([game.recordAction('gacha_pull', 1), game.refreshState()]).catch(() => {});
-            }
-          }}
-          onPullGachaMulti={async () => {
-            const result = await game.pullGacha();
-            if (result?.item) {
-              // 5연뽑은 GameOverlay 없이 인라인으로 표시, 퀘스트 기록은 백그라운드
-              game.recordAction('gacha_pull', 1).catch(() => {});
-            }
-            // 매 뽑기마다 상태 갱신 (티켓 수 등)
-            game.refreshState().catch(() => {});
-            return result;
-          }}
-          isDark={isDark}
-        />
-      )}
-
-      {/* 리더보드 모달 */}
-      <LeaderboardWidget
-        isOpen={showLeaderboard}
-        onClose={() => setShowLeaderboard(false)}
-        userLevel={game.levelInfo.level}
-        userXp={game.levelInfo.currentXp}
-        userStreak={game.userState?.streakCount ?? 0}
-        isDark={isDark}
+      <GameUI
+        game={game} isDark={isDark}
+        overlayLevelUp={overlayLevelUp} overlayAchievement={overlayAchievement}
+        overlayGacha={overlayGacha} overlayMilestone={overlayMilestone}
+        setOverlayLevelUp={setOverlayLevelUp} setOverlayAchievement={setOverlayAchievement}
+        setOverlayGacha={setOverlayGacha} setOverlayMilestone={setOverlayMilestone}
+        completionData={completionData} setCompletionData={setCompletionData}
+        setShowThumbnailGenerator={setShowThumbnailGenerator}
+        showAchievements={showAchievements} setShowAchievements={setShowAchievements}
+        showInventory={showInventory} setShowInventory={setShowInventory}
+        showLeaderboard={showLeaderboard} setShowLeaderboard={setShowLeaderboard}
+        setConsumablePopup={setConsumablePopup} fetchCredits={fetchCredits}
       />
     </div>
   );

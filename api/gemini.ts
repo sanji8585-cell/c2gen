@@ -269,7 +269,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const baseInstruction =
           topic === 'Manual Script Input' ? SYSTEM_INSTRUCTIONS.MANUAL_VISUAL_MATCHER
           : hasReferenceImage ? SYSTEM_INSTRUCTIONS.REFERENCE_MATCH
-          : SYSTEM_INSTRUCTIONS.CHIEF_ART_DIRECTOR;
+          : SYSTEM_INSTRUCTIONS.SCRIPT_DIRECTOR;
 
         const inputText = sourceContext || topic;
         const inputLength = inputText.length;
@@ -286,7 +286,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`${chunkLabel}[Script] 입력: ${inputLength}자, 예상 씬: ${estimatedSceneCount}개, maxOutputTokens: ${maxOutputTokens}, lang: ${language || 'ko'}`);
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.5-pro',
           contents: getScriptGenerationPrompt(topic, sourceContext, language),
           config: {
             thinkingConfig: { thinkingBudget: 24576 },
@@ -307,7 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }));
 
         // 크레딧 차감 (스크립트: 5크레딧)
-        const scriptCreditResult = await checkAndDeductCredits(req, 5, '스크립트 생성');
+        const scriptCreditResult = await checkAndDeductCredits(req, 15, '스크립트 생성 (Pro)');
         if (!scriptCreditResult.ok) {
           return res.status(402).json({
             error: 'insufficient_credits',
@@ -327,7 +327,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const hasCharacterRef = referenceImages?.character?.length > 0;
         const hasStyleRef = referenceImages?.style?.length > 0;
         const geminiStylePrompt = hasStyleRef ? undefined : resolveStylePrompt(styleId, customStylePrompt);
-        const basePrompt = getFinalVisualPrompt(scene, hasCharacterRef, geminiStylePrompt, suppressKorean, scene?.analysis?.directives);
+        const dominantMood = params.dominantMood; // 톤 일관성: 전체 영상의 지배적 분위기
+        const basePrompt = getFinalVisualPrompt(scene, hasCharacterRef, geminiStylePrompt, suppressKorean, scene?.analysis?.directives, dominantMood);
 
         const characterStrength = referenceImages?.characterStrength ?? 70;
         const styleStrength = referenceImages?.styleStrength ?? 70;
@@ -380,8 +381,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             parts.push({ text: `[SCENE PROMPT]\n${sanitizedPrompt}` });
 
+            // 이미지 모델 동적 선택 (클라이언트에서 전달, 기본 gemini-2.5-flash-image)
+            const imageModelId = params.imageModelId || 'gemini-2.5-flash-image';
             const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash-image',
+              model: imageModelId,
               contents: { parts },
               config: {
                 responseModalities: [Modality.IMAGE],
@@ -533,7 +536,7 @@ ${(visualPrompt || '').slice(0, 300)}
 Return ONLY the motion prompt, no explanation.`;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.5-pro',
           contents: prompt,
         });
         return res.json({ motionPrompt: response.text?.trim() || '' });
@@ -558,7 +561,7 @@ Return ONLY the motion prompt, no explanation.`;
         const aspectRatio = platform === 'tiktok' ? '9:16' : platform === 'instagram' ? '1:1' : '16:9';
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: 'gemini-3.1-flash-image-preview',
           contents: { parts: [{ text: thumbnailPromptText }] },
           config: {
             responseModalities: [Modality.IMAGE],
@@ -586,11 +589,11 @@ Return ONLY the motion prompt, no explanation.`;
 
       // ── AI 대본 어시스턴트 (고급 모드) ──
       case 'generateAdvancedScript': {
-        const { userIntent, settings, language } = params;
+        const { userIntent, settings, language, assistMode } = params;
         if (!settings) return res.status(400).json({ error: 'settings required' });
 
         // 크레딧 차감 (AI 어시스턴트: 5크레딧 — 스크립트 생성과 동일)
-        const advCreditResult = await checkAndDeductCredits(req, 5, 'AI 대본 어시스턴트');
+        const advCreditResult = await checkAndDeductCredits(req, 15, 'AI 대본 어시스턴트 (Pro)');
         if (!advCreditResult.ok) {
           return res.status(402).json({
             error: 'insufficient_credits',
@@ -608,34 +611,98 @@ Return ONLY the motion prompt, no explanation.`;
 
         const settingsText = [formatGuide, speakerGuide, moodGuide, connectionGuide].filter(Boolean).join('\n');
 
-        const prompt = `당신은 영상 대본 작가입니다. 사용자의 의도를 바탕으로 디렉티브가 포함된 완성 대본을 ${langName}로 작성하세요.
-
-## 디렉티브 문법
+        // 디렉티브 문법 공통 블록
+        const directiveBlock = `## 디렉티브 문법
 각 문장 끝에 괄호로 연출 지시를 넣을 수 있습니다:
 - (배경: 설명) — 배경 장면
 - (분위기: 밝음/어두움/중립) — 이미지 톤
 - (구도: 클로즈업/미디엄샷/와이드샷/캐릭터없음) — 카메라 구도
-- (화자: 이름) — 해당 씬의 화자 (대화형일 때). 아래 화자 이름 목록을 반드시 사용하세요.
+- (화자: 이름) — 해당 씬의 화자 (대화형일 때)
 - (이전씬유지) — 이전 씬과 같은 배경 유지
 - (같은장소) — 이전 씬 배경만 유지
 - (시간경과) — 같은 장소 + 조명 변화
 - (텍스트: "표시할 내용") — 이미지 내 텍스트
 - (색상: 설명) — 색상 강조
-- (카메라: 설명) — 카메라 앵글
+- (카메라: 설명) — 카메라 앵글`;
+
+        const characterBlock = settings.characterNames?.length ? `\n## 화자 이름 (반드시 이 이름만 사용)\n${settings.characterNames.map((n: string) => `- ${n}`).join('\n')}\n⚠️ (화자: ) 디렉티브에 위 이름을 정확히 그대로 사용하세요. 다른 이름을 만들지 마세요.` : '';
+
+        // 모드별 프롬프트 분기
+        const mode = assistMode || 'create';
+        let prompt = '';
+
+        if (mode === 'refine') {
+          // 다듬기 모드: 원본 90%+ 유지, 문장력/흐름만 개선
+          prompt = `당신은 영상 대본 편집자입니다. 아래 대본을 다듬어주세요.
+
+## 편집 규칙
+- 원본 대본의 내용과 순서를 최대한 유지하세요 (90% 이상 보존)
+- 어색한 문장만 자연스럽게 다듬으세요
+- 불필요한 군더더기 표현을 정리하세요
+- 기존 디렉티브는 그대로 유지하세요
+- 디렉티브가 없는 씬에는 적절한 디렉티브를 추가할 수 있습니다
+- 씬 수를 함부로 늘리거나 줄이지 마세요
+- 문장의 의미를 바꾸지 마세요
+- 나레이션은 ${langName}로 작성
+
+${directiveBlock}
+${settingsText ? `\n## 사용자 설정\n${settingsText}` : ''}
+${characterBlock}
+
+## 원본 대본 (다듬어주세요)
+${userIntent}
+
+다듬어진 대본만 출력하세요. 설명이나 주석 없이 대본만 작성합니다.`;
+
+        } else if (mode === 'viral') {
+          // 바이럴 변환 모드: 내용 유지 + 구조를 바이럴로 재배치
+          prompt = `당신은 바이럴 영상 대본 구조 전문가입니다. 아래 대본의 내용을 살리면서 바이럴 구조로 재구성하세요.
+
+## 바이럴 구조 변환 규칙
+- 원본의 핵심 내용과 메시지는 반드시 유지하세요 (70~80% 보존)
+- 구조만 바이럴 패턴으로 재배치하세요:
+  1. 씬 1: 가장 충격적/흥미로운 내용을 훅으로 끌어올리세요 (30자 이내)
+  2. 씬 2-3: 배경/문제 제기 + 오픈 루프 ("그런데 진짜 문제는 따로 있었습니다")
+  3. 중간: 긴장감 고조 + 패턴 인터럽트 (3씬마다 톤 전환)
+  4. 후반: 핵심 정보 공개 (원본의 가장 가치 있는 내용)
+  5. 마지막: 행동 유도 CTA (좋아요/구독/댓글)
+- 원본에 없는 내용을 지어내지 마세요
+- 문장 길이를 짧음-중간-짧음 리듬으로 배치
+- 연속 3씬이 같은 감정 톤 금지
+- 나레이션은 ${langName}로 작성
+
+${directiveBlock}
+${settingsText ? `\n## 사용자 설정\n${settingsText}` : ''}
+${characterBlock}
+
+## 원본 대본 (바이럴 구조로 변환하세요)
+${userIntent}
+
+바이럴 구조로 변환된 대본만 출력하세요. 설명이나 주석 없이 대본만 작성합니다.`;
+
+        } else {
+          // 새로 쓰기 모드 (기존 create): 의도만 받아서 처음부터 작성
+          prompt = `당신은 영상 대본 작가입니다. 사용자의 의도를 바탕으로 디렉티브가 포함된 완성 대본을 ${langName}로 작성하세요.
+
+${directiveBlock}
 
 ## 규칙
 - 한 문장 = 1개 씬. 마침표로 구분
 - 최소 6씬 이상 작성
 - 나레이션은 ${langName}로, 디렉티브 값은 ${langName}로 작성
 - 자연스럽고 몰입감 있는 대본 작성
+- 첫 씬은 반드시 강력한 훅으로 시작 (충격 통계, 반전 질문, "당신이 모르는 사실...")
+- 3씬마다 패턴 인터럽트 또는 반전 ("그런데 여기서 반전이 있습니다...")
+- 마지막 씬은 행동 유도 문장으로 마무리 (좋아요, 구독, 댓글 유도)
 - 디렉티브는 적절히 배치 (매 씬마다 넣을 필요 없음)
 ${settingsText ? `\n## 사용자 설정\n${settingsText}` : ''}
-${settings.characterNames?.length ? `\n## 화자 이름 (반드시 이 이름만 사용)\n${settings.characterNames.map((n: string, i: number) => `- ${n}`).join('\n')}\n⚠️ (화자: ) 디렉티브에 위 이름을 정확히 그대로 사용하세요. 다른 이름을 만들지 마세요.` : ''}
+${characterBlock}
 
 ## 사용자 의도
 ${userIntent}
 
 디렉티브가 포함된 완성 대본만 출력하세요. 설명이나 주석 없이 대본만 작성합니다.`;
+        }
 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',

@@ -16,11 +16,11 @@ export const IMAGE_MODELS = [
     speed: '보통'
   },
   {
-    id: 'gpt-image-1',
-    name: 'GPT Image-1',
-    provider: 'OpenAI',
-    pricePerImage: 0.042,   // $0.042/image (medium quality)
-    description: '최고 품질, 사실적 표현',
+    id: 'gemini-3.1-flash-image-preview',
+    name: 'Gemini 3.1 Flash',
+    provider: 'Google',
+    pricePerImage: 0.067,   // $0.067/image (1024px)
+    description: '고품질, 한글 지원, 차세대 모델',
     speed: '보통'
   },
 ] as const;
@@ -174,8 +174,8 @@ export const PRICING = {
 
   // 이미지 생성 (Gemini만 지원)
   IMAGE: {
-    'gemini-2.5-flash-image': 0.0315,  // $0.0315/image
-    'gpt-image-1': 0.042,              // $0.042/image (medium)
+    'gemini-2.5-flash-image': 0.039,    // $0.039/image (실제 가격 보정)
+    'gemini-3.1-flash-image-preview': 0.067,   // $0.067/image (1024px)
   },
   // TTS (ElevenLabs) - 글자당 가격
   TTS: {
@@ -195,11 +195,11 @@ export const CREDIT_CONFIG = {
   // 작업별 크레딧 비용 (API 원가 대비 원가율 30% 기준)
   // 원가율 = API원가 / 판매가, 판매가 = 크레딧 × 10원
   COSTS: {
-    'gemini-2.5-flash-image': 16,  // 원가 $0.0315(46원) → 160원 판매 → 원가율 29%
-    'gpt-image-1': 21,             // 원가 $0.042(61원) → 210원 판매 → 원가율 29%
+    'gemini-2.5-flash-image': 16,      // 원가 $0.039(57원) → 160원 판매 → 원가율 35%
+    'gemini-3.1-flash-image-preview': 33,     // 원가 $0.067(97원) → 330원 판매 → 원가율 29%
     tts_per_1000_chars: 15,        // 원가 $0.03(44원) → 150원 판매 → 원가율 29%
     video: 73,                     // 원가 $0.15(218원) → 730원 판매 → 원가율 30%
-    script: 5,                     // 원가 ~$0.01(15원) → 50원 판매 → 원가율 30%
+    script: 15,                    // 원가 ~$0.04(58원) → 150원 판매 → 원가율 39% (Pro 모델)
     thumbnail: 16,                 // 원가 $0.0315(46원) → 160원 판매 → 원가율 29%
     bgm_generation: 50,            // ElevenLabs Music 30초 BGM 생성 (Scale 플랜 550분 포함)
     // C2 PILOT Phase 1

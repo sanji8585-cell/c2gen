@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C2 GEN 바이럴 엔진 업그레이드 실행 계획서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #0a0a0f;
+    --bg-card: #12121a;
+    --bg-elevated: #1a1a2e;
+    --bg-hover: #222240;
+    --border: #2a2a45;
+    --border-accent: #3d3d6b;
+    --text-primary: #e8e8f0;
+    --text-secondary: #9090b0;
+    --text-muted: #606080;
+    --accent-cyan: #00d4ff;
+    --accent-purple: #a855f7;
+    --accent-pink: #f472b6;
+    --accent-green: #34d399;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --gradient-hero: linear-gradient(135deg, #00d4ff 0%, #a855f7 50%, #f472b6 100%);
+    --gradient-card: linear-gradient(145deg, rgba(168,85,247,0.08) 0%, rgba(0,212,255,0.04) 100%);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    line-height: 1.75;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 80px 0 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px; left: 50%; transform: translateX(-50%);
+    width: 800px; height: 800px;
+    background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, rgba(168,85,247,0.04) 40%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 16px; border-radius: 100px;
+    background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2);
+    font-size: 12px; font-weight: 500; color: var(--accent-cyan);
+    letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .hero-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-cyan); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 3.2rem; font-weight: 900;
+    background: var(--gradient-hero);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.2; margin-bottom: 16px;
+    letter-spacing: -1px;
+  }
+  .hero-meta {
+    display: flex; justify-content: center; gap: 24px; flex-wrap: wrap;
+    font-size: 13px; color: var(--text-muted);
+  }
+  .hero-meta span { display: flex; align-items: center; gap: 6px; }
+
+  /* Section */
+  section { padding: 48px 0; }
+  .section-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--accent-cyan);
+    margin-bottom: 12px;
+  }
+  .section-label::before {
+    content: ''; width: 20px; height: 1px; background: var(--accent-cyan);
+  }
+
+  h2 {
+    font-size: 1.8rem; font-weight: 900; margin-bottom: 24px;
+    color: var(--text-primary); line-height: 1.3;
+  }
+  h3 {
+    font-size: 1.15rem; font-weight: 700; margin: 32px 0 12px;
+    color: var(--text-primary);
+  }
+  h4 {
+    font-size: 0.95rem; font-weight: 700; margin: 20px 0 8px;
+    color: var(--accent-purple);
+  }
+
+  p { margin-bottom: 12px; color: var(--text-secondary); }
+  strong { color: var(--text-primary); font-weight: 700; }
+
+  /* Divider */
+  .divider {
+    height: 1px; margin: 48px 0;
+    background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+  }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0 24px;
+    border-radius: 12px; border: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead { background: var(--bg-elevated); }
+  th {
+    padding: 12px 16px; text-align: left; font-weight: 700; font-size: 12px;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 16px; border-bottom: 1px solid rgba(42,42,69,0.5);
+    color: var(--text-secondary); vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,212,255,0.02); }
+  td:first-child { color: var(--text-primary); font-weight: 500; }
+
+  /* Code blocks */
+  pre {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; overflow-x: auto;
+    margin: 12px 0 20px; font-size: 13px; line-height: 1.7;
+  }
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.88em;
+  }
+  :not(pre) > code {
+    background: var(--bg-elevated); padding: 2px 8px; border-radius: 5px;
+    color: var(--accent-cyan); border: 1px solid var(--border);
+  }
+
+  /* Alert cards */
+  .alert {
+    padding: 16px 20px; border-radius: 10px; margin: 16px 0;
+    border-left: 3px solid; font-size: 14px;
+  }
+  .alert-key {
+    background: rgba(0,212,255,0.06); border-color: var(--accent-cyan);
+    color: var(--text-secondary);
+  }
+  .alert-warn {
+    background: rgba(248,113,113,0.06); border-color: var(--accent-red);
+    color: var(--text-secondary);
+  }
+  .alert-success {
+    background: rgba(52,211,153,0.06); border-color: var(--accent-green);
+    color: var(--text-secondary);
+  }
+  .alert strong { display: block; margin-bottom: 4px; }
+
+  /* Problem cards */
+  .problem-grid { display: grid; gap: 16px; margin: 20px 0; }
+  .problem-card {
+    background: var(--gradient-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+  .problem-card h4 { margin-top: 0; color: var(--accent-red); }
+  .problem-card .solution {
+    margin-top: 8px; padding-top: 8px;
+    border-top: 1px solid var(--border);
+    color: var(--accent-green); font-weight: 500; font-size: 14px;
+  }
+
+  /* Timeline */
+  .timeline { position: relative; padding-left: 32px; margin: 24px 0; }
+  .timeline::before {
+    content: ''; position: absolute; left: 8px; top: 0; bottom: 0;
+    width: 2px; background: linear-gradient(180deg, var(--accent-cyan), var(--accent-purple), var(--accent-pink));
+    border-radius: 2px;
+  }
+  .timeline-item {
+    position: relative; margin-bottom: 32px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+  .timeline-item::before {
+    content: ''; position: absolute; left: -28px; top: 24px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent-cyan); border: 2px solid var(--bg-deep);
+    box-shadow: 0 0 12px rgba(0,212,255,0.4);
+  }
+  .timeline-item:nth-child(2)::before { background: var(--accent-purple); box-shadow: 0 0 12px rgba(168,85,247,0.4); }
+  .timeline-item:nth-child(3)::before { background: var(--accent-pink); box-shadow: 0 0 12px rgba(244,114,182,0.4); }
+  .timeline-item:nth-child(4)::before { background: var(--accent-green); box-shadow: 0 0 12px rgba(52,211,153,0.4); }
+
+  .day-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 700; margin-bottom: 8px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .day-1 { background: rgba(0,212,255,0.15); color: var(--accent-cyan); }
+  .day-3 { background: rgba(168,85,247,0.15); color: var(--accent-purple); }
+  .day-5 { background: rgba(244,114,182,0.15); color: var(--accent-pink); }
+  .day-7 { background: rgba(52,211,153,0.15); color: var(--accent-green); }
+
+  /* Stop list */
+  .stop-card {
+    background: rgba(248,113,113,0.04); border: 1px solid rgba(248,113,113,0.15);
+    border-radius: 12px; padding: 16px 20px; margin: 12px 0;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .stop-icon {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
+    background: rgba(248,113,113,0.15); display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  /* Impact badges */
+  .impact { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .impact-auto { background: rgba(0,212,255,0.15); color: var(--accent-cyan); }
+  .impact-partial { background: rgba(251,191,36,0.15); color: var(--accent-amber); }
+  .impact-all { background: rgba(52,211,153,0.15); color: var(--accent-green); }
+
+  /* File list */
+  .file-list { margin: 16px 0; }
+  .file-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; border-radius: 8px;
+    border: 1px solid var(--border); margin-bottom: 8px;
+    background: var(--bg-card); font-size: 13px;
+    transition: border-color 0.2s;
+  }
+  .file-item:hover { border-color: var(--border-accent); }
+  .file-name { font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 600; flex: 1; }
+  .file-desc { color: var(--text-muted); font-size: 12px; }
+  .file-day { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: var(--bg-elevated); color: var(--text-muted); }
+
+  /* Quote */
+  .quote-block {
+    margin: 48px 0; padding: 32px; text-align: center;
+    position: relative;
+    background: linear-gradient(135deg, rgba(0,212,255,0.04) 0%, rgba(168,85,247,0.06) 100%);
+    border: 1px solid var(--border-accent);
+    border-radius: 16px;
+  }
+  .quote-block p {
+    font-size: 1.15rem; font-weight: 500; color: var(--text-primary);
+    font-style: italic; line-height: 1.8; margin-bottom: 12px;
+  }
+  .quote-block cite {
+    font-size: 13px; color: var(--text-muted); font-style: normal;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 2rem; }
+    .hero-meta { gap: 12px; }
+    table { font-size: 12px; }
+    th, td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">폐하 승인 대기</div>
+  <h1>C2 GEN<br>바이럴 엔진 업그레이드</h1>
+  <div class="hero-meta">
+    <span>📅 2026-03-24</span>
+    <span>✍️ 제갈공명 (Claude Code)</span>
+    <span>📊 4개 AI 종합분석 기반</span>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- SECTION 0: 모드별 영향범위 -->
+<section>
+  <div class="section-label">Section 0</div>
+  <h2>모드별 영향범위</h2>
+  <p>코드를 직접 열어 확인한 3가지 입력 모드의 스크립트 생성 경로입니다.</p>
+
+  <h3>3가지 입력 모드의 스크립트 생성 경로</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>자동 모드</th><th>수동 모드</th><th>고급 모드</th></tr></thead>
+      <tbody>
+        <tr><td><strong>입력</strong></td><td>키워드만</td><td>대본 직접 입력</td><td>대본 + 디렉티브 태그</td></tr>
+        <tr><td><strong>App.tsx 핸들러</strong></td><td><code>handleGenerate</code></td><td><code>handleGenerate</code></td><td><code>handleGenerateAdvanced</code> → <code>handleGenerate</code></td></tr>
+        <tr><td><strong>sourceContext</strong></td><td><code>null</code></td><td>대본 전문</td><td>디렉티브 제거된 대본</td></tr>
+        <tr><td><strong>System Instruction</strong></td><td><code>CHIEF_ART_DIRECTOR</code></td><td><code>CHIEF_ART_DIRECTOR</code> (사실상)</td><td><code>CHIEF_ART_DIRECTOR</code></td></tr>
+        <tr><td><strong>씬 분할 규칙</strong></td><td>도입→배경→전개→시사점→결론</td><td>1문장=1씬, 원문 수정 금지</td><td>1문장=1씬, 원문 수정 금지</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>변경이 영향을 주는 범위</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변경 내용</th><th>자동</th><th>수동</th><th>고급</th></tr></thead>
+      <tbody>
+        <tr><td><strong>프롬프트 바이럴 구조 교체</strong></td><td><span class="impact impact-auto">✅ 직접 영향</span></td><td><span class="impact impact-partial">⚠️ 간접</span></td><td><span class="impact impact-partial">⚠️ 간접</span></td></tr>
+        <tr><td><strong>감정 곡선 엔진 연결</strong></td><td><span class="impact impact-auto">✅ 직접 영향</span></td><td><span class="impact impact-partial">⚠️ 부분</span></td><td><span class="impact impact-partial">⚠️ 부분</span></td></tr>
+        <tr><td><strong>린터 프롬프트 추가</strong></td><td><span class="impact impact-all">✅ 자동 검증</span></td><td><span class="impact impact-all">✅ 자동 검증</span></td><td><span class="impact impact-all">✅ 자동 검증</span></td></tr>
+        <tr><td><strong>플랫폼별 분기</strong></td><td><span class="impact impact-all">✅ 영향</span></td><td><span class="impact impact-all">✅ 영향</span></td><td><span class="impact impact-all">✅ 영향</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="alert alert-key">
+    <strong>🔑 핵심 발견</strong>
+    수동/고급 모드에서는 Gemini가 "원문 수정 금지" 규칙을 따르므로, 나레이션 텍스트 자체는 변하지 않습니다. 바이럴 구조는 <strong>주로 자동 모드에 영향</strong>. 수동/고급에서는 시각 프롬프트와 감정 분석에만 반영됩니다.
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 1: 구조적 문제 -->
+<section>
+  <div class="section-label">Section 1</div>
+  <h2>구조적 문제 발견</h2>
+  <p>코드를 직접 확인하여 발견한 3가지 구조적 문제입니다.</p>
+
+  <div class="problem-grid">
+    <div class="problem-card">
+      <h4>🚨 문제 1: System Instruction 역할 혼선</h4>
+      <p><code>CHIEF_ART_DIRECTOR</code>가 이미지 생성과 스크립트 생성 양쪽에 동시 사용됨 (<code>api/gemini.ts:272,294</code>). 바이럴 구조 지시를 여기에 넣으면 이미지 생성 AI도 영향받음.</p>
+      <div class="solution">✅ 해결: <code>SCRIPT_DIRECTOR</code> 신규 인스트럭션 추가. 스크립트 생성에만 사용.</div>
+    </div>
+    <div class="problem-card">
+      <h4>🚨 문제 2: 감정 곡선 엔진이 C2 GEN에 미연결</h4>
+      <p><code>emotionCurveEngine.ts</code>는 8종 스토리 아크, 감정 매핑, 씬 적용 함수가 완성되어 있지만 C2 GEN 메인 플로우에서 전혀 호출하지 않음. C2 PILOT에서만 사용.</p>
+      <div class="solution">✅ 해결: <code>geminiService.ts</code>의 <code>generateScript()</code>에서 감정 곡선을 sourceContext에 주입.</div>
+    </div>
+    <div class="problem-card">
+      <h4>🚨 문제 3: 청크 분할 모드 미적용</h4>
+      <p>3000자 초과 대본은 <code>generateScriptChunked()</code>로 분할되는데, 이 경로에서는 감정 곡선이 적용되지 않음.</p>
+      <div class="solution">✅ 해결: 첫 번째 청크에만 감정 가이드를 prepend.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 2: 실행 계획 -->
+<section>
+  <div class="section-label">Section 2</div>
+  <h2>실행 계획 — Day 1~7</h2>
+
+  <div class="timeline">
+    <!-- Day 1-2 -->
+    <div class="timeline-item">
+      <div class="day-badge day-1">Day 1-2</div>
+      <h3>프롬프트 바이럴 구조 교체 <span style="font-weight:400;color:var(--accent-green);font-size:14px">— 리스크 제로</span></h3>
+
+      <h4>Step 1: <code>SCRIPT_DIRECTOR</code> 신규 인스트럭션</h4>
+      <p>파일: <code>services/prompts.ts</code></p>
+      <pre><code>SCRIPT_DIRECTOR: `당신은 바이럴 영상 대본을 쓰는 전문 스크립트 디렉터입니다.
+
+## 핵심 원칙: 시청자가 끝까지 보게 만들어라
+- 씬 1은 반드시 강력한 훅으로 시작 (충격 통계, 반전 질문, 긴급성, 리스트 예고 중 택1)
+- 씬 1 나레이션은 30자 이내. 첫 문장이 길면 시청자가 이탈한다.
+- 매 3번째 씬에 패턴 인터럽트 (시점 전환, 반전, 톤 변화)
+- 연속 3개 씬이 같은 감정 톤 금지. 감정의 파동을 만들어라.
+- 씬 2 끝에 오픈 루프 ("그런데 진짜 문제는 따로 있었습니다")
+- 전체 40% 지점에 가장 큰 클리프행어 배치
+- 마지막 씬 직전에 감정 저점(위기), 마지막 씬에 해결/행동 유도
+- 1씬 = 1메시지. 한 씬에 여러 정보 넣지 마라.
+- 문장 길이를 짧음-중간-짧음 리듬으로 배치`,</code></pre>
+
+      <h4>Step 2: 시스템 인스트럭션 분기 수정</h4>
+      <p>파일: <code>api/gemini.ts</code> (269-272행)</p>
+      <pre><code>// 변경: CHIEF_ART_DIRECTOR → SCRIPT_DIRECTOR
+const baseInstruction =
+  topic === 'Manual Script Input' ? SYSTEM_INSTRUCTIONS.MANUAL_VISUAL_MATCHER
+  : hasReferenceImage ? SYSTEM_INSTRUCTIONS.REFERENCE_MATCH
+  : SYSTEM_INSTRUCTIONS.SCRIPT_DIRECTOR;  // ← 변경</code></pre>
+
+      <h4>Step 3: 자동 모드 씬 구조 변경</h4>
+      <p>파일: <code>services/prompts.ts</code> (183-187행)</p>
+      <pre><code>// 변경 전: introduction → background → development → details → implications → conclusion
+// 변경 후:
+- Expand the topic with VIRAL STRUCTURE:
+  hook(충격/질문) → problem(문제제기) → tension(긴장고조)
+  → reveal(핵심정보) → resolution(해결) → CTA(행동유도)
+- Scene 1 MUST start with a hook: shocking stat, counter-intuitive claim, or urgent question
+- Include at least 1 cliffhanger in the middle scenes
+- Final scene: clear conclusion + call to action</code></pre>
+
+      <h4>Step 4: Few-shot 예시 추가 (자동 모드 전용)</h4>
+      <p>자동 모드(<code>!isManual</code>)일 때만 바이럴 훅 예시 3개를 삽입.</p>
+
+      <h4>Step 5: JSON 스키마에 <code>scene_role</code> 필드 추가</h4>
+      <pre><code>"scene_role": "hook | build | tension | climax | resolution | cta"</code></pre>
+    </div>
+
+    <!-- Day 3-4 -->
+    <div class="timeline-item">
+      <div class="day-badge day-3">Day 3-4</div>
+      <h3>감정 곡선 엔진 C2 GEN 연결</h3>
+
+      <h4>Step 1: <code>buildEmotionGuide</code> 이동</h4>
+      <p>현재 <code>services/pilot/scriptStep.ts</code> → <code>services/emotionCurveEngine.ts</code>로 이동하여 export</p>
+
+      <h4>Step 2: <code>generateScript()</code> 수정</h4>
+      <p>파일: <code>services/geminiService.ts</code></p>
+      <pre><code>import { selectStoryArc, generateEmotionCurve, buildEmotionGuide } from './emotionCurveEngine';
+
+export const generateScript = async (topic, hasRef, sourceContext, language) => {
+  const useEmotion = localStorage.getItem('tubegen_emotion_curve') !== 'false';
+  let enrichedContext = sourceContext ?? null;
+
+  if (useEmotion && !sourceContext) {
+    // 자동 모드: 감정 가이드를 sourceContext로 설정
+    const arc = selectStoryArc(topic);
+    const curve = generateEmotionCurve(arc, 'youtube_shorts', 60);
+    enrichedContext = buildEmotionGuide(curve);
+  } else if (useEmotion && sourceContext) {
+    // 수동/고급 모드: 대본 앞에 감정 가이드 prepend
+    const arc = selectStoryArc(topic);
+    const curve = generateEmotionCurve(arc, 'youtube_shorts', 60);
+    const guide = buildEmotionGuide(curve);
+    const combined = `${guide}\n\n${sourceContext}`;
+    enrichedContext = combined.length > 2000 ? combined.slice(0, 2000) + '\n...' : combined;
+  }
+
+  return generateScriptSingle(topic, hasRef, enrichedContext, undefined, language);
+};</code></pre>
+
+      <h4>Step 3: Feature Flag</h4>
+      <p><code>config.ts</code> → <code>EMOTION_CURVE: 'tubegen_emotion_curve'</code> 추가 (기본 ON)</p>
+    </div>
+
+    <!-- Day 5-6 -->
+    <div class="timeline-item">
+      <div class="day-badge day-5">Day 5-6</div>
+      <h3>린터 프롬프트 추가 <span style="font-weight:400;color:var(--text-muted);font-size:14px">— GPT 제안 반영</span></h3>
+
+      <p>스크립트 생성 직후, 자동 검증하는 2차 프롬프트:</p>
+      <pre><code>다음 스크립트를 검토하고 약한 부분을 개선하라:
+1. 씬 1이 3초 안에 멈출 만한 훅인가? (아니면 더 강한 훅으로 교체)
+2. 군더더기 씬이 있는가? (있으면 삭제하거나 병합)
+3. 감정 곡선이 단조로운가? (단조로우면 패턴 인터럽트 추가)
+4. 마지막 씬에 행동 유도가 있는가? (없으면 추가)</code></pre>
+      <p>비용: 추가 API 호출 1회 (Gemini Flash, ~$0.01 = 5크레딧)</p>
+    </div>
+
+    <!-- Day 7 -->
+    <div class="timeline-item">
+      <div class="day-badge day-7">Day 7</div>
+      <h3>A/B 비교 테스트</h3>
+      <p>동일 키워드 10개로 기존 프롬프트 vs 새 프롬프트 대본 생성 비교.</p>
+      <p>평가 기준: <strong>훅 강도 / 긴장감 / 감정 곡선 / CTA 완결성</strong></p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 3: 2주차 -->
+<section>
+  <div class="section-label">Section 3</div>
+  <h2>2주차~한 달: 플랫폼별 분기</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>플랫폼</th><th>추가 지시</th></tr></thead>
+      <tbody>
+        <tr><td><strong>YouTube Shorts</strong></td><td>60초 이내. 교육/정보형 훅. 검색 키워드 포함.</td></tr>
+        <tr><td><strong>TikTok</strong></td><td>15~30초. 완주율 극대화. 트렌드 음악/효과음 힌트.</td></tr>
+        <tr><td><strong>Instagram Reels</strong></td><td>공유 유도 문구. "친구한테 보여줘야 해" CTA.</td></tr>
+        <tr><td><strong>YouTube 롱폼</strong></td><td>10씬+. 챕터 구조. 깊은 분석.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>UI: <code>components/InputSection.tsx</code>에 플랫폼 선택 드롭다운 추가 (영상 방향 옆)</p>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 4: 장기 -->
+<section>
+  <div class="section-label">Section 4</div>
+  <h2>장기 로드맵 (2~3개월)</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>순서</th><th>작업</th><th>의존</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1</strong></td><td>YouTube/TikTok API 성과 데이터 수집</td><td>C2 PILOT Phase 5 완성</td></tr>
+        <tr><td><strong>2</strong></td><td>성과 피드백 루프 (어떤 훅/아크가 효과적인지 추적)</td><td>1 완료 후</td></tr>
+        <tr><td><strong>3</strong></td><td>GPT "150생성→30발행" 린트 파이프라인</td><td>린터 프롬프트 안정화 후</td></tr>
+        <tr><td><strong>4</strong></td><td>2단계 생성 (beat JSON → 대본 렌더링)</td><td>1단계 프롬프트 한계 확인 후</td></tr>
+        <tr><td><strong>5</strong></td><td>Gemini 2.5 Pro / 3 Flash 모델 테스트</td><td>프롬프트 개선 효과 확인 후</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 5: 하지 말 것 -->
+<section>
+  <div class="section-label">Section 5</div>
+  <h2>🚫 하지 말 것</h2>
+
+  <div class="stop-card">
+    <div class="stop-icon">🚫</div>
+    <div>
+      <strong>모델을 당장 교체하지 마라</strong>
+      <p style="margin:4px 0 0;font-size:13px">4/4 AI 동의. 프롬프트가 "도입→배경→전개"면 Pro로 바꿔도 똑같이 밋밋함.</p>
+    </div>
+  </div>
+  <div class="stop-card">
+    <div class="stop-icon">🚫</div>
+    <div>
+      <strong>2단계 생성을 당장 도입하지 마라</strong>
+      <p style="margin:4px 0 0;font-size:13px">API 호출 2배 + 에러 처리 복잡도. 1인+AI 환경에서 과도함. — Thunder Room</p>
+    </div>
+  </div>
+  <div class="stop-card">
+    <div class="stop-icon">🚫</div>
+    <div>
+      <strong>생산량을 줄이지 마라</strong>
+      <p style="margin:4px 0 0;font-size:13px">알고리즘은 꾸준한 업로드를 봄. 줄이는 대신 최소 품질선을 올려라. — Thunder Room, GPT</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SECTION 6: 변경 파일 -->
+<section>
+  <div class="section-label">Section 6</div>
+  <h2>변경 파일 요약</h2>
+  <p><strong>총 변경: 6개 파일 · 신규 파일: 0개 · 기존 코드 삭제: 0줄</strong></p>
+
+  <div class="file-list">
+    <div class="file-item">
+      <span class="file-name">services/prompts.ts</span>
+      <span class="file-desc">SCRIPT_DIRECTOR, 바이럴 구조, Few-shot, scene_role</span>
+      <span class="file-day">D1-2</span>
+    </div>
+    <div class="file-item">
+      <span class="file-name">api/gemini.ts</span>
+      <span class="file-desc">시스템 인스트럭션 분기 변경</span>
+      <span class="file-day">D1-2</span>
+    </div>
+    <div class="file-item">
+      <span class="file-name">services/emotionCurveEngine.ts</span>
+      <span class="file-desc">buildEmotionGuide 이동 (from scriptStep.ts)</span>
+      <span class="file-day">D3-4</span>
+    </div>
+    <div class="file-item">
+      <span class="file-name">services/pilot/scriptStep.ts</span>
+      <span class="file-desc">import 경로 수정</span>
+      <span class="file-day">D3-4</span>
+    </div>
+    <div class="file-item">
+      <span class="file-name">services/geminiService.ts</span>
+      <span class="file-desc">감정 곡선 주입 + feature flag + 린터</span>
+      <span class="file-day">D3-6</span>
+    </div>
+    <div class="file-item">
+      <span class="file-name">config.ts</span>
+      <span class="file-desc">EMOTION_CURVE 스토리지 키 추가</span>
+      <span class="file-day">D3-4</span>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Quote -->
+<div class="quote-block">
+  <p>"C2 GEN의 문제는 AI가 못 써서가 아니라, AI에게 뭘 써달라고 하는지를 모르고 있었던 것이다.<br>엔진은 이미 있다. 켜기만 하면 된다."</p>
+  <cite>— Thunder Room 종합 결론</cite>
+</div>
+
+<div style="height:80px"></div>
+
+</div>
+</body>
+</html>

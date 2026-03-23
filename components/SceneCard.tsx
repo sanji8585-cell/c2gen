@@ -1,8 +1,9 @@
-import React, { useRef, memo } from 'react';
+import React, { useRef, useState, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GeneratedAsset } from '../types';
 import LazyImage from './shared/LazyImage';
 import AudioPlayer from './shared/AudioPlayer';
+import ImageLightbox from './shared/ImageLightbox';
 
 const getImageMime = (b64: string) => b64.startsWith('iVBOR') ? 'image/png' : 'image/jpeg';
 
@@ -97,6 +98,7 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
   const narrationRef = useRef<HTMLTextAreaElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const sceneNum = String(index + 1).padStart(2, '0');
   const duration = row.customDuration || row.audioDuration || row.videoDuration || 0;
@@ -205,7 +207,9 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
               <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-extrabold" style={{ background: 'rgba(6,182,212,0.2)', color: '#22d3ee', border: '1px solid rgba(6,182,212,0.3)' }}>VIDEO</div>
             </>
           ) : hasImage ? (
-            <LazyImage src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`} alt={`Scene ${sceneNum}`} className="w-full h-full object-cover" />
+            <div onClick={() => setLightboxOpen(true)} style={{ cursor: 'zoom-in', width: '100%', height: '100%' }}>
+              <LazyImage src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`} alt={`Scene ${sceneNum}`} className="w-full h-full object-cover" />
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--bg-elevated)' }}>
               <div className="flex items-center gap-2">
@@ -446,6 +450,15 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
 
       {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+      {/* Image Lightbox */}
+      {lightboxOpen && hasImage && (
+        <ImageLightbox
+          src={`data:${getImageMime(row.imageData!)};base64,${row.imageData}`}
+          alt={`Scene ${sceneNum}`}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 });

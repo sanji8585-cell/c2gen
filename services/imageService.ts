@@ -182,20 +182,12 @@ async function generateWithOpenAI(scene: ScriptScene, options?: { isPreview?: bo
 export async function generateImage(
   scene: ScriptScene,
   referenceImages: ReferenceImages,
-  options?: { isPreview?: boolean; prevSceneImage?: string }
+  options?: { isPreview?: boolean; prevSceneImage?: string; dominantMood?: string }
 ): Promise<string | null> {
   const modelId = getSelectedImageModel();
   const hasCharacterRef = referenceImages.character && referenceImages.character.length > 0;
   const hasStyleRef = referenceImages.style && referenceImages.style.length > 0;
 
-  // GPT Image-1 (참조 이미지 미지원)
-  if (modelId === 'gpt-image-1') {
-    if (hasCharacterRef || hasStyleRef) {
-      console.warn('[Image Service] GPT Image-1은 참조 이미지를 지원하지 않습니다. 텍스트 프롬프트만 사용합니다.');
-    }
-    return await generateWithOpenAI(scene, options);
-  }
-
-  // Gemini (참조 이미지 지원)
+  // 모든 모델이 Gemini 경유 (gemini-2.5-flash-image, gemini-3.1-flash-image)
   return await generateWithGemini(scene, referenceImages, options);
 }

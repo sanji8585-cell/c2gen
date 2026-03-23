@@ -20,7 +20,7 @@ interface HeroInputProps {
   onAdvancedScriptChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   step: GenerationStep;
-  onAiAssist?: (settings: AdvancedSettings) => void;
+  onAiAssist?: (settings: AdvancedSettings, assistMode?: 'create' | 'refine' | 'viral') => void;
   isAiAssisting?: boolean;
 }
 
@@ -339,20 +339,49 @@ const HeroInput: React.FC<HeroInputProps> = ({
                   </div>
                 ))}
               </div>
-              {/* AI Assist button */}
-              <button type="button"
-                onClick={() => onAiAssist?.(advSettings)}
-                disabled={isDisabled || isAiAssisting || !advancedScript.trim()}
-                style={{
-                  width: '100%', padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.3)',
-                  background: isAiAssisting ? 'var(--bg-elevated)' : 'linear-gradient(135deg, rgba(96,165,250,0.1), rgba(129,140,248,0.1))',
-                  color: isAiAssisting ? 'var(--text-muted)' : '#60a5fa',
-                  fontSize: 13, fontWeight: 600, cursor: isAiAssisting ? 'wait' : 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {isAiAssisting ? '✨ AI가 대본 작성 중...' : '✨ AI가 대본 완성해주기'}
-              </button>
+              {/* AI Assist buttons — 3가지 모드 */}
+              {isAiAssisting ? (
+                <div style={{
+                  width: '100%', padding: '10px 16px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)',
+                  background: 'var(--bg-elevated)', color: 'var(--text-muted)',
+                  fontSize: 13, fontWeight: 600, textAlign: 'center',
+                }}>
+                  ✨ AI가 대본 작업 중...
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button"
+                    onClick={() => onAiAssist?.(advSettings, 'create')}
+                    disabled={isDisabled || !advancedScript.trim()}
+                    style={{
+                      flex: 1, padding: '8px 8px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.3)',
+                      background: 'linear-gradient(135deg, rgba(96,165,250,0.1), rgba(129,140,248,0.1))',
+                      color: '#60a5fa', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      transition: 'all 0.2s', opacity: isDisabled || !advancedScript.trim() ? 0.4 : 1,
+                    }}
+                  >✨ 새로 써주기</button>
+                  <button type="button"
+                    onClick={() => onAiAssist?.(advSettings, 'refine')}
+                    disabled={isDisabled || !advancedScript.trim()}
+                    style={{
+                      flex: 1, padding: '8px 8px', borderRadius: 8, border: '1px solid rgba(52,211,153,0.3)',
+                      background: 'linear-gradient(135deg, rgba(52,211,153,0.08), rgba(16,185,129,0.08))',
+                      color: '#34d399', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      transition: 'all 0.2s', opacity: isDisabled || !advancedScript.trim() ? 0.4 : 1,
+                    }}
+                  >🔧 다듬어주기</button>
+                  <button type="button"
+                    onClick={() => onAiAssist?.(advSettings, 'viral')}
+                    disabled={isDisabled || !advancedScript.trim()}
+                    style={{
+                      flex: 1, padding: '8px 8px', borderRadius: 8, border: '1px solid rgba(251,146,60,0.3)',
+                      background: 'linear-gradient(135deg, rgba(251,146,60,0.08), rgba(245,158,11,0.08))',
+                      color: '#fb923c', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      transition: 'all 0.2s', opacity: isDisabled || !advancedScript.trim() ? 0.4 : 1,
+                    }}
+                  >🔥 바이럴 변환</button>
+                </div>
+              )}
               {/* Directive Guide button */}
               <button type="button"
                 onClick={() => setShowDirectiveGuide(true)}
