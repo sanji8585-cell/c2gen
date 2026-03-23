@@ -256,7 +256,7 @@ export const generateMotionPrompt = async (
   }
 };
 
-/** AI 대본 어시스턴트 (고급 모드) */
+/** AI 대본 어시스턴트 (고급 모드) — 3가지 모드: create(새로쓰기), refine(다듬기), viral(바이럴변환) */
 export const generateAdvancedScript = async (
   userIntent: string,
   settings: {
@@ -266,8 +266,9 @@ export const generateAdvancedScript = async (
     sceneConnection: string;
   },
   language: string = 'ko',
+  assistMode: 'create' | 'refine' | 'viral' = 'create',
 ): Promise<string> => {
-  const result = await callGeminiProxy('generateAdvancedScript', { userIntent, settings, language });
+  const result = await callGeminiProxy('generateAdvancedScript', { userIntent, settings, language, assistMode });
   return result?.script ?? (typeof result === 'string' ? result : '');
 };
 

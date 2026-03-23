@@ -621,7 +621,7 @@ const AppContent: React.FC<{
   const [isAiAssisting, setIsAiAssisting] = useState(false);
   const [aiAssistResult, setAiAssistResult] = useState<string | null>(null);
 
-  const handleAiAssist = useCallback(async (intent: string, settings: AdvancedSettings) => {
+  const handleAiAssist = useCallback(async (intent: string, settings: AdvancedSettings, assistMode: 'create' | 'refine' | 'viral' = 'create') => {
     setIsAiAssisting(true);
     try {
       const language = localStorage.getItem('tubegen_language') || 'ko';
@@ -631,7 +631,7 @@ const AppContent: React.FC<{
         const voices = JSON.parse(localStorage.getItem('tubegen_character_voices') || '[]');
         characterNames = voices.map((v: any) => v.name).filter(Boolean);
       } catch {}
-      const result = await generateAdvancedScript(intent, { ...settings, characterNames } as any, language);
+      const result = await generateAdvancedScript(intent, { ...settings, characterNames } as any, language, assistMode);
       setAiAssistResult(typeof result === 'string' ? result : (result as any).script || String(result));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
