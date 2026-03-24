@@ -120,6 +120,62 @@ export function getCurrentChunk(
 /**
  * 자막 렌더링
  */
+/**
+ * 긴 텍스트를 캔버스 너비에 맞게 자연스럽게 줄바꿈.
+ * 한국어: 글자 단위로 누적하면서, 조사/쉼표/공백 뒤를 우선 끊김점으로 사용.
+ */
+function wrapTextToLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): string[] {
+  const inputLines = text.split('\n');
+  const result: string[] = [];
+
+  // 이 글자 뒤에서 끊으면 자연스러운 위치
+  const BREAK_AFTER = /[,.\s은는이가을를에서로와과의도만요고며면지까]$/;
+
+  for (const line of inputLines) {
+    if (ctx.measureText(line).width <= maxWidth) {
+      result.push(line);
+      continue;
+    }
+
+    let current = '';
+    let lastBreakPos = 0; // current 안에서 마지막 자연스러운 끊김 위치
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const test = current + char;
+
+      if (ctx.measureText(test).width <= maxWidth) {
+        current = test;
+        // 이 글자 뒤가 자연스러운 끊김점이면 기록
+        if (BREAK_AFTER.test(char)) {
+          lastBreakPos = current.length;
+        }
+      } else {
+        // maxWidth 초과 → 끊기
+        if (lastBreakPos > 0) {
+          // 자연스러운 위치에서 끊기
+          result.push(current.slice(0, lastBreakPos).trim());
+          // 남은 부분 + 현재 글자를 다음 줄로
+          current = current.slice(lastBreakPos).trimStart() + char;
+        } else {
+          // 자연스러운 끊김점 없음 → 현재까지 끊기
+          if (current.trim()) result.push(current.trim());
+          current = char;
+        }
+        lastBreakPos = 0;
+      }
+    }
+    if (current.trim()) result.push(current.trim());
+  }
+
+  // 최대 3줄 제한
+  return result.slice(0, 3);
+}
+
 export function renderSubtitle(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
@@ -131,14 +187,15 @@ export function renderSubtitle(
   const currentChunk = getCurrentChunk(chunks, sceneElapsed);
   if (!currentChunk) return;
 
-  const lines = currentChunk.text.split('\n');
+  const padding = 20;
+  const safeMargin = 10;
+  const maxTextWidth = canvas.width - (safeMargin + padding) * 2;
+
+  ctx.font = `bold ${config.fontSize}px ${config.fontFamily}`;
+  const lines = wrapTextToLines(ctx, currentChunk.text, maxTextWidth);
   if (lines.length === 0) return;
 
   const lineHeight = config.fontSize * 1.4;
-  const padding = 20;
-  const safeMargin = 10;
-
-  ctx.font = `bold ${config.fontSize}px ${config.fontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
 
