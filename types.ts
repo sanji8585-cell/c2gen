@@ -76,6 +76,7 @@ export interface SceneAnalysis {
   motion_type: '정적' | '동적';
   motion_detail: string; // 동작디테일
   sentiment?: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'; // 감정 (선택적)
+  scene_role?: 'hook' | 'build' | 'tension' | 'climax' | 'resolution' | 'cta'; // 바이럴 구조 역할
   directives?: SceneDirectives;
 }
 

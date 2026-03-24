@@ -104,3 +104,44 @@ export function getEmotionTtsPace(emotionMeta?: SceneEmotionMeta): number {
     default: return 1.0;
   }
 }
+
+// ── scene_role 기반 TTS 오프셋 ──
+
+/** scene_role에 따른 speed/stability 오프셋 (사용자 설정에 더해짐) */
+const SCENE_ROLE_OFFSETS: Record<string, { speed: number; stability: number }> = {
+  hook:       { speed: +0.10, stability: -0.15 },  // 에너지 넘치는 오프닝
+  build:      { speed:  0.00, stability:  0.00 },  // 기본 톤 유지
+  tension:    { speed: +0.05, stability: -0.10 },  // 약간 긴장감
+  climax:     { speed: +0.15, stability: -0.20 },  // 절정 — 가장 역동적
+  resolution: { speed: -0.05, stability: +0.10 },  // 차분한 마무리
+  cta:        { speed: +0.05, stability: -0.05 },  // 약간의 에너지 (행동 유도)
+};
+
+export interface TtsRoleAdjustment {
+  speed: number;
+  stability: number;
+}
+
+/**
+ * scene_role 기반으로 사용자 설정 speed/stability에 오프셋을 적용.
+ * @param baseSpeed 사용자 설정 또는 화자별 speed
+ * @param baseStability 사용자 설정 또는 화자별 stability
+ * @param sceneRole scene의 role (hook/build/tension/climax/resolution/cta)
+ * @returns clamp 적용된 최종 speed/stability
+ */
+export function applySceneRoleOffset(
+  baseSpeed: number,
+  baseStability: number,
+  sceneRole?: string
+): TtsRoleAdjustment {
+  if (!sceneRole || localStorage.getItem('tubegen_tts_emotion') === 'false') {
+    return { speed: baseSpeed, stability: baseStability };
+  }
+
+  const offset = SCENE_ROLE_OFFSETS[sceneRole] || SCENE_ROLE_OFFSETS.build;
+
+  return {
+    speed: Math.max(0.7, Math.min(1.5, baseSpeed + offset.speed)),
+    stability: Math.max(0.2, Math.min(0.9, baseStability + offset.stability)),
+  };
+}

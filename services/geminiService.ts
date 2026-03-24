@@ -173,6 +173,53 @@ export const generateScriptChunked = async (
   return allScenes;
 };
 
+// ── 스크립트 린터 (자동 검증) ──
+
+/** 생성된 스크립트를 자동 검증하고 약한 부분을 개선 */
+export const lintScript = async (
+  scenes: ScriptScene[],
+  language?: Language
+): Promise<ScriptScene[]> => {
+  // Feature flag 확인
+  if (localStorage.getItem('tubegen_script_lint') === 'false') {
+    return scenes;
+  }
+
+  try {
+    const lintInput = scenes.map(s => ({
+      narration: s.narration,
+      analysis: {
+        sentiment: s.analysis?.sentiment,
+        scene_role: s.analysis?.scene_role,
+      },
+    }));
+
+    const fixes: { sceneIndex: number; narration: string; reason: string }[] =
+      await callGeminiProxy('lintScript', { scenes: lintInput, language: language || 'ko' });
+
+    if (!Array.isArray(fixes) || fixes.length === 0) {
+      console.log('[Linter] 수정 사항 없음 — 원본 유지');
+      return scenes;
+    }
+
+    // 수정 사항 적용
+    const linted = [...scenes];
+    for (const fix of fixes) {
+      const idx = fix.sceneIndex;
+      if (idx >= 0 && idx < linted.length && fix.narration) {
+        console.log(`[Linter] 씬 ${idx + 1} 수정: ${fix.reason}`);
+        linted[idx] = { ...linted[idx], narration: fix.narration };
+      }
+    }
+
+    console.log(`[Linter] ${fixes.length}개 씬 개선 완료`);
+    return linted;
+  } catch (error) {
+    console.warn('[Linter] 린트 실패 — 원본 유지:', error);
+    return scenes;
+  }
+};
+
 // ── 스타일 정보 (서버로 전송) ──
 
 function getGeminiStyleInfo(): { styleId: string; customStylePrompt: string } {

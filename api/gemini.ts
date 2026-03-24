@@ -5,6 +5,7 @@ import {
   SYSTEM_INSTRUCTIONS,
   getTrendSearchPrompt,
   getScriptGenerationPrompt,
+  getScriptLintPrompt,
   getFinalVisualPrompt,
   getMoodAnalysisPrompt,
   getThumbnailPrompt,
@@ -318,6 +319,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         logUsage(req, 'script', 0);
         return res.json(mapped);
+      }
+
+      // ── 스크립트 린트 (자동 검증) ──
+      case 'lintScript': {
+        const { scenes, language } = params;
+        if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
+          return res.json([]);
+        }
+
+        const lintPrompt = getScriptLintPrompt(scenes, language);
+        const lintResponse = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: lintPrompt,
+          config: {
+            responseMimeType: 'application/json',
+            systemInstruction: SYSTEM_INSTRUCTIONS.SCRIPT_LINTER,
+            maxOutputTokens: 4096,
+          },
+        });
+
+        const fixes = JSON.parse(cleanJsonResponse(lintResponse.text || '[]'));
+
+        // 크레딧 차감 (린트: 5크레딧)
+        const lintCreditResult = await checkAndDeductCredits(req, 5, '스크립트 린트');
+        if (!lintCreditResult.ok) {
+          return res.status(402).json({
+            error: 'insufficient_credits',
+            message: `크레딧이 부족합니다. (현재: ${lintCreditResult.balance ?? 0}, 필요: 5)`,
+            balance: lintCreditResult.balance,
+          });
+        }
+
+        logUsage(req, 'script_lint', 0);
+        return res.json(Array.isArray(fixes) ? fixes : []);
       }
 
       // ── 이미지 생성 ──

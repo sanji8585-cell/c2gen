@@ -14,8 +14,9 @@ import { useCostTracker } from './hooks/useCostTracker';
 import { useSceneEditor } from './hooks/useSceneEditor';
 import { useUserAccount } from './hooks/useUserAccount';
 import { useTheme } from './hooks/useTheme';
-import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript } from './services/geminiService';
+import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript, lintScript } from './services/geminiService';
 import { getDominantMood } from './services/prompts';
+import { applySceneRoleOffset } from './services/audioTagsService';
 import type { AdvancedSettings } from './components/input/HeroInput';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import { generateImage, getSelectedImageModel } from './services/imageService';
@@ -512,7 +513,12 @@ const AppContent: React.FC<{
         scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText, language);
       }
       if (isAbortedRef.current) return;
-      
+
+      // 스크립트 린터 — 자동 검증 및 개선
+      setProgressMessage('대본 검증 중...');
+      scriptScenes = await lintScript(scriptScenes, language);
+      if (isAbortedRef.current) return;
+
       const initialAssets = scriptScenes.map((scene, i) => {
         // sentiment 기반 줌 이펙트 자동 적용
         const sentiment = scene.analysis?.sentiment;
@@ -749,11 +755,14 @@ const AppContent: React.FC<{
                           if (m?.stability !== undefined) speakerStability = m.stability;
                         } catch {}
                       }
-                      console.log(`[TTS] 씬 ${i + 1} 최종: speed=${speakerSpeed} stability=${speakerStability}`);
+                      // scene_role 기반 감정 오프셋 적용
+                      const sceneRole = assetsRef.current[i].analysis?.scene_role;
+                      const adjusted = applySceneRoleOffset(speakerSpeed, speakerStability, sceneRole);
+                      console.log(`[TTS] 씬 ${i + 1} 최종: speed=${adjusted.speed.toFixed(2)} stability=${adjusted.stability.toFixed(2)} (role=${sceneRole || 'none'})`);
                       const elResult = await generateAudioWithElevenLabs(
                         assetsRef.current[i].narration,
                         undefined, voiceIdForScene, undefined,
-                        { speed: speakerSpeed, stability: speakerStability }
+                        { speed: adjusted.speed, stability: adjusted.stability }
                       );
                       if (isAbortedRef.current) break;
 
@@ -1137,6 +1146,11 @@ const AppContent: React.FC<{
       }
       if (isAbortedRef.current) return;
 
+      // 스크립트 린터 — 자동 검증 및 개선
+      setProgressMessage('대본 검증 중...');
+      scriptScenes = await lintScript(scriptScenes, language);
+      if (isAbortedRef.current) return;
+
       const newAssets = scriptScenes.map(scene => ({
         ...scene, imageData: null, audioData: null, audioDuration: null,
         subtitleData: null, videoData: null, videoDuration: null, status: 'pending' as const
@@ -1322,10 +1336,13 @@ const AppContent: React.FC<{
           if (matched?.stability !== undefined) elStability = matched.stability;
         } catch {}
       }
+      // scene_role 기반 감정 오프셋 적용
+      const regenSceneRole = assetsRef.current[idx].analysis?.scene_role;
+      const regenAdjusted = applySceneRoleOffset(elSpeed, elStability, regenSceneRole);
       const result = await generateAudioWithElevenLabs(
         assetsRef.current[idx].narration,
         undefined, voiceIdForRegen, undefined,
-        { speed: elSpeed, stability: elStability }
+        { speed: regenAdjusted.speed, stability: regenAdjusted.stability }
       );
       if (result.audioData && !isAbortedRef.current) {
         updateAssetAt(idx, {

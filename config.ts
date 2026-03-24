@@ -474,6 +474,8 @@ export const CONFIG = {
     LANGUAGE: 'tubegen_language',                 // 나레이션 언어
     SUPPRESS_KOREAN: 'tubegen_suppress_korean',  // 이미지 내 한글 억제
     THEME: 'tubegen_theme',                      // 테마 (light/dark)
+    SCRIPT_LINT: 'tubegen_script_lint',          // 스크립트 린터 ON/OFF (기본 ON)
+    TTS_EMOTION: 'tubegen_tts_emotion',          // scene_role 기반 TTS 감정 조절 ON/OFF (기본 ON)
   },
 
   // 애니메이션 설정

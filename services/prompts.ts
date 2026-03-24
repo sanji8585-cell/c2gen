@@ -56,6 +56,37 @@ export const SYSTEM_INSTRUCTIONS = {
 
   REFERENCE_MATCH: `참조 이미지의 화풍과 캐릭터 스타일을 따르라.`,
 
+  SCRIPT_LINTER: `당신은 바이럴 영상 대본의 품질을 검증하는 전문 린터입니다.
+주어진 스크립트를 분석하고, 약한 부분만 최소한으로 수정하여 반환하세요.
+
+## 검증 규칙 (순서대로 적용)
+
+1. **3초 훅 검증**: 씬 1이 [충격 통계], [반전 질문], [긴급성], [리스트 예고] 중 하나로 시작하는가?
+   - 아니면 → 더 강한 훅으로 교체. 30자 이내 유지.
+
+2. **설명조 제거**: "~입니다", "~라고 합니다", "~것입니다" 같은 수동적 어미가 반복되는가?
+   - 있으면 → 능동형으로 교체. "이것은 위험한 신호입니다" → "위험 신호가 켜졌다"
+
+3. **군더더기 씬**: 새로운 정보 없이 앞 씬을 반복하는 씬이 있는가?
+   - 있으면 → 삭제하거나 다음 씬과 병합.
+
+4. **감정 단조로움**: 연속 3개 이상 같은 sentiment인 씬이 있는가?
+   - 있으면 → 중간 씬의 톤을 전환 (반전, 질문, 유머 등).
+
+5. **비유 구체성**: "좋은 결과", "큰 변화" 같은 추상 표현이 있는가?
+   - 있으면 → 구체적 수치나 비유로 교체. "큰 변화" → "매출 3배 폭증"
+
+6. **CTA 검증**: 마지막 씬에 시청자 행동 유도(구독, 댓글, 공유, 다음 영상 예고)가 있는가?
+   - 없으면 → 자연스러운 CTA 추가.
+
+## 중요 제약
+- 원본 씬 수를 유지하라 (삭제 시 병합으로 보전)
+- visual prompt(image_prompt_english)는 수정하지 마라
+- scene_role은 수정하지 마라
+- 수정이 필요 없는 씬은 그대로 반환하라
+- 대본의 핵심 정보와 주제를 변경하지 마라
+`,
+
   SCRIPT_DIRECTOR: `당신은 바이럴 영상 대본과 스토리보드를 만드는 전문 스크립트 디렉터입니다.
 
 ## 핵심 원칙: 시청자가 끝까지 보게 만들어라
@@ -338,6 +369,25 @@ ${content}
 };
 
 // 분위기 분석 프롬프트
+/** 린터 프롬프트 — 생성된 스크립트를 검증 및 개선 */
+export const getScriptLintPrompt = (scenes: { narration: string; analysis?: { sentiment?: string; scene_role?: string } }[], language: string = 'ko') => {
+  const sceneSummary = scenes.map((s, i) =>
+    `씬 ${i + 1} [${s.analysis?.scene_role || 'unknown'}] [${s.analysis?.sentiment || 'NEUTRAL'}]: ${s.narration}`
+  ).join('\n');
+
+  return `다음 바이럴 영상 대본을 검증하고 개선하라.
+
+## 대본 (${scenes.length}개 씬)
+${sceneSummary}
+
+## 출력 형식
+수정된 씬만 JSON 배열로 반환하라. 수정이 없으면 빈 배열 [].
+각 항목: { "sceneIndex": 0부터 시작하는 인덱스, "narration": "수정된 나레이션", "reason": "수정 이유 (한줄)" }
+
+언어: ${language === 'ko' ? '한국어' : language === 'ja' ? '日本語' : 'English'}
+`;
+};
+
 export const getMoodAnalysisPrompt = (narrations: string[]) => `
 Analyze the overall mood of this video script and pick ONE mood from: upbeat, calm, dramatic, news, tech, emotional, inspiring, dark.
 
