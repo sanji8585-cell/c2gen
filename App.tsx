@@ -458,9 +458,9 @@ const AppContent: React.FC<{
       let targetTopic = topic;
 
       if (topic === "Manual Script Input" && sourceText) {
-        // 수동 대본: 대본 첫 줄/첫 부분을 프로젝트명으로 사용
+        // 수동 대본: 프로젝트명용 타이틀은 별도 보관, API에는 원래 topic 전달
         const firstLine = sourceText.split('\n').find(l => l.trim().length > 0)?.trim() || '수동 대본';
-        targetTopic = firstLine.slice(0, 50);
+        setCurrentTopic(firstLine.slice(0, 50));
         setProgressMessage(t('progress.analyzingScript'));
       } else if (sourceText) {
         setProgressMessage(t('progress.analyzingContent'));
@@ -1662,6 +1662,7 @@ const AppContent: React.FC<{
             onRegenerateFailedScenes={handleRegenerateFailedScenes}
             onExportVideo={triggerVideoExport}
             userPlan={userPlan}
+            userCredits={userCredits}
             isExporting={isVideoGenerating}
             animatingIndices={animatingIndices}
             onGenerateAnimation={handleGenerateAnimation}

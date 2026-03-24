@@ -403,8 +403,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       if (topic.trim()) onGenerate(topic, refImages, null);
     } else if (activeTab === 'manual') {
       if (manualScript.trim()) {
-        const autoTopic = manualScript.trim().split('\n')[0].slice(0, 50).trim() || '직접 입력 대본';
-        onGenerate(autoTopic, refImages, manualScript);
+        onGenerate('Manual Script Input', refImages, manualScript);
       }
     } else if (activeTab === 'advanced' && onGenerateAdvanced) {
       if (advancedScript.trim()) {

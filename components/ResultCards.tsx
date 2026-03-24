@@ -5,6 +5,7 @@ import { getVideoOrientation, ResolutionTier, getVideoResolution, setVideoResolu
 import SceneToolbar from './SceneToolbar';
 import SceneCard from './SceneCard';
 import PreviewPlayer from './PreviewPlayer';
+import BulkActionBar from './BulkActionBar';
 
 interface ResultCardsProps {
   data: GeneratedAsset[];
@@ -24,6 +25,7 @@ interface ResultCardsProps {
   onRegenerateImage?: (index: number) => void;
   onExportVideo?: (enableSubtitles: boolean, subtitleConfig?: Partial<SubtitleConfig>, sceneGap?: number, resolution?: ResolutionTier) => void;
   userPlan?: string;
+  userCredits?: number;
   onGenerateAnimation?: (index: number) => void;
   onDuplicateScene?: (index: number) => void;
   onRegenerateFailedScenes?: () => void;
@@ -63,6 +65,7 @@ const ResultCards: React.FC<ResultCardsProps> = ({
   onRegenerateImage,
   onExportVideo,
   userPlan,
+  userCredits,
   onGenerateAnimation,
   onDuplicateScene,
   onRegenerateFailedScenes,
@@ -86,6 +89,26 @@ const ResultCards: React.FC<ResultCardsProps> = ({
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+
+  const toggleSelect = useCallback((index: number) => {
+    setSelectedIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index); else next.add(index);
+      return next;
+    });
+  }, []);
+  const selectAll = useCallback(() => setSelectedIndices(new Set(data.map((_, i) => i))), [data]);
+  const deselectAll = useCallback(() => setSelectedIndices(new Set()), []);
+
+  // 데이터 변경 시 존재하지 않는 인덱스 정리
+  useEffect(() => {
+    setSelectedIndices(prev => {
+      const cleaned = new Set<number>();
+      prev.forEach(i => { if (i < data.length) cleaned.add(i); });
+      return cleaned.size !== prev.size ? cleaned : prev;
+    });
+  }, [data.length]);
   const [subtitlePos, setSubtitlePos] = useState<'top' | 'center' | 'bottom'>('bottom');
   const [subtitleFontSize, setSubtitleFontSize] = useState(DEFAULT_SUBTITLE_CONFIG.fontSize);
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(75);
@@ -226,6 +249,8 @@ const ResultCards: React.FC<ResultCardsProps> = ({
             isEditing={editingIndex === index}
             isExpanded={expandedIndex === index}
             confirmDelete={confirmDeleteIndex === index}
+            isSelected={selectedIndices.has(index)}
+            onToggleSelect={toggleSelect}
             onRegenerateImage={onRegenerateImage}
             onGenerateAnimation={onGenerateAnimation}
             onEditToggle={onEditToggle}
@@ -257,6 +282,25 @@ const ResultCards: React.FC<ResultCardsProps> = ({
           + 씬 추가
         </button>
       )}
+
+      <BulkActionBar
+        selectedIndices={selectedIndices}
+        data={data}
+        onSelectAll={selectAll}
+        onDeselectAll={deselectAll}
+        onBulkRegenerateImages={(indices) => indices.forEach(i => onRegenerateImage?.(i))}
+        onBulkRegenerateAudio={(indices) => indices.forEach(i => onRegenerateAudio?.(i))}
+        onBulkGenerateAnimation={(indices) => indices.forEach(i => onGenerateAnimation?.(i))}
+        onBulkDelete={(indices) => {
+          // 뒤에서부터 삭제해야 인덱스 안 꼬임
+          [...indices].sort((a, b) => b - a).forEach(i => onDeleteScene?.(i));
+          deselectAll();
+        }}
+        onBulkMuteToggle={(indices) => indices.forEach(i => {
+          onUpdateAsset?.(i, { audioMuted: !data[i]?.audioMuted });
+        })}
+        userCredits={userCredits}
+      />
     </div>
   );
 };

@@ -51,6 +51,11 @@ interface ResultTableProps {
   canRedo?: boolean;
   onOpenThumbnail?: () => void;
   onSaveProject?: () => void;
+  // 일괄 작업
+  selectedIndices?: Set<number>;
+  onToggleSelect?: (index: number) => void;
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
 }
 
 // TableRow Props
@@ -60,6 +65,8 @@ interface TableRowProps {
   isAnimating: boolean;
   isEditing: boolean;
   confirmDelete: boolean;
+  isSelected: boolean;
+  onToggleSelect?: (index: number) => void;
   onRegenerateImage?: (index: number) => void;
   onGenerateAnimation?: (index: number) => void;
   onEditToggle?: (index: number | null) => void;
@@ -80,7 +87,7 @@ interface TableRowProps {
 }
 
 const TableRow: React.FC<TableRowProps> = memo(({
-  row, index, isAnimating, isEditing, confirmDelete,
+  row, index, isAnimating, isEditing, confirmDelete, isSelected, onToggleSelect,
   onRegenerateImage, onGenerateAnimation,
   onEditToggle, onUpdateAsset, onRegenerateAudio,
   onDeleteScene, onAddScene, onDuplicateScene, onUploadSceneImage, onSetCustomDuration,
@@ -127,6 +134,19 @@ const TableRow: React.FC<TableRowProps> = memo(({
         draggable onDragStart={() => onDragStart?.(index)} onDragEnd={onDragEnd}
       >
         <div className="flex flex-col items-center gap-2">
+          {/* 체크박스 */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSelect?.(index); }}
+            className="w-5 h-5 rounded border-2 flex items-center justify-center transition-all text-[10px] font-bold"
+            style={{
+              borderColor: isSelected ? '#3b82f6' : 'var(--border-default)',
+              backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+              color: isSelected ? '#fff' : 'transparent',
+            }}
+          >
+            {isSelected ? '✓' : ''}
+          </button>
+
           {/* 드래그 핸들 */}
           <div className="group-hover:text-[var(--text-muted)] transition-colors" style={{ color: 'var(--border-subtle)' }} title={t('result.dragToReorder')}>
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -1331,6 +1351,8 @@ const ResultTable = React.memo<ResultTableProps>(({
                   isAnimating={animatingIndices?.has(index) || false}
                   isEditing={editingIndex === index}
                   confirmDelete={confirmDeleteIndex === index}
+                  isSelected={selectedIndices?.has(index) || false}
+                  onToggleSelect={onToggleSelect}
                   onRegenerateImage={onRegenerateImage}
                   onGenerateAnimation={onGenerateAnimation}
                   onEditToggle={onEditToggle}

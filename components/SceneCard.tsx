@@ -15,6 +15,8 @@ export interface SceneCardProps {
   isEditing: boolean;
   isExpanded: boolean;
   confirmDelete: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (index: number) => void;
   onRegenerateImage?: (index: number) => void;
   onGenerateAnimation?: (index: number) => void;
   onEditToggle?: (index: number | null) => void;
@@ -89,6 +91,7 @@ const btnBaseStyle = {
 
 const SceneCard: React.FC<SceneCardProps> = memo(({
   row, index, isPortrait, isAnimating, isEditing, isExpanded, confirmDelete,
+  isSelected, onToggleSelect,
   onRegenerateImage, onGenerateAnimation, onEditToggle, onUpdateAsset,
   onRegenerateAudio, onDeleteScene, onAddScene, onDuplicateScene,
   onUploadSceneImage, onSetCustomDuration, onSetZoomEffect, onSetTransition,
@@ -335,6 +338,17 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
       {/* ═══ Header ═══ */}
       <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: '1px solid var(--border-default)' }}>
         <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSelect?.(index); }}
+            className="w-5 h-5 rounded border-2 flex items-center justify-center transition-all text-[10px] font-bold shrink-0"
+            style={{
+              borderColor: isSelected ? '#3b82f6' : 'var(--border-default)',
+              backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+              color: isSelected ? '#fff' : 'transparent',
+            }}
+          >
+            {isSelected ? '✓' : ''}
+          </button>
           <div className="opacity-0 group-hover:opacity-60 text-xs transition-opacity duration-200" style={{ color: 'var(--text-muted)', cursor: 'grab' }}>{'\u2807'}</div>
           <span className="font-mono text-xs font-bold" style={{ color: isEditing ? '#60a5fa' : 'var(--text-muted)' }}>
             #{sceneNum}{isEditing ? ` ${t('editing', '\ud3b8\uc9d1\uc911')}` : ''}
