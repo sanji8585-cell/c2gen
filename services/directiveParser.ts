@@ -51,7 +51,12 @@ export function parseDirectives(narration: string): ParseResult {
     const internalKey = DIRECTIVE_KEY_MAP[key] || DIRECTIVE_KEY_MAP[inner.trim()];
 
     if (!internalKey) {
-      // 매핑 키가 아니면 일반 괄호 텍스트 -> 건드리지 않음
+      // 미등록 키지만 콜론이 있으면 → AI가 만든 디렉티브로 간주, 나레이션에서 제거
+      // 콜론 없는 일반 괄호 (GDP, 웃음 등)는 건드리지 않음
+      if (colonIdx !== -1) {
+        rawDirectives.push(fullMatch);
+        toRemove.push({ start: match.index!, end: match.index! + fullMatch.length });
+      }
       continue;
     }
 
