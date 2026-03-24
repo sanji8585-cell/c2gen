@@ -6,7 +6,7 @@ import SceneToolbar from './SceneToolbar';
 import SceneCard from './SceneCard';
 import PreviewPlayer from './PreviewPlayer';
 import BulkActionBar from './BulkActionBar';
-import SceneStatusBar from './SceneStatusBar';
+// SceneStatusBar 제거 — 진행 상태는 상단 진행 메시지 영역에서 표시
 
 interface ResultCardsProps {
   data: GeneratedAsset[];
@@ -225,8 +225,6 @@ const ResultCards: React.FC<ResultCardsProps> = ({
         onBgmDuckingToggle={onBgmDuckingToggle}
         onBgmDuckingAmountChange={onBgmDuckingAmountChange}
       />
-
-      <SceneStatusBar data={data} selectedCount={selectedIndices.size} />
 
       {showPreview && (
         <PreviewPlayer

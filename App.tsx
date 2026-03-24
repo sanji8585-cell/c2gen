@@ -1598,13 +1598,24 @@ const AppContent: React.FC<{
                <p className="mt-3 text-sm font-medium animate-fade-sub" style={{ color: step === GenerationStep.ERROR ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{funTip}</p>
              )}
              {step === GenerationStep.ASSETS && generatedData.length > 0 && (() => {
-               const done = generatedData.filter(d => d.imageData).length;
-               const phase = getStorytellingPhase(done, generatedData.length);
+               const total = generatedData.length;
+               const imgDone = generatedData.filter(d => d.imageData).length;
+               const ttsDone = generatedData.filter(d => d.audioData).length;
+               const errors = generatedData.filter(d => d.status === 'error').length;
+               const phase = getStorytellingPhase(imgDone, total);
                return (
-                 <div className="mt-2 flex items-center justify-center gap-2">
+                 <div className="mt-2 flex items-center justify-center gap-3 flex-wrap">
                    <span className="text-lg">{phase.icon}</span>
                    <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{phase.text}</span>
-                   <span key={done} className="text-xs font-bold text-green-400 animate-number-pop inline-block">✓ {done}/{generatedData.length} 씬 완성</span>
+                   <span className="text-xs font-bold" style={{ color: imgDone === total ? '#22c55e' : '#60a5fa' }}>
+                     🖼️ {imgDone}/{total}
+                   </span>
+                   <span className="text-xs font-bold" style={{ color: ttsDone === total ? '#22c55e' : '#a78bfa' }}>
+                     🔊 {ttsDone}/{total}
+                   </span>
+                   {errors > 0 && (
+                     <span className="text-xs font-bold" style={{ color: '#ef4444' }}>⚠️ {errors}</span>
+                   )}
                  </div>
                );
              })()}
