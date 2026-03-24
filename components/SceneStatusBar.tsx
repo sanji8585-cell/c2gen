@@ -20,7 +20,7 @@ export default function SceneStatusBar({ data, selectedCount = 0 }: SceneStatusB
   const audPct = Math.round((audio / total) * 100);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl mb-3 flex-wrap bg-blue-50 dark:bg-slate-800/90 border border-blue-200 dark:border-blue-500/30 shadow-sm">
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl mb-3 flex-wrap" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-surface, #f0f4ff) 92%, rgba(59,130,246,0.15))', border: '1px solid color-mix(in srgb, var(--border-default, #bfdbfe) 80%, rgba(59,130,246,0.3))', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       {/* 전체 씬 수 */}
       <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
         📊 {total}씬
