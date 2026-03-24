@@ -323,23 +323,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 스크립트 린트 (자동 검증) ──
       case 'lintScript': {
-        const { scenes, language } = params;
+        const { scenes, language, focusTags, freeInput } = params;
         if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
           return res.json([]);
         }
 
-        const lintPrompt = getScriptLintPrompt(scenes, language);
+        const lintPrompt = getScriptLintPrompt(scenes, language, focusTags || [], freeInput || '');
         const lintResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: lintPrompt,
           config: {
             responseMimeType: 'application/json',
             systemInstruction: SYSTEM_INSTRUCTIONS.SCRIPT_LINTER,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 2048,
           },
         });
 
-        const fixes = JSON.parse(cleanJsonResponse(lintResponse.text || '[]'));
+        let fixes = JSON.parse(cleanJsonResponse(lintResponse.text || '[]'));
+
+        // 후처리: 최대 2개 씬만 허용 (과잉 교정 방지)
+        if (Array.isArray(fixes) && fixes.length > 2) {
+          console.log(`[Lint] 과잉 교정 감지: ${fixes.length}개 → 2개로 제한`);
+          fixes = fixes.slice(0, 2);
+        }
 
         // 크레딧 차감 (린트: 5크레딧)
         const lintCreditResult = await checkAndDeductCredits(req, 5, '스크립트 린트');

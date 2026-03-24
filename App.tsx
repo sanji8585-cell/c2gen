@@ -14,7 +14,7 @@ import { useCostTracker } from './hooks/useCostTracker';
 import { useSceneEditor } from './hooks/useSceneEditor';
 import { useUserAccount } from './hooks/useUserAccount';
 import { useTheme } from './hooks/useTheme';
-import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript, lintScript } from './services/geminiService';
+import { generateScript, generateScriptChunked, findTrendingTopics, generateAudioForScene, generateMotionPrompt, analyzeMood, generateAdvancedScript } from './services/geminiService';
 import { getDominantMood } from './services/prompts';
 import { applySceneRoleOffset } from './services/audioTagsService';
 import type { AdvancedSettings } from './components/input/HeroInput';
@@ -512,11 +512,6 @@ const AppContent: React.FC<{
         // 일반 대본: 기존 방식
         scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText, language);
       }
-      if (isAbortedRef.current) return;
-
-      // 스크립트 린터 — 자동 검증 및 개선
-      setProgressMessage('대본 검증 중...');
-      scriptScenes = await lintScript(scriptScenes, language);
       if (isAbortedRef.current) return;
 
       const initialAssets = scriptScenes.map((scene, i) => {
@@ -1146,11 +1141,6 @@ const AppContent: React.FC<{
       }
       if (isAbortedRef.current) return;
 
-      // 스크립트 린터 — 자동 검증 및 개선
-      setProgressMessage('대본 검증 중...');
-      scriptScenes = await lintScript(scriptScenes, language);
-      if (isAbortedRef.current) return;
-
       const newAssets = scriptScenes.map(scene => ({
         ...scene, imageData: null, audioData: null, audioDuration: null,
         subtitleData: null, videoData: null, videoDuration: null, status: 'pending' as const
@@ -1643,6 +1633,12 @@ const AppContent: React.FC<{
             }}
             onOpenCreditShop={() => setShowCreditShop(true)}
             isProcessingRef={isProcessingRef}
+            onUpdateNarration={(idx, narration) => {
+              const updated = [...generatedData];
+              updated[idx] = { ...updated[idx], narration };
+              assetsRef.current[idx] = { ...assetsRef.current[idx], narration };
+              setGeneratedData(updated);
+            }}
           />
         )}
 

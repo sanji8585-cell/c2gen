@@ -56,35 +56,32 @@ export const SYSTEM_INSTRUCTIONS = {
 
   REFERENCE_MATCH: `참조 이미지의 화풍과 캐릭터 스타일을 따르라.`,
 
-  SCRIPT_LINTER: `당신은 바이럴 영상 대본의 품질을 검증하는 전문 린터입니다.
-주어진 스크립트를 분석하고, 약한 부분만 최소한으로 수정하여 반환하세요.
+  SCRIPT_LINTER: `당신은 10년 경력의 한국 유튜브 숏폼 작가입니다. 후배가 쓴 초고를 검토합니다.
 
-## 검증 규칙 (순서대로 적용)
+## 기본 원칙
+- 당신의 기본 스탠스는 "승인"입니다. 대부분의 대본은 충분히 좋습니다.
+- 전체 대본을 한 번 읽고, "시청자가 어디서 스크롤하여 이탈할까?"만 판단하세요.
+- 이탈 위험이 없으면 빈 배열 []을 반환하세요. 이것이 가장 올바른 답입니다.
 
-1. **3초 훅 검증**: 씬 1이 [충격 통계], [반전 질문], [긴급성], [리스트 예고] 중 하나로 시작하는가?
-   - 아니면 → 더 강한 훅으로 교체. 30자 이내 유지.
+## 검토 방법
+1. 전체 스크립트를 처음부터 끝까지 읽는다.
+2. 감정 흐름(훅→긴장→전환→해소→CTA)이 자연스러운지 본다.
+3. 시청자 이탈 위험이 있는 가장 약한 1~2곳만 찾는다.
+4. 해당 부분만 최소한으로 수정한다. 나머지는 절대 건드리지 않는다.
 
-2. **설명조 제거**: "~입니다", "~라고 합니다", "~것입니다" 같은 수동적 어미가 반복되는가?
-   - 있으면 → 능동형으로 교체. "이것은 위험한 신호입니다" → "위험 신호가 켜졌다"
+## 절대 금지 (위반 시 실격)
+- 최대 2개 씬만 수정 가능. 3개 이상 수정하면 과잉 교정이다.
+- 다음 클리셰는 절대 사용 금지: "그런데 진짜 문제는 따로 있었다", "충격!", "위험 신호가 켜졌다"
+- ~입니다/~합니다 어미를 기계적으로 치환하지 마라. 4개 이상 연속일 때만 지적.
+- 30자 이하 짧은 문장은 건드리지 마라 (이미 펀치력 있음).
+- 원본에 없는 감탄사, 과장, 수사의문문을 추가하지 마라.
+- 원본 작가의 단어 선택, 문장 리듬, 정보 순서를 존중하라.
 
-3. **군더더기 씬**: 새로운 정보 없이 앞 씬을 반복하는 씬이 있는가?
-   - 있으면 → 삭제하거나 다음 씬과 병합.
-
-4. **감정 단조로움**: 연속 3개 이상 같은 sentiment인 씬이 있는가?
-   - 있으면 → 중간 씬의 톤을 전환 (반전, 질문, 유머 등).
-
-5. **비유 구체성**: "좋은 결과", "큰 변화" 같은 추상 표현이 있는가?
-   - 있으면 → 구체적 수치나 비유로 교체. "큰 변화" → "매출 3배 폭증"
-
-6. **CTA 검증**: 마지막 씬에 시청자 행동 유도(구독, 댓글, 공유, 다음 영상 예고)가 있는가?
-   - 없으면 → 자연스러운 CTA 추가.
-
-## 중요 제약
-- 원본 씬 수를 유지하라 (삭제 시 병합으로 보전)
-- visual prompt(image_prompt_english)는 수정하지 마라
-- scene_role은 수정하지 마라
-- 수정이 필요 없는 씬은 그대로 반환하라
-- 대본의 핵심 정보와 주제를 변경하지 마라
+## 수정 시 원칙
+- 한 문장에서 바꾸는 단어는 최대 3개.
+- reason은 "규칙 위반"이 아닌 "이탈 위험"으로 적어라.
+  ❌ "설명조 어미 제거" (기계적)
+  ✅ "씬 3~4가 동일 톤이라 시청자 집중력 저하 위험" (판단)
 `,
 
   SCRIPT_DIRECTOR: `당신은 바이럴 영상 대본과 스토리보드를 만드는 전문 스크립트 디렉터입니다.
@@ -369,20 +366,55 @@ ${content}
 };
 
 // 분위기 분석 프롬프트
-/** 린터 프롬프트 — 생성된 스크립트를 검증 및 개선 */
-export const getScriptLintPrompt = (scenes: { narration: string; analysis?: { sentiment?: string; scene_role?: string } }[], language: string = 'ko') => {
+/** 사용자 리뷰 포커스 태그 */
+export const LINT_FOCUS_TAGS = [
+  { id: 'hook', label: '🎯 훅 강화', desc: '첫 씬을 더 강렬하게' },
+  { id: 'natural', label: '💬 자연스럽게', desc: 'TTS로 읽었을 때 자연스러운 구어체' },
+  { id: 'boring', label: '📉 지루한 부분', desc: '시청자 이탈 구간 찾기' },
+  { id: 'emotion', label: '🔥 감정 변화', desc: '톤이 단조로운 부분 개선' },
+  { id: 'concise', label: '✂️ 간결하게', desc: '불필요한 말 줄이기' },
+  { id: 'cta', label: '🎬 CTA 보강', desc: '마지막 씬 행동 유도 강화' },
+] as const;
+
+export type LintFocusId = typeof LINT_FOCUS_TAGS[number]['id'];
+
+/** 린터 프롬프트 — 시니어 리뷰어 방식 */
+export const getScriptLintPrompt = (
+  scenes: { narration: string; analysis?: { sentiment?: string; scene_role?: string } }[],
+  language: string = 'ko',
+  focusTags: LintFocusId[] = [],
+  freeInput: string = '',
+) => {
   const sceneSummary = scenes.map((s, i) =>
-    `씬 ${i + 1} [${s.analysis?.scene_role || 'unknown'}] [${s.analysis?.sentiment || 'NEUTRAL'}]: ${s.narration}`
+    `씬 ${i + 1} [역할:${s.analysis?.scene_role || '?'}] [감정:${s.analysis?.sentiment || '?'}]: ${s.narration}`
   ).join('\n');
 
-  return `다음 바이럴 영상 대본을 검증하고 개선하라.
+  // 포커스 지시 생성
+  const focusInstructions: string[] = [];
+  if (focusTags.includes('hook')) focusInstructions.push('- 씬 1(훅)이 3초 안에 시청자를 멈출 만큼 강한지 집중 확인하라.');
+  if (focusTags.includes('natural')) focusInstructions.push('- TTS로 읽었을 때 어색한 문어체가 있는지 확인하라. 대화하듯 자연스러운 톤으로.');
+  if (focusTags.includes('boring')) focusInstructions.push('- 새로운 정보 없이 반복되거나 시청자가 이탈할 만한 지루한 씬을 찾아라.');
+  if (focusTags.includes('emotion')) focusInstructions.push('- 감정 톤이 너무 일정한 구간이 있는지 확인하라. 변화가 필요한 곳을 찾아라.');
+  if (focusTags.includes('concise')) focusInstructions.push('- 같은 말 반복, 불필요한 수식어, 군더더기 표현을 찾아라.');
+  if (focusTags.includes('cta')) focusInstructions.push('- 마지막 씬이 시청자 행동(구독/댓글/공유)을 자연스럽게 유도하는지 확인하라.');
+
+  const focusSection = focusTags.length > 0
+    ? `\n## 사용자 요청 포커스 (이 부분을 우선 검토)\n${focusInstructions.join('\n')}`
+    : '';
+
+  const freeSection = freeInput.trim()
+    ? `\n## 사용자 추가 요청\n${freeInput.trim()}`
+    : '';
+
+  return `~60초 유튜브 숏폼 TTS 대본을 검토하라.${focusSection}${freeSection}
 
 ## 대본 (${scenes.length}개 씬)
 ${sceneSummary}
 
-## 출력 형식
-수정된 씬만 JSON 배열로 반환하라. 수정이 없으면 빈 배열 [].
-각 항목: { "sceneIndex": 0부터 시작하는 인덱스, "narration": "수정된 나레이션", "reason": "수정 이유 (한줄)" }
+## 출력
+수정이 필요한 씬만 JSON 배열로 반환. 수정 없으면 빈 배열 [].
+최대 2개 씬만 수정 가능.
+{ "sceneIndex": 0부터, "narration": "수정된 나레이션", "reason": "이탈 위험 사유 (한줄)" }
 
 언어: ${language === 'ko' ? '한국어' : language === 'ja' ? '日本語' : 'English'}
 `;

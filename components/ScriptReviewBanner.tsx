@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GeneratedAsset } from '../types';
 import { getSelectedImageModel } from '../services/imageService';
+import { LINT_FOCUS_TAGS, type LintFocusId } from '../services/prompts';
+
+interface LintFix {
+  sceneIndex: number;
+  narration: string;
+  reason: string;
+  accepted: boolean;
+}
 
 interface ScriptReviewBannerProps {
   generatedData: GeneratedAsset[];
@@ -13,13 +21,82 @@ interface ScriptReviewBannerProps {
   onCancel: () => void;
   onOpenCreditShop: () => void;
   isProcessingRef: React.MutableRefObject<boolean>;
+  onUpdateNarration?: (index: number, narration: string) => void;
 }
 
 export default function ScriptReviewBanner({
   generatedData, bgmData, userCredits, userPlan,
-  onApprove, onRegenerate, onCancel, onOpenCreditShop, isProcessingRef
+  onApprove, onRegenerate, onCancel, onOpenCreditShop, isProcessingRef,
+  onUpdateNarration,
 }: ScriptReviewBannerProps) {
   const { t } = useTranslation();
+  const [lintFixes, setLintFixes] = useState<LintFix[]>([]);
+  const [isLinting, setIsLinting] = useState(false);
+  const [lintDone, setLintDone] = useState(false);
+  const [showLintOptions, setShowLintOptions] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<LintFocusId[]>([]);
+  const [freeInput, setFreeInput] = useState('');
+
+  const toggleTag = (id: LintFocusId) => {
+    setSelectedTags(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
+  };
+
+  const handleLint = useCallback(async () => {
+    setIsLinting(true);
+    setShowLintOptions(false);
+    try {
+      const language = (localStorage.getItem('tubegen_language') as string) || 'ko';
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const customKey = localStorage.getItem('tubegen_custom_gemini_key');
+      if (customKey) headers['x-custom-api-key'] = customKey;
+      const sessionToken = localStorage.getItem('c2gen_session_token');
+      if (sessionToken) headers['x-session-token'] = sessionToken;
+
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'lintScript',
+          scenes: generatedData.map(s => ({
+            narration: s.narration,
+            analysis: { sentiment: s.analysis?.sentiment, scene_role: s.analysis?.scene_role },
+          })),
+          language,
+          focusTags: selectedTags,
+          freeInput: freeInput.trim(),
+        }),
+      });
+      const fixes = await res.json();
+
+      if (Array.isArray(fixes) && fixes.length > 0) {
+        setLintFixes(fixes.map((f: any) => ({ ...f, accepted: true })));
+      } else {
+        setLintFixes([]);
+      }
+      setLintDone(true);
+    } catch (err) {
+      console.error('[Lint] 실패:', err);
+      setLintDone(true);
+    } finally {
+      setIsLinting(false);
+    }
+  }, [generatedData, selectedTags, freeInput]);
+
+  const toggleFix = (idx: number) => {
+    setLintFixes(prev => prev.map((f, i) => i === idx ? { ...f, accepted: !f.accepted } : f));
+  };
+
+  const applyFixes = () => {
+    if (!onUpdateNarration) return;
+    for (const fix of lintFixes) {
+      if (fix.accepted && fix.sceneIndex >= 0 && fix.sceneIndex < generatedData.length) {
+        onUpdateNarration(fix.sceneIndex, fix.narration);
+      }
+    }
+    setLintDone(false);
+    setLintFixes([]);
+  };
 
   const sc = generatedData.length;
   const imgModel = getSelectedImageModel();
@@ -175,6 +252,134 @@ export default function ScriptReviewBanner({
         </div>
       )}
 
+      {/* AI 검수 옵션 패널 */}
+      {showLintOptions && !lintDone && (
+        <div className="mx-auto max-w-lg mb-5 rounded-2xl overflow-hidden border" style={{ borderColor: 'rgba(34,197,94,0.3)', background: 'linear-gradient(135deg, rgba(34,197,94,0.04) 0%, rgba(59,130,246,0.04) 100%)' }}>
+          <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(34,197,94,0.15)' }}>
+            <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#22c55e' }}>검수 포커스 선택</span>
+            <span className="text-[10px] ml-2" style={{ color: 'var(--text-muted)' }}>(선택 안 하면 전체 검토)</span>
+          </div>
+          <div className="px-4 py-3">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {LINT_FOCUS_TAGS.map(tag => (
+                <button
+                  key={tag.id}
+                  onClick={() => toggleTag(tag.id)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border"
+                  style={{
+                    borderColor: selectedTags.includes(tag.id) ? '#22c55e' : 'var(--border-default)',
+                    backgroundColor: selectedTags.includes(tag.id) ? 'rgba(34,197,94,0.15)' : 'transparent',
+                    color: selectedTags.includes(tag.id) ? '#22c55e' : 'var(--text-secondary)',
+                  }}
+                >
+                  {tag.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={freeInput}
+              onChange={e => setFreeInput(e.target.value)}
+              placeholder="추가 요청 (예: 좀 더 유머러스하게)"
+              className="w-full px-3 py-2 rounded-lg text-xs border"
+              style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
+            />
+          </div>
+          <div className="px-4 py-3 flex justify-end gap-2" style={{ borderTop: '1px solid rgba(34,197,94,0.1)' }}>
+            <button
+              onClick={() => setShowLintOptions(false)}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold border"
+              style={{ borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}
+            >
+              취소
+            </button>
+            <button
+              onClick={handleLint}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ backgroundColor: '#22c55e' }}
+            >
+              🔍 검수 시작
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI 검수 결과 */}
+      {lintDone && lintFixes.length > 0 && (
+        <div className="mx-auto max-w-2xl mb-5 rounded-2xl overflow-hidden border" style={{ borderColor: 'rgba(34,197,94,0.3)', background: 'linear-gradient(135deg, rgba(34,197,94,0.06) 0%, rgba(59,130,246,0.06) 100%)' }}>
+          <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(34,197,94,0.15)' }}>
+            <span className="text-base">🔍</span>
+            <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#22c55e' }}>AI 검수 결과</span>
+            <span className="ml-auto text-[10px] px-2.5 py-1 rounded-full font-bold" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
+              {lintFixes.length}개 개선 제안
+            </span>
+          </div>
+          <div className="px-4 py-3 space-y-3 max-h-80 overflow-y-auto">
+            {lintFixes.map((fix, idx) => (
+              <div key={idx} className="rounded-xl p-3 border transition-all" style={{
+                borderColor: fix.accepted ? 'rgba(34,197,94,0.3)' : 'rgba(107,114,128,0.3)',
+                backgroundColor: fix.accepted ? 'rgba(34,197,94,0.05)' : 'rgba(107,114,128,0.05)',
+              }}>
+                <div className="flex items-start gap-3">
+                  <button
+                    onClick={() => toggleFix(idx)}
+                    className="mt-0.5 w-5 h-5 rounded flex items-center justify-center text-xs font-bold border transition-all shrink-0"
+                    style={{
+                      borderColor: fix.accepted ? '#22c55e' : '#6b7280',
+                      backgroundColor: fix.accepted ? '#22c55e' : 'transparent',
+                      color: fix.accepted ? '#fff' : '#6b7280',
+                    }}
+                  >
+                    {fix.accepted ? '✓' : ''}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-bold mb-1.5" style={{ color: '#f59e0b' }}>
+                      씬 {fix.sceneIndex + 1} — {fix.reason}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg p-2" style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <div className="text-[9px] font-bold mb-1" style={{ color: '#ef4444' }}>변경 전</div>
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          {generatedData[fix.sceneIndex]?.narration || ''}
+                        </p>
+                      </div>
+                      <div className="rounded-lg p-2" style={{ backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                        <div className="text-[9px] font-bold mb-1" style={{ color: '#22c55e' }}>변경 후</div>
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                          {fix.narration}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="px-5 py-3 flex justify-end gap-2" style={{ borderTop: '1px solid rgba(34,197,94,0.15)' }}>
+            <button
+              onClick={() => { setLintDone(false); setLintFixes([]); }}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold border transition-all hover:opacity-80"
+              style={{ borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}
+            >
+              취소
+            </button>
+            <button
+              onClick={applyFixes}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90"
+              style={{ backgroundColor: '#22c55e' }}
+            >
+              선택 항목 적용 ({lintFixes.filter(f => f.accepted).length}개)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {lintDone && lintFixes.length === 0 && (
+        <div className="mx-auto max-w-md mb-5 px-4 py-3 rounded-xl text-center" style={{ backgroundColor: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)' }}>
+          <p className="text-sm font-bold" style={{ color: '#22c55e' }}>✅ 수정 사항 없음 — 대본 품질이 좋습니다!</p>
+        </div>
+      )}
+
       {/* 액션 버튼 */}
       <div className="flex justify-center gap-3">
         <button
@@ -184,6 +389,14 @@ export default function ScriptReviewBanner({
           style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
         >
           {t('scriptReview.regenerateScript')}
+        </button>
+        <button
+          onClick={() => setShowLintOptions(!showLintOptions)}
+          disabled={isLinting || isProcessingRef.current}
+          className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all border hover:opacity-80"
+          style={{ backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)', color: '#22c55e' }}
+        >
+          {isLinting ? '검수 중...' : '🔍 AI 검수 (5크레딧)'}
         </button>
         <button
           onClick={isInsufficientCredits ? onOpenCreditShop : onApprove}
