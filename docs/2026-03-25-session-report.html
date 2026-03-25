@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C2 GEN Session Report — 2026-03-25</title>
+<style>
+  :root {
+    --bg-body: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-elevated: #22263a;
+    --bg-code: #151822;
+    --border: #2d3148;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-blue: #60a5fa;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #a78bfa;
+    --critical: #ef4444;
+    --feature: #22c55e;
+    --improvement: #3b82f6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    line-height: 1.7;
+    padding: 0;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem 2rem;
+    text-align: center;
+  }
+
+  .hero h1 {
+    font-size: 2.2rem;
+    font-weight: 900;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+
+  .hero .date {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .hero .project-tag {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 0.3rem 1rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: rgba(96, 165, 250, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+  }
+
+  /* Summary Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    max-width: 1100px;
+    margin: -2rem auto 2rem;
+    padding: 0 1.5rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  .stat-card .number {
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .stat-card .label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+
+  .stat-card.critical .number { color: var(--critical); }
+  .stat-card.feature .number { color: var(--feature); }
+  .stat-card.improvement .number { color: var(--improvement); }
+  .stat-card.total .number { color: var(--accent-purple); }
+
+  /* Main Content */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+  }
+
+  /* Severity Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .badge.critical { background: rgba(239, 68, 68, 0.15); color: var(--critical); border: 1px solid rgba(239, 68, 68, 0.3); }
+  .badge.feature { background: rgba(34, 197, 94, 0.15); color: var(--feature); border: 1px solid rgba(34, 197, 94, 0.3); }
+  .badge.improvement { background: rgba(59, 130, 246, 0.15); color: var(--improvement); border: 1px solid rgba(59, 130, 246, 0.3); }
+
+  /* Collapsible Section */
+  .section {
+    margin-bottom: 1.25rem;
+  }
+
+  .section-toggle {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 800;
+    text-align: left;
+    transition: all 0.2s ease;
+  }
+
+  .section-toggle:hover {
+    background: var(--bg-elevated);
+    border-color: rgba(96, 165, 250, 0.3);
+  }
+
+  .section-toggle .arrow {
+    transition: transform 0.25s ease;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .section.open .section-toggle .arrow {
+    transform: rotate(90deg);
+  }
+
+  .section-toggle .title-text {
+    flex: 1;
+  }
+
+  .section-body {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    padding: 1.5rem;
+    margin-top: -14px;
+    padding-top: 2rem;
+  }
+
+  .section.open .section-body {
+    display: block;
+  }
+
+  .section.open .section-toggle {
+    border-radius: 14px 14px 0 0;
+  }
+
+  /* Before / After Comparison */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+
+  @media (max-width: 768px) {
+    .comparison { grid-template-columns: 1fr; }
+  }
+
+  .comp-panel {
+    border-radius: 12px;
+    padding: 1.25rem;
+    position: relative;
+  }
+
+  .comp-panel.before {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .comp-panel.after {
+    background: rgba(34, 197, 94, 0.05);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+  }
+
+  .comp-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    display: inline-block;
+    margin-bottom: 0.75rem;
+  }
+
+  .before .comp-label {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--critical);
+  }
+
+  .after .comp-label {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--feature);
+  }
+
+  .comp-panel p, .comp-panel ul {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+  }
+
+  .comp-panel ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .comp-panel ul li {
+    padding: 0.3rem 0;
+    padding-left: 1.2rem;
+    position: relative;
+  }
+
+  .comp-panel.before ul li::before {
+    content: '✗';
+    position: absolute;
+    left: 0;
+    color: var(--critical);
+    font-weight: bold;
+  }
+
+  .comp-panel.after ul li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--feature);
+    font-weight: bold;
+  }
+
+  /* Code Blocks */
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.78rem;
+    line-height: 1.65;
+    color: #e2e8f0;
+    margin: 0.75rem 0;
+  }
+
+  pre .comment { color: #64748b; }
+  pre .keyword { color: #c084fc; }
+  pre .string { color: #34d399; }
+  pre .number { color: #fbbf24; }
+  pre .type { color: #60a5fa; }
+  pre .fn { color: #f472b6; }
+
+  /* Description text */
+  .desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.8;
+  }
+
+  /* Files changed */
+  .files-changed {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: rgba(96, 165, 250, 0.05);
+    border: 1px solid rgba(96, 165, 250, 0.15);
+  }
+
+  .files-changed .label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--accent-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .files-changed code {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 0.15rem 0;
+  }
+
+  /* Feature highlights */
+  .highlight-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.75rem 0;
+  }
+
+  .highlight-list li {
+    padding: 0.4rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+  }
+
+  .highlight-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.7rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+  }
+
+  /* Info callout */
+  .callout {
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    margin: 0.75rem 0;
+  }
+
+  .callout.info {
+    background: rgba(96, 165, 250, 0.08);
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    color: var(--accent-blue);
+  }
+
+  .callout.warning {
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    color: var(--accent-amber);
+  }
+
+  /* Table of Contents */
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .toc h3 {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+
+  .toc ol {
+    padding-left: 1.5rem;
+  }
+
+  .toc li {
+    padding: 0.25rem 0;
+    font-size: 0.88rem;
+  }
+
+  .toc a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .toc a:hover {
+    color: var(--accent-purple);
+  }
+
+  .toc .badge {
+    margin-left: 0.5rem;
+    font-size: 0.6rem;
+    vertical-align: middle;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  /* Section number */
+  .section-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .section-num.critical { background: rgba(239,68,68,0.15); color: var(--critical); }
+  .section-num.feature { background: rgba(34,197,94,0.15); color: var(--feature); }
+  .section-num.improvement { background: rgba(59,130,246,0.15); color: var(--improvement); }
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <h1>C2 GEN 세션 리포트</h1>
+  <div class="date">2026년 3월 25일 (수)</div>
+  <div class="project-tag">TubeGen AI V9.2 &mdash; imagemaker branch</div>
+</div>
+
+<!-- Summary Stats -->
+<div class="stats-grid">
+  <div class="stat-card total">
+    <div class="number">10</div>
+    <div class="label">총 작업 항목</div>
+  </div>
+  <div class="stat-card feature">
+    <div class="number">5</div>
+    <div class="label">신규 기능</div>
+  </div>
+  <div class="stat-card critical">
+    <div class="number">2</div>
+    <div class="label">치명적 버그 수정</div>
+  </div>
+  <div class="stat-card improvement">
+    <div class="number">3</div>
+    <div class="label">개선 사항</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Table of Contents -->
+  <div class="toc">
+    <h3>목차</h3>
+    <ol>
+      <li><a href="#s1">스크립트 린터 엔진 (Script Linter)</a> <span class="badge feature">NEW</span></li>
+      <li><a href="#s2">scene_role 기반 TTS 감정 조절</a> <span class="badge feature">NEW</span></li>
+      <li><a href="#s3">스토리보드 일괄 작업 (Bulk Actions)</a> <span class="badge feature">NEW</span></li>
+      <li><a href="#s4">수동 모드 버그 수정</a> <span class="badge critical">CRITICAL</span></li>
+      <li><a href="#s5">디렉티브 파서 수정</a> <span class="badge critical">CRITICAL</span></li>
+      <li><a href="#s6">자막 자동 줄바꿈</a> <span class="badge feature">NEW</span></li>
+      <li><a href="#s7">고급 모드 씬 줄바꿈</a> <span class="badge improvement">IMPROVE</span></li>
+      <li><a href="#s8">진행률 메시지 개선</a> <span class="badge improvement">IMPROVE</span></li>
+      <li><a href="#s9">Config &amp; Type 업데이트</a> <span class="badge improvement">IMPROVE</span></li>
+      <li><a href="#s10">UI 접근성 감사</a> <span class="badge feature">NEW</span></li>
+    </ol>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 1: Script Linter Engine
+    =============================================
+  -->
+  <div class="section open" id="s1">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num feature">1</span>
+      <span class="title-text">스크립트 린터 엔진 (Script Linter)</span>
+      <span class="badge feature">NEW FEATURE</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        AI가 생성한 스크립트를 시니어 리뷰어 관점에서 자동 검수하는 엔진.
+        뻔한 AI 템플릿 문구를 잡아내고, 훅 강화 / 감정 변화 / CTA 보강 등 6가지 포커스 태그로 정밀 피드백 제공.
+        씬 단위 수정 제안과 수락/거절 UI를 통해 사용자가 최종 결정.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li>스크립트 생성 후 품질 검증 없음</li>
+            <li>약한 훅, 반복 콘텐츠, 단조로운 감정 그대로 노출</li>
+            <li>AI 특유 템플릿 문구 ("~에 대해 알아보겠습니다") 방치</li>
+            <li>사용자가 직접 모든 문제를 찾아 수정해야 함</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li>"AI 검수" 버튼으로 원클릭 품질 체크</li>
+            <li>6개 포커스 태그: 훅 강화 / 자연스럽게 / 지루한 부분 / 감정 변화 / 간결하게 / CTA 보강</li>
+            <li>자유 텍스트 입력으로 커스텀 요청 가능</li>
+            <li>씬별 Before/After 비교 UI + 수락/거절 체크박스</li>
+            <li>안티클리셰 리스트로 AI 템플릿 문구 차단</li>
+            <li>서버 하드캡: 최대 2개 씬만 수정 (과도한 변경 방지)</li>
+            <li>5크레딧/회, 피처플래그: <code>tubegen_script_lint</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="desc"><strong>핵심 코드 — ScriptReviewBanner 컴포넌트 구조:</strong></p>
+<pre><span class="keyword">interface</span> <span class="type">LintFix</span> {
+  <span class="fn">sceneIndex</span>: <span class="type">number</span>;     <span class="comment">// 수정 대상 씬 인덱스</span>
+  <span class="fn">narration</span>: <span class="type">string</span>;     <span class="comment">// 수정된 나레이션</span>
+  <span class="fn">reason</span>: <span class="type">string</span>;        <span class="comment">// 수정 사유</span>
+  <span class="fn">accepted</span>: <span class="type">boolean</span>;     <span class="comment">// 사용자 수락 여부</span>
+}
+
+<span class="comment">// 6개 포커스 태그 + 자유 입력</span>
+<span class="keyword">const</span> [<span class="fn">selectedTags</span>, <span class="fn">setSelectedTags</span>] = <span class="fn">useState</span>&lt;<span class="type">LintFocusId</span>[]&gt;([]);
+<span class="keyword">const</span> [<span class="fn">freeInput</span>, <span class="fn">setFreeInput</span>] = <span class="fn">useState</span>(<span class="string">''</span>);
+</pre>
+
+      <div class="callout info">
+        린트 프롬프트는 "시니어 리뷰어" 페르소나를 사용하며, 기계적 규칙이 아닌 맥락 기반 판단을 수행합니다.
+        서버에서 AI가 3개 이상 수정을 리턴해도 앞 2개만 전달하는 하드캡이 적용됩니다.
+      </div>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>components/ScriptReviewBanner.tsx</code>
+        <code>services/prompts.ts (LINT_FOCUS_TAGS)</code>
+        <code>api/gemini.ts (scriptLint action)</code>
+        <code>config.ts (SCRIPT_LINT storage key)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 2: scene_role TTS Emotion
+    =============================================
+  -->
+  <div class="section" id="s2">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num feature">2</span>
+      <span class="title-text">scene_role 기반 TTS 감정 조절</span>
+      <span class="badge feature">NEW FEATURE</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        씬의 역할(hook/build/tension/climax/resolution/cta)에 따라 TTS 속도와 안정성을 자동 조절.
+        사용자의 기본 설정에 오프셋을 <strong>더하는</strong> 방식으로, 기존 설정을 덮어쓰지 않음.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li>모든 씬이 동일한 속도/안정성으로 TTS 생성</li>
+            <li>훅이든 클라이맥스든 같은 톤</li>
+            <li>감정 변화 없는 단조로운 나레이션</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li>hook: 속도 +0.10, 안정성 -0.15 (에너지 넘치는 오프닝)</li>
+            <li>climax: 속도 +0.15, 안정성 -0.20 (가장 역동적)</li>
+            <li>resolution: 속도 -0.05, 안정성 +0.10 (차분한 마무리)</li>
+            <li>사용자 기본 설정 + 화자별 설정도 존중 (오프셋 합산)</li>
+            <li>Clamp: speed 0.7~1.5, stability 0.2~0.9</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="desc"><strong>핵심 코드 — 오프셋 테이블 및 적용 함수:</strong></p>
+<pre><span class="keyword">const</span> <span class="fn">SCENE_ROLE_OFFSETS</span>: <span class="type">Record</span>&lt;<span class="type">string</span>, { speed: <span class="type">number</span>; stability: <span class="type">number</span> }&gt; = {
+  <span class="fn">hook</span>:       { speed: <span class="number">+0.10</span>, stability: <span class="number">-0.15</span> },  <span class="comment">// 에너지 넘치는 오프닝</span>
+  <span class="fn">build</span>:      { speed:  <span class="number">0.00</span>, stability:  <span class="number">0.00</span> },  <span class="comment">// 기본 톤 유지</span>
+  <span class="fn">tension</span>:    { speed: <span class="number">+0.05</span>, stability: <span class="number">-0.10</span> },  <span class="comment">// 약간 긴장감</span>
+  <span class="fn">climax</span>:     { speed: <span class="number">+0.15</span>, stability: <span class="number">-0.20</span> },  <span class="comment">// 절정 — 가장 역동적</span>
+  <span class="fn">resolution</span>: { speed: <span class="number">-0.05</span>, stability: <span class="number">+0.10</span> },  <span class="comment">// 차분한 마무리</span>
+  <span class="fn">cta</span>:        { speed: <span class="number">+0.05</span>, stability: <span class="number">-0.05</span> },  <span class="comment">// 약간의 에너지 (행동 유도)</span>
+};
+
+<span class="keyword">export function</span> <span class="fn">applySceneRoleOffset</span>(
+  baseSpeed: <span class="type">number</span>, baseStability: <span class="type">number</span>, sceneRole?: <span class="type">string</span>
+): <span class="type">TtsRoleAdjustment</span> {
+  <span class="keyword">if</span> (!sceneRole || localStorage.getItem(<span class="string">'tubegen_tts_emotion'</span>) === <span class="string">'false'</span>) {
+    <span class="keyword">return</span> { speed: baseSpeed, stability: baseStability };
+  }
+  <span class="keyword">const</span> offset = SCENE_ROLE_OFFSETS[sceneRole] || SCENE_ROLE_OFFSETS.build;
+  <span class="keyword">return</span> {
+    speed:     Math.<span class="fn">max</span>(<span class="number">0.7</span>, Math.<span class="fn">min</span>(<span class="number">1.5</span>, baseSpeed + offset.speed)),
+    stability: Math.<span class="fn">max</span>(<span class="number">0.2</span>, Math.<span class="fn">min</span>(<span class="number">0.9</span>, baseStability + offset.stability)),
+  };
+}</pre>
+
+      <div class="callout info">
+        피처 플래그 <code>tubegen_tts_emotion</code>으로 ON/OFF 가능 (기본 ON).
+        초기 생성과 씬별 재생성 모두에 적용됩니다.
+      </div>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>services/audioTagsService.ts (applySceneRoleOffset, SCENE_ROLE_OFFSETS)</code>
+        <code>types.ts (SceneAnalysis.scene_role)</code>
+        <code>config.ts (TTS_EMOTION storage key)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 3: Bulk Actions
+    =============================================
+  -->
+  <div class="section" id="s3">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num feature">3</span>
+      <span class="title-text">스토리보드 일괄 작업 (Bulk Actions)</span>
+      <span class="badge feature">NEW FEATURE</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        20개 씬을 하나하나 조작하던 고통을 해소. 체크박스 선택 후 플로팅 액션 바에서
+        이미지/TTS/영상/음소거/삭제를 일괄 처리. 친근한 한국어 확인 다이얼로그와 비용 추정 포함.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li>모든 작업이 단일 씬 단위</li>
+            <li>20씬 = 20번 클릭</li>
+            <li>비용 예측 불가</li>
+            <li>실수로 잘못된 씬 작업 시 되돌리기 어려움</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li>씬 카드에 체크박스 추가</li>
+            <li>1개 이상 선택 시 플로팅 액션 바 표시</li>
+            <li>이미지/TTS/영상/음소거/삭제 일괄 처리</li>
+            <li>확인 다이얼로그: 예상 비용 + 현재 잔액 표시</li>
+            <li>영상 변환: 이미지 없는 씬 자동 경고</li>
+            <li>고비용 팁: "핵심 씬만 선택하시면 크레딧을 아낄 수 있어요"</li>
+            <li>삭제: "되돌릴 수 없어요. 신중하게 결정해주세요!"</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="desc"><strong>핵심 코드 — BulkActionBar 컴포넌트:</strong></p>
+<pre><span class="comment">// 영상 변환 시 이미지 없는 씬 체크</span>
+<span class="keyword">const</span> noImageScenes = indices.<span class="fn">filter</span>(i =&gt; !data[i]?.imageData);
+<span class="keyword">const</span> animatableCount = count - noImageScenes.length;
+<span class="keyword">const</span> animationCost = animatableCount * <span class="number">73</span>;  <span class="comment">// 73 크레딧/씬</span>
+
+<span class="comment">// 고비용 경고 (300 크레딧 초과 시)</span>
+{animationCost &gt; <span class="number">300</span> &amp;&amp; (
+  &lt;p&gt;꼭 필요한 핵심 씬(훅, 클라이맥스)만 선택하시면 크레딧을 아낄 수 있어요.&lt;/p&gt;
+)}
+
+<span class="comment">// 삭제 확인 — 친근한 한국어 톤</span>
+<span class="comment">// 버튼: "아니요, 취소할게요" / "네, 진행할게요!"</span></pre>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>components/BulkActionBar.tsx (신규)</code>
+        <code>components/ResultCards.tsx (체크박스 + 연동)</code>
+        <code>App.tsx (bulk action 핸들러)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 4: Manual Mode Bug Fix
+    =============================================
+  -->
+  <div class="section" id="s4">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num critical">4</span>
+      <span class="title-text">수동 모드 버그 수정</span>
+      <span class="badge critical">CRITICAL FIX</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        수동 모드에서 사용자의 대본이 완전히 재작성되는 치명적 버그.
+        대본 첫 줄이 topic으로 전달되어 API가 자동 모드로 동작, SCRIPT_DIRECTOR가 대본을 통째로 변경.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <p>수동 모드에서 대본 첫 줄을 topic으로 전송</p>
+          <p style="margin-top:0.5rem">→ API가 auto 모드로 인식</p>
+          <p>→ SCRIPT_DIRECTOR 적용</p>
+          <p>→ <strong style="color:var(--critical)">사용자 대본 완전 재작성</strong></p>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <p>수동 모드는 항상 <code>"Manual Script Input"</code>을 topic으로 전송</p>
+          <p style="margin-top:0.5rem">→ API가 정확히 수동 모드 인식</p>
+          <p>→ MANUAL_VISUAL_MATCHER 적용</p>
+          <p>→ <strong style="color:var(--feature)">사용자 원본 텍스트 100% 보존</strong></p>
+        </div>
+      </div>
+
+      <p class="desc"><strong>수정된 코드:</strong></p>
+<pre><span class="comment">// InputSection.tsx — 수동 모드 호출</span>
+onGenerate(<span class="string">'Manual Script Input'</span>, refImages, manualScript);
+
+<span class="comment">// api/gemini.ts — topic에 따른 시스템 프롬프트 분기</span>
+topic === <span class="string">'Manual Script Input'</span>
+  ? SYSTEM_INSTRUCTIONS.<span class="fn">MANUAL_VISUAL_MATCHER</span>   <span class="comment">// 원본 보존</span>
+  : SYSTEM_INSTRUCTIONS.<span class="fn">SCRIPT_DIRECTOR</span>          <span class="comment">// 자동 생성</span></pre>
+
+      <div class="callout warning">
+        이 버그는 수동 모드 사용자의 대본을 파괴하는 치명적 문제였습니다.
+        사용자가 공들여 작성한 대본이 AI에 의해 완전히 다른 내용으로 바뀌었습니다.
+      </div>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>components/InputSection.tsx (topic 전달 수정)</code>
+        <code>api/gemini.ts (시스템 프롬프트 분기 수정)</code>
+        <code>App.tsx (수동 모드 플로우)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 5: Directive Parser Fix
+    =============================================
+  -->
+  <div class="section" id="s5">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num critical">5</span>
+      <span class="title-text">디렉티브 파서 수정</span>
+      <span class="badge critical">CRITICAL FIX</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        미등록 디렉티브가 나레이션과 자막에 그대로 노출되던 버그.
+        AI가 <code>(표정: 허탈함)</code>처럼 등록되지 않은 디렉티브를 생성하면, TTS가 "표정 콜론 허탈함"을 그대로 읽음.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li><code>(표정: 허탈함)</code> → 나레이션에 남음</li>
+            <li>TTS가 "표정 콜론 허탈함" 읽음</li>
+            <li>자막에 "(표정: 허탈함)" 표시</li>
+            <li>DIRECTIVE_KEY_MAP에 없는 키만 걸러냄</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li>콜론(:) 포함 괄호 → 무조건 디렉티브로 간주, 나레이션에서 제거</li>
+            <li>콜론 없는 일반 괄호 (GDP), (웃음) → 보존</li>
+            <li>TTS, 자막 모두 깨끗한 텍스트</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="desc"><strong>핵심 코드 — directiveParser.ts:</strong></p>
+<pre><span class="keyword">if</span> (!internalKey) {
+  <span class="comment">// 미등록 키지만 콜론이 있으면 → AI가 만든 디렉티브로 간주, 나레이션에서 제거</span>
+  <span class="comment">// 콜론 없는 일반 괄호 (GDP, 웃음 등)는 건드리지 않음</span>
+  <span class="keyword">if</span> (colonIdx !== <span class="number">-1</span>) {
+    rawDirectives.<span class="fn">push</span>(fullMatch);
+    toRemove.<span class="fn">push</span>({ start: match.index!, end: match.index! + fullMatch.length });
+  }
+  <span class="keyword">continue</span>;
+}</pre>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>services/directiveParser.ts (parseDirectives 함수)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 6: Subtitle Auto Line-Wrap
+    =============================================
+  -->
+  <div class="section" id="s6">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num feature">6</span>
+      <span class="title-text">자막 자동 줄바꿈</span>
+      <span class="badge feature">NEW FEATURE</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        긴 자막 텍스트가 한 줄로 표시되어 특히 세로(9:16) 영상에서 읽기 어려웠던 문제 해결.
+        Canvas 기반 글자 단위 너비 측정 + 한국어 자연 끊김점(조사, 쉼표, 공백)을 활용한 줄바꿈 엔진.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li>자막 텍스트가 한 줄로 표시</li>
+            <li>세로(9:16) 영상에서 화면 밖으로 넘침</li>
+            <li>가독성 매우 낮음</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li>Canvas measureText로 글자 단위 너비 정밀 측정</li>
+            <li>한국어 조사(은/는/이/가/을/를/에/서/로/와/과/의/도/만/요/고/며/면/지/까) 뒤 우선 끊김</li>
+            <li>쉼표, 공백도 자연 끊김점으로 활용</li>
+            <li>최대 3줄 제한</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="desc"><strong>핵심 코드 — wrapTextToLines:</strong></p>
+<pre><span class="comment">// 이 글자 뒤에서 끊으면 자연스러운 위치</span>
+<span class="keyword">const</span> <span class="fn">BREAK_AFTER</span> = <span class="string">/[,.\s은는이가을를에서로와과의도만요고며면지까]$/</span>;
+
+<span class="keyword">for</span> (<span class="keyword">let</span> i = <span class="number">0</span>; i &lt; line.length; i++) {
+  <span class="keyword">const</span> test = current + line[i];
+  <span class="keyword">if</span> (ctx.<span class="fn">measureText</span>(test).width &lt;= maxWidth) {
+    current = test;
+    <span class="keyword">if</span> (BREAK_AFTER.<span class="fn">test</span>(line[i])) lastBreakPos = current.length;
+  } <span class="keyword">else</span> {
+    <span class="comment">// maxWidth 초과 → 자연 끊김점에서 줄바꿈</span>
+    <span class="keyword">if</span> (lastBreakPos &gt; <span class="number">0</span>) {
+      result.<span class="fn">push</span>(current.<span class="fn">slice</span>(<span class="number">0</span>, lastBreakPos).trim());
+      current = current.<span class="fn">slice</span>(lastBreakPos).trimStart() + line[i];
+    }
+    lastBreakPos = <span class="number">0</span>;
+  }
+}
+<span class="comment">// 최대 3줄 제한</span>
+<span class="keyword">return</span> result.<span class="fn">slice</span>(<span class="number">0</span>, <span class="number">3</span>);</pre>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>services/renderUtils.ts (wrapTextToLines, renderSubtitle)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 7: Advanced Mode Scene Line Breaks
+    =============================================
+  -->
+  <div class="section" id="s7">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num improvement">7</span>
+      <span class="title-text">고급 모드 씬 줄바꿈 지시</span>
+      <span class="badge improvement">IMPROVEMENT</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        고급 모드(새로쓰기/다듬기/바이럴변환)에서 AI가 줄바꿈 없는 벽면 텍스트를 반환하던 문제.
+        세 가지 모드 모두에 씬 구분 빈 줄 지시문 추가.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li>새로쓰기/다듬기/바이럴변환 → 줄바꿈 없는 텍스트 벽</li>
+            <li>textarea에서 씬 구분 불가</li>
+            <li>사용자가 수동으로 빈 줄 삽입 필요</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li>3개 모드 모두 "씬과 씬 사이에 반드시 빈 줄 1개를 넣어 구분하세요" 지시문 포함</li>
+            <li>AI가 자동으로 씬 사이에 빈 줄 삽입</li>
+            <li>textarea에서 씬 구분 명확</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="desc"><strong>추가된 지시문 (3개 모드 공통):</strong></p>
+<pre><span class="comment">// api/gemini.ts — 새로쓰기, 다듬기, 바이럴변환 모드 공통</span>
+<span class="string">"⚠️ 씬과 씬 사이에 반드시 빈 줄 1개를 넣어 구분하세요."</span></pre>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>api/gemini.ts (advancedAssist 핸들러, 3개 모드 프롬프트)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 8: Progress Message Improvement
+    =============================================
+  -->
+  <div class="section" id="s8">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num improvement">8</span>
+      <span class="title-text">진행률 메시지 개선</span>
+      <span class="badge improvement">IMPROVEMENT</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        생성 진행 상황 표시를 이미지 카운트만 보여주던 것에서 이미지/TTS/에러를 분리 표시하도록 개선.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <p style="font-family:monospace; font-size:1.1rem; padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; text-align:center;">
+            &#10003; 0/8 씬 완성
+          </p>
+          <ul style="margin-top:0.75rem">
+            <li>이미지 카운트만 표시</li>
+            <li>TTS 진행 상황 알 수 없음</li>
+            <li>에러 발생 여부 모름</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <p style="font-family:monospace; font-size:1.1rem; padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; text-align:center;">
+            &#x1f5bc;&#xfe0f; 3/8 &nbsp; &#x1f50a; 5/8 &nbsp; <span style="color:var(--accent-amber)">&#x26a0;&#xfe0f; 1</span>
+          </p>
+          <ul style="margin-top:0.75rem">
+            <li>이미지 + TTS 진행률 분리 표시</li>
+            <li>에러 발생 수 실시간 표시</li>
+            <li>완료 시 색상 변경</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>App.tsx (진행률 상태 메시지)</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 9: Config & Type Updates
+    =============================================
+  -->
+  <div class="section" id="s9">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num improvement">9</span>
+      <span class="title-text">Config &amp; Type 업데이트</span>
+      <span class="badge improvement">IMPROVEMENT</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        오늘 추가된 신규 기능들을 지원하기 위한 타입 정의 및 설정 키 추가.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li><code>SceneAnalysis</code> 타입에 <code>scene_role</code> 필드 없음</li>
+            <li>스크립트 린터, TTS 감정 조절용 스토리지 키 없음</li>
+            <li><code>.env</code> 파일이 .gitignore에 없음</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li><code>SceneAnalysis</code>에 <code>scene_role</code> 필드 추가</li>
+            <li>스토리지 키 추가: <code>SCRIPT_LINT: 'tubegen_script_lint'</code></li>
+            <li>스토리지 키 추가: <code>TTS_EMOTION: 'tubegen_tts_emotion'</code></li>
+            <li><code>.gitignore</code>에 <code>.env</code> 추가 (보안 강화)</li>
+          </ul>
+        </div>
+      </div>
+
+<pre><span class="comment">// config.ts — 새 스토리지 키</span>
+STORAGE_KEYS: {
+  ...
+  <span class="fn">SCRIPT_LINT</span>: <span class="string">'tubegen_script_lint'</span>,     <span class="comment">// 스크립트 린터 ON/OFF (기본 ON)</span>
+  <span class="fn">TTS_EMOTION</span>: <span class="string">'tubegen_tts_emotion'</span>,    <span class="comment">// scene_role 기반 TTS 감정 조절 (기본 ON)</span>
+}</pre>
+
+      <div class="files-changed">
+        <div class="label">관련 파일</div>
+        <code>types.ts (SceneAnalysis 타입)</code>
+        <code>config.ts (STORAGE_KEYS)</code>
+        <code>.gitignore</code>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    =============================================
+    SECTION 10: UI Audit
+    =============================================
+  -->
+  <div class="section" id="s10">
+    <button class="section-toggle" onclick="toggleSection(this)">
+      <span class="arrow">&#9654;</span>
+      <span class="section-num feature">10</span>
+      <span class="title-text">UI 접근성 감사 (Accessibility Audit)</span>
+      <span class="badge feature">NEW</span>
+    </button>
+    <div class="section-body">
+      <p class="desc">
+        Playwright 기반 종합 UI 접근성 감사를 수행하여 18개 개선 항목을 도출.
+        우선순위별 구현 로드맵 수립 완료.
+      </p>
+
+      <div class="comparison">
+        <div class="comp-panel before">
+          <span class="comp-label">BEFORE</span>
+          <ul>
+            <li>접근성 감사 미실시</li>
+            <li>개선 항목 파악 불가</li>
+            <li>우선순위 없는 임의 개선</li>
+          </ul>
+        </div>
+        <div class="comp-panel after">
+          <span class="comp-label">AFTER</span>
+          <ul>
+            <li>Playwright 기반 종합 감사 완료</li>
+            <li>18개 개선 항목 식별</li>
+            <li>8개 Quick Win (빠른 수정 가능)</li>
+            <li>7개 Medium (중간 난이도)</li>
+            <li>3개 Major (대규모 개선 필요)</li>
+            <li>우선순위별 구현 로드맵 수립</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout info">
+        감사 결과를 기반으로 Quick Win 8개 항목은 다음 세션에서 즉시 구현할 수 있도록 준비되었습니다.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <p>C2 GEN Session Report &mdash; 2026-03-25 &mdash; Generated by Claude Code</p>
+  <p style="margin-top:0.3rem">Branch: <strong>imagemaker</strong> &middot; Project: TubeGen AI V9.2</p>
+</div>
+
+<script>
+function toggleSection(btn) {
+  const section = btn.parentElement;
+  section.classList.toggle('open');
+}
+
+// Open first section by default (already done via class)
+// Smooth scroll for TOC links
+document.querySelectorAll('.toc a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      // Open the section
+      target.classList.add('open');
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+
+</body>
+</html>

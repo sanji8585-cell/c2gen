@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C2 GEN UI 개선 감사 보고서 — 2026-03-25</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f172a; color: #e2e8f0; line-height: 1.6;
+  }
+  a { color: #60a5fa; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Layout ── */
+  .container { max-width: 1360px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Header ── */
+  .report-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-bottom: 1px solid rgba(96,165,250,0.15);
+    padding: 48px 0 36px;
+  }
+  .report-header h1 {
+    font-size: 32px; font-weight: 900; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .report-header .subtitle {
+    font-size: 15px; color: #94a3b8; margin-top: 8px;
+  }
+
+  /* ── Stats Bar ── */
+  .stats-bar {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin: 32px 0;
+  }
+  .stat-card {
+    flex: 1; min-width: 180px;
+    background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+    padding: 20px 24px; text-align: center;
+  }
+  .stat-card .num { font-size: 36px; font-weight: 900; }
+  .stat-card .label { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+  .stat-num-red { color: #f87171; }
+  .stat-num-yellow { color: #fbbf24; }
+  .stat-num-green { color: #4ade80; }
+  .stat-num-blue { color: #60a5fa; }
+
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex; gap: 6px; border-bottom: 2px solid #1e293b;
+    margin-bottom: 32px; padding-top: 16px;
+  }
+  .tab-btn {
+    padding: 10px 22px; font-size: 14px; font-weight: 700;
+    border: none; border-radius: 10px 10px 0 0; cursor: pointer;
+    background: transparent; color: #64748b; transition: all .2s;
+  }
+  .tab-btn:hover { color: #e2e8f0; background: rgba(96,165,250,0.08); }
+  .tab-btn.active { color: #60a5fa; background: #1e293b; border-bottom: 2px solid #60a5fa; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Item Card ── */
+  .item-card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+    margin-bottom: 28px; overflow: hidden;
+    transition: border-color .2s;
+  }
+  .item-card:hover { border-color: rgba(96,165,250,0.3); }
+  .item-header {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 20px 24px; border-bottom: 1px solid #334155;
+  }
+  .item-id {
+    font-size: 13px; font-weight: 800; padding: 4px 10px;
+    background: rgba(96,165,250,0.15); color: #60a5fa;
+    border-radius: 6px; white-space: nowrap;
+  }
+  .item-title { font-size: 17px; font-weight: 800; flex: 1; }
+  .badge {
+    font-size: 12px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; white-space: nowrap;
+  }
+  .badge-high { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+  .badge-medium { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+  .badge-low { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+
+  .item-meta {
+    display: flex; gap: 24px; flex-wrap: wrap; padding: 12px 24px;
+    font-size: 13px; color: #94a3b8; border-bottom: 1px solid rgba(51,65,85,0.5);
+  }
+  .item-meta span { display: flex; align-items: center; gap: 5px; }
+  .item-meta .file-tag {
+    font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px;
+    background: rgba(96,165,250,0.1); color: #93c5fd; padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── Before / After ── */
+  .compare-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  }
+  @media (max-width: 900px) {
+    .compare-row { grid-template-columns: 1fr; }
+  }
+  .compare-col {
+    padding: 24px;
+  }
+  .compare-col.before { border-right: 1px solid #334155; }
+  .compare-label {
+    font-size: 12px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .compare-label.before-label { color: #f87171; }
+  .compare-label.after-label { color: #4ade80; }
+  .compare-label .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .compare-label.before-label .dot { background: #f87171; }
+  .compare-label.after-label .dot { background: #4ade80; }
+
+  /* ── Mockup Containers ── */
+  .mockup-frame {
+    border-radius: 12px; padding: 20px; min-height: 120px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; position: relative;
+  }
+  .mockup-before {
+    background: rgba(239,68,68,0.04);
+    border: 2px dashed rgba(239,68,68,0.25);
+  }
+  .mockup-after {
+    background: rgba(74,222,128,0.04);
+    border: 2px solid rgba(74,222,128,0.25);
+  }
+  .mockup-annotation {
+    position: absolute; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px;
+  }
+  .anno-bad {
+    background: rgba(239,68,68,0.2); color: #fca5a5;
+  }
+  .anno-good {
+    background: rgba(74,222,128,0.2); color: #86efac;
+  }
+
+  /* ── Shared mock UI styles ── */
+  .mock-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 14px; font-weight: 700; border: none; border-radius: 10px;
+    cursor: default; white-space: nowrap; font-family: inherit;
+  }
+  .mock-btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: #fff; padding: 12px 28px;
+  }
+  .mock-btn-disabled {
+    background: #334155; color: #475569; padding: 12px 28px;
+  }
+  .mock-input {
+    background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+    padding: 12px 16px; color: #e2e8f0; font-size: 14px; width: 100%;
+    font-family: inherit;
+  }
+  .mock-input::placeholder { color: #475569; }
+  .mock-hint {
+    font-size: 12px; color: #64748b; margin-top: 6px;
+  }
+  .mock-hint-visible {
+    font-size: 12px; color: #94a3b8; margin-top: 6px;
+  }
+  .mock-slider-wrap {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+  }
+  .mock-slider {
+    -webkit-appearance: none; appearance: none; flex: 1; height: 6px;
+    background: #334155; border-radius: 3px; outline: none;
+  }
+  .mock-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: #60a5fa; cursor: pointer;
+  }
+  .mock-small-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid #475569; background: #1e293b; color: #94a3b8;
+    border-radius: 6px; cursor: default; font-family: inherit; font-size: 12px;
+  }
+  .mock-toast {
+    background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+    padding: 10px 18px; font-size: 13px; color: #e2e8f0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mock-card {
+    background: #0f172a; border: 1px solid #334155; border-radius: 12px;
+    padding: 16px; width: 100%;
+  }
+  .mock-accordion-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; border-radius: 12px; cursor: default;
+    transition: background .2s;
+  }
+  .mock-accordion-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .mock-checkbox-wrap {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; color: #e2e8f0;
+  }
+  .mock-checkbox {
+    border: 2px solid #475569; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; flex-shrink: 0;
+  }
+  .mock-radio-group { display: flex; gap: 8px; }
+  .mock-radio-tile {
+    flex: 1; padding: 10px 14px; border-radius: 10px;
+    border: 2px solid #334155; text-align: center;
+    font-size: 13px; font-weight: 700; cursor: default;
+  }
+  .mock-radio-tile.selected { border-color: #60a5fa; background: rgba(96,165,250,0.1); color: #60a5fa; }
+  .mock-radio-tile.locked { color: #475569; position: relative; }
+  .mock-code {
+    font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px;
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; width: 100%; text-align: left;
+    line-height: 1.7; color: #cbd5e1;
+  }
+  .mock-code .kw { color: #c084fc; }
+  .mock-code .str { color: #4ade80; }
+  .mock-code .cm { color: #64748b; }
+  .mock-code .fn { color: #60a5fa; }
+
+  .mock-bottom-nav {
+    display: flex; background: #1e293b; border-radius: 16px;
+    border: 1px solid #334155; overflow: hidden; width: 100%;
+  }
+  .mock-nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 3px; padding: 10px 4px; font-size: 11px; font-weight: 600; color: #64748b;
+  }
+  .mock-nav-item.active { color: #60a5fa; }
+  .mock-nav-item .nav-icon { font-size: 18px; }
+
+  .mock-tooltip {
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: #334155; color: #e2e8f0; padding: 5px 10px;
+    border-radius: 6px; font-size: 11px; white-space: nowrap;
+  }
+  .mock-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: #334155;
+  }
+
+  /* ── Phone frame ── */
+  .phone-frame {
+    width: 220px; background: #0f172a; border: 2px solid #334155;
+    border-radius: 20px; padding: 8px; display: flex; flex-direction: column;
+    gap: 6px; position: relative; overflow: hidden;
+  }
+  .phone-status-bar {
+    display: flex; justify-content: space-between; font-size: 10px;
+    color: #64748b; padding: 2px 8px;
+  }
+
+  /* ── Pulse animation ── */
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .anim-pulse { animation: pulse 1.5s ease infinite; }
+  @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; transform: translateY(8px); } }
+
+  /* quest float button */
+  .quest-float-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: none;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff; font-size: 20px; cursor: default;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(245,158,11,0.3);
+  }
+
+  /* ── Section divider ── */
+  .section-divider {
+    height: 1px; background: linear-gradient(90deg, transparent, #334155 30%, #334155 70%, transparent);
+    margin: 40px 0;
+  }
+
+  /* ── Footer ── */
+  .report-footer {
+    text-align: center; padding: 40px 0; font-size: 13px; color: #475569;
+    border-top: 1px solid #1e293b;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header class="report-header">
+  <div class="container">
+    <h1>C2 GEN UI 개선 감사 보고서</h1>
+    <p class="subtitle">2026-03-25 &middot; TubeGen AI V9.2 &middot; 18개 항목 &middot; BEFORE vs AFTER 시각 비교</p>
+  </div>
+</header>
+
+<!-- ═══════════════════ STATS ═══════════════════ -->
+<section class="container">
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="num stat-num-blue">18</div>
+      <div class="label">전체 개선 항목</div>
+    </div>
+    <div class="stat-card">
+      <div class="num stat-num-red">8</div>
+      <div class="label">높은 영향도</div>
+    </div>
+    <div class="stat-card">
+      <div class="num stat-num-yellow">7</div>
+      <div class="label">중간 영향도</div>
+    </div>
+    <div class="stat-card">
+      <div class="num stat-num-green">3</div>
+      <div class="label">카테고리 (Quick / Medium / Major)</div>
+    </div>
+    <div class="stat-card">
+      <div class="num stat-num-blue">~48h</div>
+      <div class="label">예상 총 소요 시간</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ TABS ═══════════════════ -->
+<section class="container">
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="quick">A. Quick Wins (8)</button>
+    <button class="tab-btn" data-tab="medium">B. Medium (7)</button>
+    <button class="tab-btn" data-tab="major">C. Major (3)</button>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!--  TAB A: QUICK WINS                          -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-quick">
+
+    <!-- ── A-1 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-1</span>
+        <span class="item-title">"시작→" 버튼 비활성 시 안내 없음</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">HeroInput.tsx</span></span>
+        <span>⏱ 약 0.5h</span>
+        <span>사용자가 버튼이 왜 눌리지 않는지 모름 → 이탈</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before" style="gap: 14px;">
+            <input class="mock-input" placeholder="비트코인 반감기 이후 시세 전망" disabled style="opacity:.5; width:280px;">
+            <button class="mock-btn mock-btn-disabled" style="width: 200px; font-size: 15px;">
+              시작 →
+            </button>
+            <div style="height: 20px;"><!-- 아무것도 없음 --></div>
+            <div class="mockup-annotation anno-bad" style="bottom:14px; right:14px;">
+              힌트 텍스트 없음 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="gap: 14px;">
+            <input class="mock-input" placeholder="비트코인 반감기 이후 시세 전망" disabled style="opacity:.5; width:280px;">
+            <button class="mock-btn mock-btn-disabled" style="width: 200px; font-size: 15px;">
+              시작 →
+            </button>
+            <div class="mock-hint-visible" style="text-align:center;">
+              💡 주제를 입력하면 활성화됩니다
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:14px; right:14px;">
+              안내 텍스트 표시 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A-2 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-2</span>
+        <span class="item-title">토스트 메시지 위치 겹침 + 퇴장 애니메이션 없음</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">App.tsx</span></span>
+        <span>⏱ 약 1h</span>
+        <span>퀘스트 버튼과 토스트가 겹쳐 클릭 불가</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before" style="height: 220px; justify-content: flex-end; position: relative;">
+            <!-- Scene card area -->
+            <div style="width:100%; height: 80px; background: rgba(15,23,42,0.6); border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#64748b;">
+              씬 카드 영역
+            </div>
+            <!-- Quest button -->
+            <div style="position:absolute; bottom: 12px; right: 12px;">
+              <div class="quest-float-btn" style="width:42px; height:42px; font-size:16px;">🎮</div>
+            </div>
+            <!-- Toast overlapping -->
+            <div style="position:absolute; bottom: 12px; right: 12px; left: 12px;">
+              <div class="mock-toast" style="justify-content: center;">
+                ✅ 이미지가 생성되었습니다
+              </div>
+            </div>
+            <div class="mockup-annotation anno-bad" style="top:10px; left:10px;">
+              겹침! 갑자기 사라짐 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="height: 220px; justify-content: flex-end; position: relative;">
+            <div style="width:100%; height: 80px; background: rgba(15,23,42,0.6); border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#64748b;">
+              씬 카드 영역
+            </div>
+            <!-- Quest button clear -->
+            <div style="position:absolute; bottom: 12px; right: 12px;">
+              <div class="quest-float-btn" style="width:42px; height:42px; font-size:16px;">🎮</div>
+            </div>
+            <!-- Toast higher up, with fade animation visual -->
+            <div style="position:absolute; bottom: 80px; right: 12px; left: 12px;">
+              <div class="mock-toast" style="justify-content: center; opacity: 0.85;">
+                ✅ 이미지가 생성되었습니다
+              </div>
+              <div style="text-align:center; margin-top:4px; font-size:10px; color:#4ade80;">
+                ↓ 3초 후 페이드아웃
+              </div>
+            </div>
+            <div class="mockup-annotation anno-good" style="top:10px; left:10px;">
+              bottom-24, 페이드아웃 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A-3 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-3</span>
+        <span class="item-title">슬라이더/토글 접근성 라벨 없음</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SoundSettingsGroup.tsx</span></span>
+        <span>⏱ 약 1h</span>
+        <span>스크린리더 사용자 접근 불가, WCAG 위반</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before" style="align-items: flex-start; gap: 12px;">
+            <div style="font-size:13px; font-weight:700; color:#94a3b8;">BGM 볼륨</div>
+            <div class="mock-slider-wrap">
+              <input type="range" class="mock-slider" min="0" max="100" value="70" disabled>
+              <span style="font-size:12px; color:#64748b;">70%</span>
+            </div>
+            <div class="mock-code" style="font-size:11px; padding:8px 12px; margin-top:6px; width:100%;">
+              &lt;input type="range" /&gt;<br>
+              <span class="cm">// aria-label 없음</span>
+            </div>
+            <div class="mockup-annotation anno-bad" style="top:10px; right:10px;">
+              aria-label 없음 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="align-items: flex-start; gap: 12px;">
+            <div style="font-size:13px; font-weight:700; color:#e2e8f0;">BGM 볼륨</div>
+            <div class="mock-slider-wrap" style="position:relative;">
+              <input type="range" class="mock-slider" min="0" max="100" value="70" disabled aria-label="BGM 볼륨">
+              <span style="font-size:12px; color:#94a3b8;">70%</span>
+              <div class="mock-tooltip" style="left:70%; bottom:28px;">BGM 볼륨: 70%</div>
+            </div>
+            <div class="mock-code" style="font-size:11px; padding:8px 12px; margin-top:6px; width:100%;">
+              &lt;input type="range"<br>
+              &nbsp;&nbsp;<span class="fn">aria-label</span>=<span class="str">"BGM 볼륨"</span><br>
+              &nbsp;&nbsp;<span class="fn">title</span>=<span class="str">"BGM 볼륨: 70%"</span> /&gt;
+            </div>
+            <div class="mockup-annotation anno-good" style="top:10px; right:10px;">
+              aria-label + 툴팁 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A-4 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-4</span>
+        <span class="item-title">설정 아코디언 호버 배경 다크 하드코딩</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SettingsAccordion.tsx</span></span>
+        <span>⏱ 약 0.5h</span>
+        <span>라이트 모드에서 진한 남색 얼룩이 보임</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE — 라이트 모드</div>
+          <div class="mockup-frame mockup-before" style="background: #f8fafc !important;">
+            <div class="mock-accordion-header" style="background: rgba(30,40,70,0.4); width: 100%; border: 1px solid #e2e8f0;">
+              <div class="mock-accordion-icon" style="background: linear-gradient(135deg,#a78bfa,#818cf8);">🎵</div>
+              <div style="flex:1;">
+                <div style="font-size:14px; font-weight:800; color:#1e293b;">사운드 설정</div>
+                <div style="font-size:12px; color:#64748b;">음성, BGM</div>
+              </div>
+              <span style="color:#94a3b8;">▼</span>
+            </div>
+            <div class="mockup-annotation anno-bad" style="top:8px; right:8px;">
+              rgba(30,40,70,0.4) 얼룩 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER — 라이트 모드</div>
+          <div class="mockup-frame mockup-after" style="background: #f8fafc !important;">
+            <div class="mock-accordion-header" style="background: rgba(0,0,0,0.04); width: 100%; border: 1px solid #e2e8f0;">
+              <div class="mock-accordion-icon" style="background: linear-gradient(135deg,#a78bfa,#818cf8);">🎵</div>
+              <div style="flex:1;">
+                <div style="font-size:14px; font-weight:800; color:#1e293b;">사운드 설정</div>
+                <div style="font-size:12px; color:#64748b;">음성, BGM</div>
+              </div>
+              <span style="color:#94a3b8;">▼</span>
+            </div>
+            <div class="mockup-annotation anno-good" style="top:8px; right:8px;">
+              var(--hover-overlay) ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A-5 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-5</span>
+        <span class="item-title">"저장" 버튼에 드롭다운 표시 없음</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SceneToolbar.tsx</span></span>
+        <span>⏱ 약 0.5h</span>
+        <span>사용자가 저장/내보내기/SRT 등 하위 메뉴 존재를 모름</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <div style="display:flex; gap:8px;">
+              <button class="mock-btn mock-small-btn" style="padding:8px 14px; font-size:13px; gap:5px;">
+                <span>💾</span> 저장
+              </button>
+              <button class="mock-btn mock-small-btn" style="padding:8px 14px; font-size:13px;">
+                🖼 썸네일
+              </button>
+            </div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              드롭다운 힌트 없음 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="position:relative;">
+            <div style="display:flex; gap:8px;">
+              <button class="mock-btn mock-small-btn" style="padding:8px 14px; font-size:13px; gap:5px; border-color:#60a5fa; color:#60a5fa;">
+                <span>💾</span> 저장 <span style="font-size:10px; opacity:0.7;">▾</span>
+              </button>
+              <button class="mock-btn mock-small-btn" style="padding:8px 14px; font-size:13px;">
+                🖼 썸네일
+              </button>
+            </div>
+            <!-- Dropdown preview -->
+            <div style="margin-top:8px; background:#1e293b; border:1px solid #334155; border-radius:10px; padding:6px; width:180px;">
+              <div style="padding:8px 12px; font-size:12px; color:#e2e8f0; border-radius:6px; background:rgba(96,165,250,0.1);">💾 프로젝트 저장</div>
+              <div style="padding:8px 12px; font-size:12px; color:#94a3b8;">📦 ZIP 내보내기</div>
+              <div style="padding:8px 12px; font-size:12px; color:#94a3b8;">📝 SRT 다운로드</div>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              ▾ 표시 + 드롭다운 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A-6 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-6</span>
+        <span class="item-title">씬 카드 액션 버튼 너무 작음 (28×24px)</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SceneCard.tsx</span></span>
+        <span>⏱ 약 1h</span>
+        <span>모바일에서 터치 불가, WCAG 44px 최소 터치 타겟 미달</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <div style="display:flex; gap:3px; align-items:center;">
+              <div class="mock-small-btn" style="width:28px; height:24px; font-size:10px;">↗</div>
+              <div class="mock-small-btn" style="width:28px; height:24px; font-size:10px;">↙</div>
+              <div class="mock-small-btn" style="width:28px; height:24px; font-size:10px;">←</div>
+              <div class="mock-small-btn" style="width:28px; height:24px; font-size:10px;">→</div>
+              <div class="mock-small-btn" style="width:28px; height:24px; font-size:10px;">•</div>
+            </div>
+            <div style="display:flex; gap:4px; align-items:center; margin-top:8px;">
+              <div style="width:28px; height:1px; background:#f87171;"></div>
+              <span style="font-size:10px; color:#f87171;">28px</span>
+              <div style="width:24px; height:1px; background:#f87171; transform:rotate(90deg); margin-left:20px;"></div>
+              <span style="font-size:10px; color:#f87171;">24px</span>
+            </div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              28×24px — 터치 불가 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after">
+            <div style="display:flex; gap:6px; align-items:center;">
+              <div class="mock-small-btn" style="width:32px; height:32px; font-size:13px; padding:0;">↗</div>
+              <div class="mock-small-btn" style="width:32px; height:32px; font-size:13px; padding:0;">↙</div>
+              <div class="mock-small-btn" style="width:32px; height:32px; font-size:13px; padding:0;">←</div>
+              <div class="mock-small-btn" style="width:32px; height:32px; font-size:13px; padding:0;">→</div>
+              <div class="mock-small-btn" style="width:32px; height:32px; font-size:13px; padding:0;">•</div>
+            </div>
+            <div style="display:flex; gap:4px; align-items:center; margin-top:8px;">
+              <div style="width:32px; height:1px; background:#4ade80;"></div>
+              <span style="font-size:10px; color:#4ade80;">32px (44px 터치영역)</span>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              32×32px + 44px 패딩 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A-7 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-7</span>
+        <span class="item-title">BGM 업로드 재생 버튼 터치 불가</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SoundSettingsGroup.tsx</span></span>
+        <span>⏱ 약 0.5h</span>
+        <span>10px 폰트 재생 버튼, 모바일에서 누르기 어려움</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <div class="mock-card" style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:12px; color:#94a3b8; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">my_bgm_track.mp3</span>
+              <button class="mock-small-btn" style="font-size:10px; padding:2px 6px; min-width:0;">▶</button>
+              <button class="mock-small-btn" style="font-size:10px; padding:2px 6px; min-width:0; color:#f87171;">✕</button>
+            </div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              10px, 패딩 2px ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after">
+            <div class="mock-card" style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:13px; color:#e2e8f0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">my_bgm_track.mp3</span>
+              <button class="mock-small-btn" style="font-size:13px; width:32px; height:32px; padding:0;">▶</button>
+              <button class="mock-small-btn" style="font-size:13px; width:32px; height:32px; padding:0; color:#f87171;">✕</button>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              13px, 32×32px ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A-8 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">A-8</span>
+        <span class="item-title">"자동 줌" 라벨 의미 불명확</span>
+        <span class="badge badge-low">낮음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SceneToolbar.tsx</span></span>
+        <span>⏱ 약 0.5h</span>
+        <span>초보 사용자 혼란 — "자동 줌"이 무엇인지 모름</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:13px; font-weight:700; color:#94a3b8;">자동 줌</span>
+              <select class="mock-input" style="width:140px; padding:6px 10px; font-size:12px;" disabled>
+                <option>교차 줌인/아웃</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="position:relative;">
+            <div style="display:flex; align-items:center; gap:8px; position:relative;">
+              <span style="font-size:13px; font-weight:700; color:#e2e8f0; position:relative;">
+                전체 씬 줌/컷 효과
+                <span style="margin-left:4px; font-size:11px; color:#64748b; cursor:help;" title="모든 씬에 줌, 패닝 효과를 일괄 적용합니다">ⓘ</span>
+              </span>
+              <select class="mock-input" style="width:140px; padding:6px 10px; font-size:12px;" disabled>
+                <option>교차 줌인/아웃</option>
+              </select>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              명확한 라벨 + 툴팁 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-quick -->
+
+
+  <!-- ════════════════════════════════════════════ -->
+  <!--  TAB B: MEDIUM IMPROVEMENTS                 -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-medium">
+
+    <!-- ── B-1 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">B-1</span>
+        <span class="item-title">설정 섹션 스크롤 과다</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">InputSection.tsx</span></span>
+        <span>⏱ 약 3h</span>
+        <span>제출 버튼이 화면 밖으로 밀림 → 사용자 이탈</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before" style="align-items:stretch;">
+            <div class="mock-card" style="padding:10px 14px; margin-bottom:4px;">
+              <div style="font-size:12px; font-weight:700; color:#94a3b8;">🎨 이미지 설정</div>
+              <div style="height:40px; background:rgba(51,65,85,0.3); border-radius:6px; margin-top:6px;"></div>
+            </div>
+            <div class="mock-card" style="padding:10px 14px; margin-bottom:4px;">
+              <div style="font-size:12px; font-weight:700; color:#94a3b8;">🎵 사운드 설정</div>
+              <div style="height:40px; background:rgba(51,65,85,0.3); border-radius:6px; margin-top:6px;"></div>
+            </div>
+            <div class="mock-card" style="padding:10px 14px; margin-bottom:4px;">
+              <div style="font-size:12px; font-weight:700; color:#94a3b8;">📐 참조 이미지</div>
+              <div style="height:40px; background:rgba(51,65,85,0.3); border-radius:6px; margin-top:6px;"></div>
+            </div>
+            <div style="text-align:center; font-size:11px; color:#f87171; margin-top:6px;">
+              ↓ 스크롤해야 버튼 보임 ↓
+            </div>
+            <button class="mock-btn mock-btn-primary" style="width:100%; margin-top:8px; opacity:0.4; font-size:13px;">
+              시작 →
+            </button>
+            <div class="mockup-annotation anno-bad" style="top:8px; right:8px;">
+              모두 펼침 — 버튼 안 보임 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="align-items:stretch;">
+            <input class="mock-input" placeholder="비트코인 반감기 이후 시세 전망" style="margin-bottom:8px;">
+            <div style="text-align:center; margin-bottom:8px;">
+              <span style="font-size:12px; color:#60a5fa; cursor:pointer; border-bottom:1px dashed rgba(96,165,250,0.4); padding-bottom:1px;">
+                ⚙ 설정 보기
+              </span>
+            </div>
+            <button class="mock-btn mock-btn-primary" style="width:100%; font-size:14px;">
+              시작 →
+            </button>
+            <div style="font-size:11px; color:#64748b; text-align:center; margin-top:6px;">
+              기본값으로 바로 시작 가능
+            </div>
+            <div class="mockup-annotation anno-good" style="top:8px; right:8px;">
+              접힌 상태 — 버튼 바로 보임 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B-2 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">B-2</span>
+        <span class="item-title">잠긴 해상도 클릭 시 안내 없음</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SceneToolbar.tsx</span></span>
+        <span>⏱ 약 2h</span>
+        <span>프리미엄 기능 발견 기회 상실, 업그레이드 전환율 0%</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <div style="font-size:12px; font-weight:700; color:#94a3b8; margin-bottom:8px;">해상도</div>
+            <select class="mock-input" style="width:200px; padding:8px 12px; font-size:13px;" disabled>
+              <option>720P</option>
+              <option disabled>1080P (베이직+)</option>
+              <option disabled>4K (프로)</option>
+            </select>
+            <div style="font-size:11px; color:#64748b; margin-top:6px;">disabled option — 클릭해도 아무 반응 없음</div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              무반응 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after">
+            <div style="font-size:12px; font-weight:700; color:#e2e8f0; margin-bottom:8px;">해상도</div>
+            <div class="mock-radio-group" style="width:100%;">
+              <div class="mock-radio-tile selected">720P ✓</div>
+              <div class="mock-radio-tile locked" style="border-color:#475569;">
+                1080P 🔒
+                <div style="font-size:10px; color:#fbbf24; margin-top:2px;">베이직+</div>
+              </div>
+              <div class="mock-radio-tile locked" style="border-color:#475569;">
+                4K 🔒
+                <div style="font-size:10px; color:#a78bfa; margin-top:2px;">프로</div>
+              </div>
+            </div>
+            <div style="text-align:right; margin-top:6px;">
+              <span style="font-size:11px; color:#60a5fa; cursor:pointer;">업그레이드 →</span>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              라디오 타일 + 업그레이드 링크 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B-3 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">B-3</span>
+        <span class="item-title">퀘스트 패널 콘텐츠 겹침</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">DailyQuestPanel.tsx</span></span>
+        <span>⏱ 약 3h</span>
+        <span>플로팅 버튼이 씬 카드 하단 컨트롤과 겹쳐 클릭 방해</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before" style="height:240px; position:relative; align-items:stretch; justify-content:flex-start; padding:12px;">
+            <!-- Scene card bottom -->
+            <div class="mock-card" style="padding:10px;">
+              <div style="font-size:11px; color:#94a3b8;">씬 3 — 나레이션 텍스트...</div>
+              <div style="display:flex; gap:4px; margin-top:8px; justify-content:flex-end;">
+                <div class="mock-small-btn" style="width:26px; height:22px; font-size:9px;">🔄</div>
+                <div class="mock-small-btn" style="width:26px; height:22px; font-size:9px;">🎬</div>
+                <div class="mock-small-btn" style="width:26px; height:22px; font-size:9px;">✏️</div>
+              </div>
+            </div>
+            <!-- Floating quest button overlapping -->
+            <div style="position:absolute; bottom:12px; right:12px;">
+              <div class="quest-float-btn anim-pulse">🎮</div>
+            </div>
+            <div class="mockup-annotation anno-bad" style="top:8px; left:8px;">
+              퀘스트 버튼이 컨트롤 위에 겹침 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="height:240px; position:relative; align-items:stretch; justify-content:flex-start; padding:0; overflow:hidden;">
+            <!-- Header bar -->
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:#1e293b; border-bottom:1px solid #334155; width:100%;">
+              <span style="font-size:14px; font-weight:800; color:#e2e8f0; flex:1;">C2 GEN</span>
+              <span style="font-size:12px; background:rgba(245,158,11,0.15); color:#fbbf24; padding:3px 10px; border-radius:12px; font-weight:700;">
+                🎮 퀘스트 <span style="background:#f59e0b; color:#fff; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; margin-left:4px;">2</span>
+              </span>
+            </div>
+            <!-- Scene card clean -->
+            <div style="padding:12px;">
+              <div class="mock-card" style="padding:10px;">
+                <div style="font-size:11px; color:#94a3b8;">씬 3 — 나레이션 텍스트...</div>
+                <div style="display:flex; gap:4px; margin-top:8px; justify-content:flex-end;">
+                  <div class="mock-small-btn" style="width:26px; height:22px; font-size:9px;">🔄</div>
+                  <div class="mock-small-btn" style="width:26px; height:22px; font-size:9px;">🎬</div>
+                  <div class="mock-small-btn" style="width:26px; height:22px; font-size:9px;">✏️</div>
+                </div>
+              </div>
+            </div>
+            <div class="mockup-annotation anno-good" style="top:42px; right:8px;">
+              헤더 배지로 이동 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B-4 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">B-4</span>
+        <span class="item-title">"보상 받기" 버튼 너무 작고 항상 깜박임</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">DailyQuestPanel.tsx</span></span>
+        <span>⏱ 약 1h</span>
+        <span>끊임없는 펄스 애니메이션이 집중력 방해</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <div class="mock-card" style="padding:12px; display:flex; align-items:center; gap:10px;">
+              <div style="flex:1;">
+                <div style="font-size:12px; font-weight:700; color:#e2e8f0;">이미지 3장 생성</div>
+                <div style="font-size:11px; color:#4ade80; margin-top:2px;">✅ 완료!</div>
+              </div>
+              <button class="mock-btn anim-pulse" style="background:#f59e0b; color:#fff; padding:4px 10px; font-size:11px; border-radius:6px; border:none; min-height:21px;">
+                보상 받기
+              </button>
+            </div>
+            <div style="font-size:10px; color:#f87171; margin-top:4px;">← 항상 깜박임 (68×21px)</div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              68×21, 상시 펄스 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after">
+            <div class="mock-card" style="padding:12px; display:flex; align-items:center; gap:10px;">
+              <div style="flex:1;">
+                <div style="font-size:12px; font-weight:700; color:#e2e8f0;">이미지 3장 생성</div>
+                <div style="font-size:11px; color:#4ade80; margin-top:2px;">✅ 완료!</div>
+              </div>
+              <button class="mock-btn" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; padding:8px 16px; font-size:13px; border-radius:8px; border:none; min-height:44px; font-weight:700;">
+                🎁 보상 받기
+              </button>
+            </div>
+            <div style="font-size:10px; color:#4ade80; margin-top:4px;">← 호버 시에만 애니메이션 (44px 높이)</div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              44px, 호버 시만 펄스 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B-5 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">B-5</span>
+        <span class="item-title">라이트 모드 텍스트 대비 부족</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">theme.css</span></span>
+        <span>⏱ 약 2h</span>
+        <span>WCAG AA 대비율 미달 (3.2:1 → 최소 4.5:1 필요)</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE — 라이트 모드</div>
+          <div class="mockup-frame mockup-before" style="background:#ffffff !important; border-color:rgba(239,68,68,0.2);">
+            <div style="width:100%; padding:14px;">
+              <div style="font-size:15px; font-weight:800; color:#1e293b; margin-bottom:8px;">씬 1 — 비트코인 시세 전망</div>
+              <div style="font-size:13px; color:#94a3b8; line-height:1.5;">
+                비트코인은 최근 반감기를 거치며 공급량이 줄어들었습니다. 이로 인해 시장에서는 가격 상승을 기대하고 있으며...
+              </div>
+              <div style="display:flex; gap:6px; margin-top:10px;">
+                <span style="font-size:11px; color:#94a3b8; background:rgba(148,163,184,0.1); padding:3px 8px; border-radius:4px;">POSITIVE</span>
+                <span style="font-size:11px; color:#94a3b8; background:rgba(148,163,184,0.1); padding:3px 8px; border-radius:4px;">STANDARD</span>
+              </div>
+            </div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              #94a3b8 on #fff = 3.2:1 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER — 라이트 모드</div>
+          <div class="mockup-frame mockup-after" style="background:#ffffff !important; border-color:rgba(74,222,128,0.3);">
+            <div style="width:100%; padding:14px;">
+              <div style="font-size:15px; font-weight:800; color:#0f172a; margin-bottom:8px;">씬 1 — 비트코인 시세 전망</div>
+              <div style="font-size:13px; color:#64748b; line-height:1.5;">
+                비트코인은 최근 반감기를 거치며 공급량이 줄어들었습니다. 이로 인해 시장에서는 가격 상승을 기대하고 있으며...
+              </div>
+              <div style="display:flex; gap:6px; margin-top:10px;">
+                <span style="font-size:11px; color:#475569; background:rgba(71,85,105,0.08); padding:3px 8px; border-radius:4px;">POSITIVE</span>
+                <span style="font-size:11px; color:#475569; background:rgba(71,85,105,0.08); padding:3px 8px; border-radius:4px;">STANDARD</span>
+              </div>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              #64748b on #fff = 4.7:1 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B-6 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">B-6</span>
+        <span class="item-title">자동 모드 글자수/예시 사용 버튼 없음</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">HeroInput.tsx</span></span>
+        <span>⏱ 약 2h</span>
+        <span>글자수 제한 모름, 빈 입력란에서 뭘 쓸지 막막</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <input class="mock-input" placeholder="비트코인 반감기 이후 시세 전망" style="width:280px;">
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              글자수 표시 없음, 예시 버튼 없음 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after">
+            <div style="width:280px; position:relative;">
+              <input class="mock-input" value="비트코인 반감기" style="width:100%; padding-right:60px;">
+              <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:11px; color:#64748b;">8/200</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; width:280px; margin-top:6px;">
+              <button class="mock-btn" style="font-size:11px; color:#60a5fa; background:transparent; border:1px dashed rgba(96,165,250,0.3); padding:4px 10px; border-radius:6px;">
+                ✨ 예시 사용
+              </button>
+              <span style="font-size:11px; color:#64748b;">최대 200자</span>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              카운터 + 예시 사용 버튼 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B-7 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">B-7</span>
+        <span class="item-title">체크박스 터치 타겟 너무 작음</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">SceneCard.tsx</span></span>
+        <span>⏱ 약 1h</span>
+        <span>모바일에서 체크박스 선택 어려움</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before">
+            <div class="mock-checkbox-wrap">
+              <div class="mock-checkbox" style="width:20px; height:20px;">
+                <span style="font-size:12px; color:#60a5fa;">✓</span>
+              </div>
+              <span>씬 1 선택</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; margin-top:8px;">
+              <div style="width:20px; height:2px; background:#f87171;"></div>
+              <span style="font-size:10px; color:#f87171;">20×20px</span>
+            </div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              20×20px — WCAG 미달 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after">
+            <div class="mock-checkbox-wrap" style="padding:10px; border-radius:8px; background:rgba(96,165,250,0.04); cursor:pointer;">
+              <div class="mock-checkbox" style="width:24px; height:24px; border-color:#60a5fa; background:rgba(96,165,250,0.15);">
+                <span style="font-size:14px; color:#60a5fa;">✓</span>
+              </div>
+              <span>씬 1 선택</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; margin-top:8px;">
+              <div style="width:24px; height:2px; background:#4ade80;"></div>
+              <span style="font-size:10px; color:#4ade80;">24×24px + 44px 터치 패딩</span>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              24×24px + 터치 패딩 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-medium -->
+
+
+  <!-- ════════════════════════════════════════════ -->
+  <!--  TAB C: MAJOR REDESIGN                      -->
+  <!-- ════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-major">
+
+    <!-- ── C-1 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">C-1</span>
+        <span class="item-title">설정 분리: 생성 전 vs 생성 후</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">InputSection.tsx</span> + <span class="file-tag">new PostGenerationSettings.tsx</span></span>
+        <span>⏱ 약 8h</span>
+        <span>모든 설정이 한곳에 몰려 인지 부하 극심</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE</div>
+          <div class="mockup-frame mockup-before" style="align-items:stretch; padding:14px;">
+            <div style="font-size:11px; font-weight:800; color:#f87171; text-align:center; margin-bottom:8px;">모든 설정이 입력 위에 뭉침</div>
+            <div class="mock-card" style="padding:8px 12px; margin-bottom:4px;">
+              <div style="font-size:11px; color:#94a3b8;">🎨 이미지 모델, 화풍, 비율...</div>
+            </div>
+            <div class="mock-card" style="padding:8px 12px; margin-bottom:4px;">
+              <div style="font-size:11px; color:#94a3b8;">🎵 음성, BGM, 볼륨, 덕킹...</div>
+            </div>
+            <div class="mock-card" style="padding:8px 12px; margin-bottom:4px;">
+              <div style="font-size:11px; color:#94a3b8;">📐 참조이미지, 강도, 캐릭터...</div>
+            </div>
+            <div style="height:1px; background:#334155; margin:8px 0;"></div>
+            <input class="mock-input" placeholder="주제 입력..." style="font-size:12px; padding:8px 12px;">
+            <button class="mock-btn mock-btn-primary" style="width:100%; margin-top:6px; font-size:12px; padding:8px;">시작 →</button>
+            <div style="height:1px; background:#334155; margin:8px 0;"></div>
+            <div style="text-align:center; font-size:11px; color:#64748b;">
+              ↓ 생성 후 설정 변경 불가 ↓
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER</div>
+          <div class="mockup-frame mockup-after" style="align-items:stretch; padding:14px;">
+            <!-- Pre-gen zone -->
+            <div style="border:1px solid rgba(96,165,250,0.2); border-radius:10px; padding:10px; margin-bottom:8px;">
+              <div style="font-size:10px; font-weight:800; color:#60a5fa; margin-bottom:6px;">생성 전 설정</div>
+              <div style="font-size:11px; color:#94a3b8; display:flex; gap:8px; flex-wrap:wrap;">
+                <span style="background:rgba(96,165,250,0.1); padding:3px 8px; border-radius:4px;">Gemini Flash</span>
+                <span style="background:rgba(96,165,250,0.1); padding:3px 8px; border-radius:4px;">16:9</span>
+                <span style="background:rgba(96,165,250,0.1); padding:3px 8px; border-radius:4px;">한국어</span>
+              </div>
+            </div>
+            <input class="mock-input" placeholder="주제 입력..." style="font-size:12px; padding:8px 12px;">
+            <button class="mock-btn mock-btn-primary" style="width:100%; margin-top:6px; font-size:12px; padding:8px;">시작 →</button>
+            <!-- Post-gen zone -->
+            <div style="border:1px solid rgba(74,222,128,0.2); border-radius:10px; padding:10px; margin-top:12px;">
+              <div style="font-size:10px; font-weight:800; color:#4ade80; margin-bottom:6px;">생성 후 설정 (씬 카드 근처)</div>
+              <div style="font-size:11px; color:#94a3b8; display:flex; gap:8px; flex-wrap:wrap;">
+                <span style="background:rgba(74,222,128,0.1); padding:3px 8px; border-radius:4px;">자막 위치</span>
+                <span style="background:rgba(74,222,128,0.1); padding:3px 8px; border-radius:4px;">해상도</span>
+                <span style="background:rgba(74,222,128,0.1); padding:3px 8px; border-radius:4px;">줌 효과</span>
+                <span style="background:rgba(74,222,128,0.1); padding:3px 8px; border-radius:4px;">BGM 볼륨</span>
+              </div>
+            </div>
+            <div class="mockup-annotation anno-good" style="top:8px; right:8px;">
+              2단 분리 — 인지 부하 감소 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── C-2 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">C-2</span>
+        <span class="item-title">모바일 하단 네비게이션</span>
+        <span class="badge badge-high">높음</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">new MobileNav.tsx</span> + <span class="file-tag">Header.tsx</span></span>
+        <span>⏱ 약 8h</span>
+        <span>모바일에서 햄버거 메뉴 접근성 및 발견성 낮음</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE — 모바일</div>
+          <div class="mockup-frame mockup-before" style="padding:0;">
+            <div class="phone-frame">
+              <div style="display:flex; align-items:center; padding:8px 10px; background:#1e293b; border-radius:12px 12px 0 0; border-bottom:1px solid #334155;">
+                <span style="font-size:13px; font-weight:800; color:#e2e8f0; flex:1;">C2 GEN</span>
+                <div class="mock-small-btn" style="width:28px; height:28px; font-size:14px; padding:0;">☰</div>
+              </div>
+              <div style="flex:1; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                <div style="height:60px; background:#1e293b; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#64748b;">콘텐츠</div>
+                <div style="height:60px; background:#1e293b; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#64748b;">콘텐츠</div>
+              </div>
+              <!-- Floating quest button -->
+              <div style="position:absolute; bottom:14px; right:14px;">
+                <div class="quest-float-btn anim-pulse" style="width:36px; height:36px; font-size:14px;">🎮</div>
+              </div>
+            </div>
+            <div class="mockup-annotation anno-bad" style="bottom:8px; right:8px;">
+              햄버거 + 플로팅 버튼 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER — 모바일</div>
+          <div class="mockup-frame mockup-after" style="padding:0;">
+            <div class="phone-frame">
+              <div style="display:flex; align-items:center; padding:8px 10px; background:#1e293b; border-radius:12px 12px 0 0; border-bottom:1px solid #334155;">
+                <span style="font-size:13px; font-weight:800; color:#e2e8f0;">C2 GEN</span>
+              </div>
+              <div style="flex:1; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                <div style="height:60px; background:#1e293b; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#64748b;">콘텐츠</div>
+                <div style="height:60px; background:#1e293b; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:10px; color:#64748b;">콘텐츠</div>
+              </div>
+              <!-- Bottom nav -->
+              <div class="mock-bottom-nav" style="border-radius:0 0 12px 12px;">
+                <div class="mock-nav-item active">
+                  <span class="nav-icon">🎬</span>
+                  <span>생성</span>
+                </div>
+                <div class="mock-nav-item">
+                  <span class="nav-icon">📁</span>
+                  <span>갤러리</span>
+                </div>
+                <div class="mock-nav-item">
+                  <span class="nav-icon">🎮</span>
+                  <span>놀이터</span>
+                </div>
+                <div class="mock-nav-item">
+                  <span class="nav-icon">⚙</span>
+                  <span>설정</span>
+                </div>
+              </div>
+            </div>
+            <div class="mockup-annotation anno-good" style="bottom:8px; right:8px;">
+              하단 네비게이션 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── C-3 ── -->
+    <div class="item-card">
+      <div class="item-header">
+        <span class="item-id">C-3</span>
+        <span class="item-title">하드코딩 색상 → CSS 변수 통합</span>
+        <span class="badge badge-medium">중간</span>
+      </div>
+      <div class="item-meta">
+        <span>📁 <span class="file-tag">theme.css</span> + 모든 컴포넌트</span>
+        <span>⏱ 약 12h</span>
+        <span>라이트/다크 테마 전환 시 불일치 다수 발생</span>
+      </div>
+      <div class="compare-row">
+        <div class="compare-col before">
+          <div class="compare-label before-label"><span class="dot"></span> BEFORE — 하드코딩</div>
+          <div class="mockup-frame mockup-before" style="align-items:stretch;">
+            <div class="mock-code" style="width:100%;">
+              <span class="cm">// SettingsAccordion.tsx:50</span><br>
+              <span class="kw">background</span>: <span class="str">'rgba(30, 40, 70, 0.4)'</span>,<br><br>
+              <span class="cm">// SceneCard.tsx:76</span><br>
+              <span class="kw">background</span>: <span class="str">'rgba(96,165,250,0.15)'</span>,<br>
+              <span class="kw">borderColor</span>: <span class="str">'rgba(96,165,250,0.4)'</span>,<br>
+              <span class="kw">color</span>: <span class="str">'#60a5fa'</span>,<br><br>
+              <span class="cm">// DailyQuestPanel.tsx:74</span><br>
+              <span class="kw">background</span>: <span class="str">'linear-gradient(135deg, #f59e0b, #d97706)'</span>,
+            </div>
+            <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+              <div style="width:30px; height:30px; border-radius:6px; background:rgba(30,40,70,0.4); border:1px solid #475569;" title="rgba(30,40,70,0.4)"></div>
+              <div style="width:30px; height:30px; border-radius:6px; background:rgba(96,165,250,0.15); border:1px solid #475569;" title="rgba(96,165,250,0.15)"></div>
+              <div style="width:30px; height:30px; border-radius:6px; background:#60a5fa; border:1px solid #475569;" title="#60a5fa"></div>
+              <div style="width:30px; height:30px; border-radius:6px; background:#f59e0b; border:1px solid #475569;" title="#f59e0b"></div>
+              <span style="font-size:10px; color:#f87171; align-self:center;">× 50+ 파일에 흩어짐</span>
+            </div>
+            <div class="mockup-annotation anno-bad" style="top:8px; right:8px;">
+              하드코딩 색상 ✕
+            </div>
+          </div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-label after-label"><span class="dot"></span> AFTER — CSS 변수</div>
+          <div class="mockup-frame mockup-after" style="align-items:stretch;">
+            <div class="mock-code" style="width:100%;">
+              <span class="cm">/* theme.css */</span><br>
+              <span class="kw">:root</span> {<br>
+              &nbsp;&nbsp;<span class="fn">--hover-overlay</span>: <span class="str">rgba(0,0,0,0.04)</span>;<br>
+              &nbsp;&nbsp;<span class="fn">--interactive-bg</span>: <span class="str">rgba(96,165,250,0.15)</span>;<br>
+              &nbsp;&nbsp;<span class="fn">--interactive-border</span>: <span class="str">rgba(96,165,250,0.4)</span>;<br>
+              &nbsp;&nbsp;<span class="fn">--accent-primary</span>: <span class="str">#3b82f6</span>;<br>
+              &nbsp;&nbsp;<span class="fn">--accent-warning</span>: <span class="str">#f59e0b</span>;<br>
+              }<br><br>
+              <span class="kw">[data-theme="dark"]</span> {<br>
+              &nbsp;&nbsp;<span class="fn">--hover-overlay</span>: <span class="str">rgba(255,255,255,0.06)</span>;<br>
+              }
+            </div>
+            <div class="mock-code" style="width:100%; margin-top:8px;">
+              <span class="cm">// SettingsAccordion.tsx</span><br>
+              <span class="kw">background</span>: <span class="fn">var</span>(<span class="str">--hover-overlay</span>),
+            </div>
+            <div class="mockup-annotation anno-good" style="top:8px; right:8px;">
+              CSS 변수 — 양 테마 대응 ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-major -->
+
+</section>
+
+<!-- ═══════════════════ PRIORITY MATRIX ═══════════════════ -->
+<section class="container" style="margin-top: 40px;">
+  <div class="section-divider"></div>
+  <h2 style="font-size: 22px; font-weight: 900; margin-bottom: 24px; color: #e2e8f0;">우선순위 매트릭스</h2>
+  <div style="overflow-x: auto;">
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead>
+        <tr style="border-bottom:2px solid #334155;">
+          <th style="text-align:left; padding:10px 14px; color:#94a3b8; font-weight:700;">ID</th>
+          <th style="text-align:left; padding:10px 14px; color:#94a3b8; font-weight:700;">문제</th>
+          <th style="text-align:center; padding:10px 14px; color:#94a3b8; font-weight:700;">영향도</th>
+          <th style="text-align:left; padding:10px 14px; color:#94a3b8; font-weight:700;">수정 대상 파일</th>
+          <th style="text-align:center; padding:10px 14px; color:#94a3b8; font-weight:700;">소요 시간</th>
+          <th style="text-align:center; padding:10px 14px; color:#94a3b8; font-weight:700;">ROI</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-1</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">시작 버튼 비활성 안내 없음</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">HeroInput.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">0.5h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-2</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">토스트 위치 겹침 + 퇴장 없음</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">App.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">1h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-3</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">슬라이더/토글 접근성 라벨 없음</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SoundSettingsGroup.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">1h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-6</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">씬 카드 버튼 28×24px 터치 불가</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SceneCard.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">1h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-4</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">아코디언 호버 다크 하드코딩</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SettingsAccordion.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">0.5h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-5</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">저장 버튼 드롭다운 표시 없음</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SceneToolbar.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">0.5h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-7</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">BGM 재생 버튼 터치 불가</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SoundSettingsGroup.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">0.5h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">A-8</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">자동 줌 라벨 불명확</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-low">낮음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SceneToolbar.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#4ade80;">0.5h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #334155; background:rgba(96,165,250,0.03);">
+          <td colspan="6" style="padding:8px 14px; font-size:12px; font-weight:800; color:#60a5fa;">B. Medium Improvements</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">B-1</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">설정 스크롤 과다 → 버튼 안 보임</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">InputSection.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#fbbf24;">3h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">B-2</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">잠긴 해상도 클릭 무반응</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SceneToolbar.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#fbbf24;">2h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">B-3</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">퀘스트 패널 콘텐츠 겹침</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">DailyQuestPanel.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#fbbf24;">3h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">B-4</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">보상 버튼 소형 + 상시 깜박임</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">DailyQuestPanel.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#fbbf24;">1h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">B-5</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">라이트 모드 대비 부족</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">theme.css</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#fbbf24;">2h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">B-6</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">글자수 카운터 + 예시 버튼 없음</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">HeroInput.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#fbbf24;">2h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">B-7</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">체크박스 터치 타겟 소형</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">SceneCard.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#fbbf24;">1h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #334155; background:rgba(96,165,250,0.03);">
+          <td colspan="6" style="padding:8px 14px; font-size:12px; font-weight:800; color:#60a5fa;">C. Major Redesign</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">C-1</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">설정 분리 (생성 전/후)</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">InputSection.tsx</span> + new</td>
+          <td style="padding:10px 14px; text-align:center; color:#f87171;">8h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b;">
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">C-2</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">모바일 하단 네비게이션</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-high">높음</span></td>
+          <td style="padding:10px 14px;">new <span class="file-tag">MobileNav.tsx</span></td>
+          <td style="padding:10px 14px; text-align:center; color:#f87171;">8h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐⭐</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 14px; font-weight:700; color:#60a5fa;">C-3</td>
+          <td style="padding:10px 14px; color:#e2e8f0;">하드코딩 색상 → CSS 변수</td>
+          <td style="padding:10px 14px; text-align:center;"><span class="badge badge-medium">중간</span></td>
+          <td style="padding:10px 14px;"><span class="file-tag">theme.css</span> + all</td>
+          <td style="padding:10px 14px; text-align:center; color:#f87171;">12h</td>
+          <td style="padding:10px 14px; text-align:center; font-size:16px;">⭐⭐</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════ RECOMMENDED ORDER ═══════════════════ -->
+<section class="container" style="margin-top: 40px; margin-bottom: 60px;">
+  <div class="section-divider"></div>
+  <h2 style="font-size: 22px; font-weight: 900; margin-bottom: 24px; color: #e2e8f0;">권장 구현 순서</h2>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+    <div class="stat-card" style="text-align:left; border-color:rgba(74,222,128,0.3);">
+      <div style="font-size:13px; font-weight:800; color:#4ade80; margin-bottom:10px;">Phase 1 — 즉시 (1일, ~5.5h)</div>
+      <div style="font-size:12px; color:#94a3b8; line-height:1.8;">
+        A-1 시작 버튼 힌트<br>
+        A-3 접근성 라벨<br>
+        A-4 아코디언 호버<br>
+        A-5 저장 드롭다운<br>
+        A-6 씬 버튼 크기<br>
+        A-7 BGM 재생 버튼<br>
+        A-8 자동 줌 라벨
+      </div>
+    </div>
+    <div class="stat-card" style="text-align:left; border-color:rgba(251,191,36,0.3);">
+      <div style="font-size:13px; font-weight:800; color:#fbbf24; margin-bottom:10px;">Phase 2 — 이번 주 (3일, ~14h)</div>
+      <div style="font-size:12px; color:#94a3b8; line-height:1.8;">
+        A-2 토스트 위치/애니메이션<br>
+        B-1 설정 접힘 기본값<br>
+        B-2 해상도 라디오 타일<br>
+        B-4 보상 버튼 개선<br>
+        B-5 라이트 모드 대비<br>
+        B-6 글자수 카운터<br>
+        B-7 체크박스 터치 타겟
+      </div>
+    </div>
+    <div class="stat-card" style="text-align:left; border-color:rgba(96,165,250,0.3);">
+      <div style="font-size:13px; font-weight:800; color:#60a5fa; margin-bottom:10px;">Phase 3 — 다음 스프린트 (~31h)</div>
+      <div style="font-size:12px; color:#94a3b8; line-height:1.8;">
+        B-3 퀘스트 패널 리팩토링<br>
+        C-1 설정 분리 (전/후)<br>
+        C-2 모바일 하단 네비게이션<br>
+        C-3 CSS 변수 통합
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<footer class="report-footer">
+  <div class="container">
+    C2 GEN UI Audit Report &middot; Generated 2026-03-25 &middot; 18 items &middot; TubeGen AI V9.2
+  </div>
+</footer>
+
+<!-- ═══════════════════ TAB SCRIPT ═══════════════════ -->
+<script>
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
