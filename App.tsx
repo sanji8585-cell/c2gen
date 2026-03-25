@@ -8,6 +8,7 @@ import InputSection from './components/InputSection';
 import ResultCards from './components/ResultCards';
 import ScriptReviewBanner from './components/ScriptReviewBanner';
 import GameUI from './components/GameUI';
+import MobileNav from './components/MobileNav';
 import { GeneratedAsset, GenerationStep, ScriptScene, CostBreakdown, ReferenceImages, DEFAULT_REFERENCE_IMAGES, SubtitleConfig, SceneDirectives } from './types';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useCostTracker } from './hooks/useCostTracker';
@@ -1854,6 +1855,9 @@ const AppContent: React.FC<{
         showLeaderboard={showLeaderboard} setShowLeaderboard={setShowLeaderboard}
         setConsumablePopup={setConsumablePopup} fetchCredits={fetchCredits}
       />
+
+      {/* 모바일 하단 네비게이션 */}
+      <MobileNav activeView={viewMode} onChangeView={setViewMode} />
     </div>
   );
 };

@@ -67,9 +67,9 @@ const COMPOSITION_BADGE: Record<string, { bg: string; border: string; color: str
 };
 
 const btnActiveStyle = {
-  background: 'rgba(96,165,250,0.15)',
-  borderColor: 'rgba(96,165,250,0.4)',
-  color: '#60a5fa',
+  background: 'var(--accent-blue-bg, rgba(96,165,250,0.15))',
+  borderColor: 'var(--accent-blue-border, rgba(96,165,250,0.4))',
+  color: 'var(--accent-blue-text, #60a5fa)',
 };
 
 const btnBaseStyle = {
