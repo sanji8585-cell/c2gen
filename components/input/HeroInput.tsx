@@ -173,6 +173,24 @@ const HeroInput: React.FC<HeroInputProps> = ({
               transition: opacity 400ms ease;
             }
           `}</style>
+          {/* 글자수 카운터 + 예시 사용 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, minHeight: 18 }}>
+            {topic.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => onTopicChange(PLACEHOLDER_EXAMPLES[placeholderIndex])}
+                style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, opacity: 0.7 }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.7')}
+              >
+                💡 이 주제로 시작하기
+              </button>
+            ) : (
+              <span style={{ fontSize: 11, color: topic.length > 100 ? '#f59e0b' : 'var(--text-muted)' }}>
+                {topic.length}/200
+              </span>
+            )}
+          </div>
         </div>
         )}
 

@@ -340,7 +340,7 @@ const SceneCard: React.FC<SceneCardProps> = memo(({
         <div className="flex items-center gap-3">
           <button
             onClick={(e) => { e.stopPropagation(); onToggleSelect?.(index); }}
-            className="w-5 h-5 rounded border-2 flex items-center justify-center transition-all text-[10px] font-bold shrink-0"
+            className="w-6 h-6 rounded border-2 flex items-center justify-center transition-all text-[11px] font-bold shrink-0 p-[10px] -m-[10px]"
             style={{
               borderColor: isSelected ? '#3b82f6' : 'var(--border-default)',
               backgroundColor: isSelected ? '#3b82f6' : 'transparent',
