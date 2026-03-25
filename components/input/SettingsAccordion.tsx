@@ -47,7 +47,7 @@ const SettingsAccordion: React.FC<SettingsAccordionProps> = ({
           gap: 14,
           padding: '18px 22px',
           cursor: 'pointer',
-          background: isHovered ? 'rgba(30, 40, 70, 0.4)' : 'transparent',
+          background: isHovered ? 'var(--bg-hover, rgba(0,0,0,0.04))' : 'transparent',
           transition: 'background 0.2s ease',
           userSelect: 'none',
         }}

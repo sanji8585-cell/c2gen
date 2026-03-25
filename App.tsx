@@ -1833,8 +1833,8 @@ const AppContent: React.FC<{
       )}
 
       {toastMessage && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] animate-toast-in">
-          <div className="px-6 py-3 rounded-2xl shadow-2xl border text-sm font-bold animate-bounce-in" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}>
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] animate-toast-in pointer-events-none">
+          <div className="px-6 py-3 rounded-2xl shadow-2xl border text-sm font-bold" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}>
             {toastMessage}
           </div>
         </div>

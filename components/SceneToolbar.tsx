@@ -289,7 +289,7 @@ const SceneToolbar: React.FC<SceneToolbarProps> = ({
               </div>
               {/* 컷 신 전체 반영 */}
               <div>
-                <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--text-muted)' }}>컷 신 전체 반영</label>
+                <label className="text-xs font-semibold mb-2 block" style={{ color: 'var(--text-muted)' }}>전체 씬 줌/컷 효과</label>
                 <select onChange={(e) => { onAutoZoom?.(e.target.value || 'alternating'); onAutoZoomPatternChange(e.target.value); }} value={autoZoomPattern}
                   className="w-full h-11 px-3 rounded-lg text-sm border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
                   <option value="">{t('result.autoZoom')}</option>

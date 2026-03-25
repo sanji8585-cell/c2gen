@@ -247,6 +247,11 @@ const HeroInput: React.FC<HeroInputProps> = ({
           >
             {buttonText}
           </button>
+          {!canSubmit && !isDisabled && (
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>
+              {activeTab === 'auto' ? '주제를 입력하면 활성화됩니다' : '대본을 입력하면 활성화됩니다'}
+            </p>
+          )}
         </div>
 
         {/* Manual textarea (수동 모드) */}

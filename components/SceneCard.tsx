@@ -73,8 +73,8 @@ const btnActiveStyle = {
 };
 
 const btnBaseStyle = {
-  width: 28,
-  height: 24,
+  width: 32,
+  height: 30,
   borderRadius: 6,
   border: '1px solid var(--border-subtle)',
   background: 'var(--bg-elevated)',

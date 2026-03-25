@@ -250,7 +250,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
                 setSelectedLibraryTrackId(null);
                 onBgmDataChange(null);
               }
-            }} disabled={isDisabled} style={toggleBtn(autoBgm)}>
+            }} disabled={isDisabled} style={toggleBtn(autoBgm)} role="switch" aria-checked={autoBgm} aria-label="자동 AI BGM">
               <div style={toggleThumb(autoBgm)} />
             </button>
           </div>
@@ -382,11 +382,13 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
                 type="button"
                 onClick={previewUploadedBgm}
                 style={{
-                  fontSize: 10,
-                  padding: '2px 6px',
+                  fontSize: 13,
+                  padding: '6px 10px',
+                  minWidth: 32,
+                  minHeight: 32,
                   background: previewTrackId === '__uploaded__' ? 'rgba(96,165,250,0.2)' : 'var(--bg-hover)',
                   border: 'none',
-                  borderRadius: 4,
+                  borderRadius: 6,
                   cursor: 'pointer',
                   color: previewTrackId === '__uploaded__' ? '#60a5fa' : 'var(--text-secondary)',
                   flexShrink: 0,
@@ -408,12 +410,14 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
                 type="button"
                 onClick={handleRemoveBgm}
                 style={{
-                  padding: '2px 6px',
-                  fontSize: 11,
+                  padding: '6px 8px',
+                  minWidth: 28,
+                  minHeight: 28,
+                  fontSize: 12,
                   color: '#f87171',
                   background: 'rgba(239,68,68,0.15)',
                   border: 'none',
-                  borderRadius: 4,
+                  borderRadius: 6,
                   cursor: 'pointer',
                   flexShrink: 0,
                 }}
@@ -442,6 +446,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
               onChange={(e) => onBgmVolumeChange(Number(e.target.value) / 100)}
               disabled={isDisabled}
               style={sliderTrack}
+              aria-label="BGM 볼륨"
             />
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', minWidth: 32, textAlign: 'right' }}>
               {Math.round(bgmVolume * 100)}%
@@ -458,7 +463,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
                 나레이션 구간 BGM 자동 감소
               </span>
             </div>
-            <button type="button" onClick={() => onBgmDuckingToggle(!bgmDuckingEnabled)} disabled={isDisabled} style={toggleBtn(bgmDuckingEnabled)}>
+            <button type="button" onClick={() => onBgmDuckingToggle(!bgmDuckingEnabled)} disabled={isDisabled} style={toggleBtn(bgmDuckingEnabled)} role="switch" aria-checked={bgmDuckingEnabled} aria-label="오토 덕킹">
               <div style={toggleThumb(bgmDuckingEnabled)} />
             </button>
           </div>
@@ -477,6 +482,7 @@ const SoundSettingsGroup: React.FC<SoundSettingsGroupProps> = ({
                 onChange={(e) => onBgmDuckingAmountChange(Number(e.target.value) / 100)}
                 disabled={isDisabled}
                 style={sliderTrack}
+                aria-label="덕킹 감소량"
               />
               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', minWidth: 32, textAlign: 'right' }}>
                 {Math.round(bgmDuckingAmount * 100)}%
