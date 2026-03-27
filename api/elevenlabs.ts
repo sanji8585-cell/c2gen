@@ -172,6 +172,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const data = await response.json();
 
+        // ElevenLabs 응답 검증 — audio_base64가 없으면 에러 반환
+        if (!data.audio_base64) {
+          const debugInfo = {
+            hasAlignment: !!data.alignment,
+            responseKeys: Object.keys(data),
+            textLength: charCount,
+            textPreview: text?.slice(0, 100),
+            voiceId,
+            modelId,
+            apiKeyPrefix: apiKey.slice(0, 8) + '...',
+          };
+          console.error('[api/elevenlabs] TTS 응답에 audio_base64 없음:', JSON.stringify(debugInfo));
+          await logError('generateAudio', `audio_base64 missing in ElevenLabs response`, {
+            severity: 'error',
+            context: debugInfo,
+          });
+          return res.status(502).json({
+            error: 'ElevenLabs가 오디오 데이터를 반환하지 않았습니다',
+            debug: debugInfo,
+          });
+        }
+
         const ttsCost = charCount * 0.00003;
         logUsage(req, 'tts', ttsCost);
         return res.json({ ...data, creditBalance: creditResult.balance });

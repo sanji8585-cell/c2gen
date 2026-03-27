@@ -160,6 +160,17 @@ export const generateAudioWithElevenLabs = async (
       if (response.status === 429) {
         throw new Error('429 Rate limit — 잠시 후 재시도');
       }
+      if (response.status === 502) {
+        try {
+          const errJson = JSON.parse(errorDetail);
+          const debug = errJson.debug;
+          console.error('[TTS] 서버 502 디버그:', debug);
+          throw new Error(`ElevenLabs 오디오 미반환 (voice=${debug?.voiceId}, text=${debug?.textPreview})`);
+        } catch (e) {
+          if (e instanceof Error && e.message.includes('오디오')) throw e;
+          throw new Error('ElevenLabs 오디오 데이터 미반환');
+        }
+      }
       throw new Error(`TTS API 오류 (${response.status})`);
     }
 
