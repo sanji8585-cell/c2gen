@@ -3,13 +3,17 @@ import { createClient } from '@supabase/supabase-js';
 
 // ── API 키 라운드 로빈 ──
 
+let _elKeyIdx = 0;
 function pickElevenLabsKey(): string | undefined {
   const keys = [
     process.env.ELEVENLABS_API_KEY,
     process.env.ELEVENLABS_API_KEY_2,
-  ].filter(Boolean) as string[];
+  ].filter((k): k is string => !!k && k.length >= 10);
   if (keys.length === 0) return undefined;
-  return keys[Math.floor(Math.random() * keys.length)];
+  // 라운드 로빈 (랜덤 대신 순차 — 유효하지 않은 키 혼입 시 안정성 향상)
+  const key = keys[_elKeyIdx % keys.length];
+  _elKeyIdx++;
+  return key;
 }
 
 // ── 사용량 로깅 ──
@@ -127,6 +131,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { text, modelId = 'eleven_multilingual_v2', speed = 1.0, stability = 0.6 } = params;
 
+        // 크레딧 차감을 API 호출 전에 수행 (실패 시 불필요한 API 호출 방지)
+        const charCount = text?.length || 0;
+        const ttsCredits = Math.max(1, Math.ceil(charCount / 1000) * 15);
+        const creditResult = await checkAndDeductCredits(req, ttsCredits, `TTS 생성 (${charCount}자)`);
+        if (!creditResult.ok) {
+          return res.status(402).json({
+            error: 'insufficient_credits',
+            message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: ${ttsCredits})`,
+            balance: creditResult.balance,
+          });
+        }
+
         const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`;
         const response = await fetch(url, {
           method: 'POST',
@@ -155,18 +171,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const data = await response.json();
-
-        // 크레딧 차감 (TTS: 1000자당 15크레딧)
-        const charCount = text?.length || 0;
-        const ttsCredits = Math.max(1, Math.ceil(charCount / 1000) * 15);
-        const creditResult = await checkAndDeductCredits(req, ttsCredits, `TTS 생성 (${charCount}자)`);
-        if (!creditResult.ok) {
-          return res.status(402).json({
-            error: 'insufficient_credits',
-            message: `크레딧이 부족합니다. (현재: ${creditResult.balance ?? 0}, 필요: ${ttsCredits})`,
-            balance: creditResult.balance,
-          });
-        }
 
         const ttsCost = charCount * 0.00003;
         logUsage(req, 'tts', ttsCost);

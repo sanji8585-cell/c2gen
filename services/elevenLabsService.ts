@@ -146,14 +146,27 @@ export const generateAudioWithElevenLabs = async (
 
     if (!response.ok) {
       const errorDetail = await response.text();
-      console.error("ElevenLabs API Error:", errorDetail);
-      return { audioData: null, subtitleData: null, estimatedDuration: null };
+      console.error("ElevenLabs API Error:", response.status, errorDetail);
+      // 구체적 에러 메시지를 throw하여 호출부에서 원인 파악 가능하도록
+      if (response.status === 402) {
+        try {
+          const errJson = JSON.parse(errorDetail);
+          throw new Error(errJson.message || '크레딧이 부족합니다');
+        } catch (e) {
+          if (e instanceof Error && e.message.includes('크레딧')) throw e;
+          throw new Error('크레딧이 부족합니다');
+        }
+      }
+      if (response.status === 429) {
+        throw new Error('429 Rate limit — 잠시 후 재시도');
+      }
+      throw new Error(`TTS API 오류 (${response.status})`);
     }
 
     const jsonResponse = await response.json();
     if (jsonResponse.error) {
       console.warn("ElevenLabs:", jsonResponse.error);
-      return { audioData: null, subtitleData: null, estimatedDuration: null };
+      throw new Error(jsonResponse.error);
     }
 
     const audioBase64 = jsonResponse.audio_base64;

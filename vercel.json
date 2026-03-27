@@ -4,7 +4,8 @@
   "outputDirectory": "dist",
   "devCommand": "vite --port $PORT",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/:path*" }
+    { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [
     { "path": "/api/scheduler-trigger", "schedule": "0 * * * *" },

@@ -1345,10 +1345,13 @@ const AppContent: React.FC<{
         const chars = assetsRef.current[idx].narration.length;
         addCost('tts', chars * PRICING.TTS.perCharacter, chars);
         setProgressMessage(`씬 ${idx + 1} 음성 재생성 완료!`);
+      } else if (!isAbortedRef.current) {
+        updateAssetAt(idx, { status: 'error', errorMessage: 'TTS 응답 없음 — 크레딧 또는 API 키를 확인하세요' });
+        setProgressMessage(`씬 ${idx + 1} 음성 재생성 실패: 응답 없음`);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      updateAssetAt(idx, { status: 'error' });
+      updateAssetAt(idx, { status: 'error', errorMessage: msg });
       setProgressMessage(`씬 ${idx + 1} 음성 재생성 실패: ${msg}`);
     }
   }, []);
