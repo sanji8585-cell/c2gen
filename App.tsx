@@ -616,6 +616,45 @@ const AppContent: React.FC<{
     console.log('[Advanced] 디렉티브 저장 완료. sceneDirectivesRef:', dirMap);
   }, [handleGenerate]);
 
+  // ── 심층대본 나레이션 정제 함수 (마크다운/메타텍스트/씬 라벨 완전 제거) ──
+  const cleanDeepScriptNarration = (text: string): string => {
+    return text
+      // 1. 마크다운 헤딩 줄 전체 제거 (## 2026 자동차 최종 대본, ### 최종 대본 등)
+      .replace(/^#{1,6}\s+.*$/gm, '')
+      // 2. 구분선 제거
+      .replace(/^---+$/gm, '')
+      // 3. **씬 N** (나레이션) 또는 **(씬 N)** 패턴 (볼드 씬 라벨 + 나레이션 라벨)
+      .replace(/\*\*\(?씬\s*\d+\)?\*\*\s*(?:\((?:나레이션|내레이션|Narration)\)\s*)?/gi, '')
+      // 4. **S#N**, **#N** 등 영어 씬 번호
+      .replace(/\*\*S?#?\d+\*\*/g, '')
+      // 5. **최종 대본**, **내레이션:**, **나레이션** 등 볼드 라벨
+      .replace(/\*\*(?:내레이션|나레이션|Narration|최종\s*대본)[:\s]?\*\*/gi, '')
+      // 6. 남은 ** 볼드 마크다운 → 내부 텍스트만 유지
+      .replace(/\*\*([^*]*)\*\*/g, '$1')
+      // 7. *이탤릭* 마크다운 → 내부 텍스트만 유지
+      .replace(/\*([^*]+)\*/g, '$1')
+      // 8. (씬 N) 볼드 없는 버전
+      .replace(/^["\s]*\(씬\s*\d+\)\s*/gm, '')
+      // 9. 씬 1: 또는 씬 1. (한국어 씬 번호 라벨)
+      .replace(/^씬\s*\d+[.:]\s*/gm, '')
+      // 10. Scene 1: (영어 씬 번호 라벨)
+      .replace(/^Scene\s*\d+[.:]\s*/gim, '')
+      // 11. (나레이션), (내레이션), (Narration) 독립 라벨
+      .replace(/\((?:나레이션|내레이션|Narration)\)\s*/gi, '')
+      // 12. 남은 디렉티브 괄호 (배경, 분위기, 구도, 카메라 등)
+      .replace(/\((?:배경|분위기|구도|카메라|색상|텍스트|자막|스타일|화자|이전씬유지|같은장소|시간경과|색조|앵글)[^)]*\)/g, '')
+      // 13. 끝에 붙은 ") 패턴
+      .replace(/"\)\s*$/gm, '')
+      // 14. 줄 시작/끝의 홀따옴표
+      .replace(/^\s*"\s*/gm, '')
+      .replace(/\s*"\s*$/gm, '')
+      // 15. 여러 줄바꿈 → 공백
+      .replace(/\n{2,}/g, ' ')
+      // 16. 다중 공백 정리
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  };
+
   // ── 심층대본 → 스토리보드 직접 연결 (Gemini 재생성 없이 씬 분할만) ──
   const handleDeepScriptToStoryboard = useCallback((script: string, styleId: string, analysisData?: any) => {
     if (isProcessingRef.current) return;
@@ -633,12 +672,8 @@ const AppContent: React.FC<{
       }
     }
 
-    // 대본 전처리: 메타 텍스트/마크다운 헤딩 제거 후 씬 분할
-    const preprocessed = script
-      .replace(/^#{1,4}\s+.*$/gm, '')               // ### 최종 대본 등 마크다운 헤딩 줄 제거
-      .replace(/^---+$/gm, '')                       // --- 구분선 제거
-      .replace(/^\*\*최종\s*대본\*\*.*$/gm, '')       // **최종 대본** 라벨 줄 제거
-      .trim();
+    // 대본 전처리: 마크다운/메타텍스트/씬 라벨을 공격적으로 제거 후 씬 분할
+    const preprocessed = cleanDeepScriptNarration(script);
 
     const scenes = preprocessed
       .split(/\n\s*\n/)
@@ -657,21 +692,8 @@ const AppContent: React.FC<{
     // 각 씬을 ScriptScene 형태로 변환 (디렉티브 파싱 + 마크다운/잔여 괄호 정제)
     const scriptScenes: ScriptScene[] = scenes.map((sceneText, i) => {
       const { cleanNarration: parsed, directives } = parseDirectives(sceneText);
-      // 추가 정제: 마크다운(**bold**, ##), 씬 번호(**S#1**), 남은 디렉티브 괄호 제거
-      const cleanNarration = parsed
-        .replace(/^#{1,4}\s+.*$/gm, '')             // ### 최종 대본, ## 제목 등 마크다운 헤딩 (줄 전체 제거)
-        .replace(/\*\*\(?씬\s*\d+\)?\*\*/g, '')     // **(씬 1)**, **(씬 2)** 패턴
-        .replace(/\*\*S?#?\d+\*\*/g, '')            // **S#18**, **#1** 등 씬 번호
-        .replace(/\*\*(내레이션|나레이션|Narration|최종\s*대본)[:\s]?\*\*/gi, '') // **내레이션:**, **최종 대본** 라벨
-        .replace(/\*\*/g, '')                        // 남은 ** 마크다운 볼드
-        .replace(/\((?:배경|분위기|구도|카메라|색상|텍스트|자막|스타일|화자|이전씬유지|같은장소|시간경과|색조|앵글)[^)]*\)/g, '') // 남은 디렉티브 괄호
-        .replace(/^["\s]*\(씬\s*\d+\)\s*/gm, '')    // (씬 1) (볼드 없는 버전)
-        .replace(/^씬\s*\d+[.:]\s*/gm, '')           // 씬 1: 또는 씬 1.
-        .replace(/"\)\s*$/g, '')                     // 끝에 붙은 ")
-        .replace(/^\s*"\s*/gm, '')                   // 줄 시작의 홀따옴표
-        .replace(/\n{2,}/g, ' ')                     // 여러 줄바꿈 → 공백
-        .replace(/\s{2,}/g, ' ')                     // 다중 공백 정리
-        .trim();
+      // cleanDeepScriptNarration으로 마크다운/메타텍스트/씬 라벨 완전 제거
+      const cleanNarration = cleanDeepScriptNarration(parsed);
       const sentiment = directives.MOOD === '밝음' || directives.MOOD === '따뜻함' ? 'POSITIVE' as const
         : directives.MOOD === '어두움' || directives.MOOD === '긴장' ? 'NEGATIVE' as const
         : 'NEUTRAL' as const;

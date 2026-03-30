@@ -499,7 +499,7 @@ export const DIRECTIVE_KEY_MAP: Record<string, string> = {
   '텍스트': 'TEXT', '자막': 'TEXT',
   '카메라': 'CAMERA', '앵글': 'CAMERA',
   '색상': 'COLOR', '색깔': 'COLOR', '색조': 'COLOR',
-  '화자': 'SPEAKER', '나레이터': 'SPEAKER',
+  '화자': 'SPEAKER', '나레이터': 'SPEAKER', '나레이션': 'SPEAKER',
   '이전씬유지': 'KEEP_PREV', '같은장소': 'SAME_PLACE', '시간경과': 'TIME_PASS',
   // English
   'composition': 'COMPOSITION', 'shot': 'COMPOSITION',
