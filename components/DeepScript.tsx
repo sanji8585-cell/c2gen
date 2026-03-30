@@ -453,7 +453,7 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
             type="text"
             value={channelUrl}
             onChange={e => { setChannelUrl(e.target.value); if (channelStyle) { setChannelStyle(null); setChannelError(''); } }}
-            placeholder="https://youtube.com/@채널명"
+            placeholder="@슈카월드 또는 채널 URL"
             disabled={isAnalyzingChannel}
             className="flex-1 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-500/40"
             style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}

@@ -11,10 +11,13 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; cha
   if (channelIdMatch) return { channelId: channelIdMatch[1], channelName: channelIdMatch[1] };
 
   // 2. @handle 추출 (한글/유니코드 지원)
+  // 지원 형식: @슈카월드, 슈카월드, https://youtube.com/@슈카월드, youtube.com/@슈카월드
   const handleMatch = url.match(/@([^\s/]+)/);
-  const handle = handleMatch?.[1]
+  let handle = handleMatch?.[1]
     || url.replace(/^https?:\/\/(www\.)?youtube\.com\/?/, '').replace(/^@/, '').split('/')[0].split('?')[0];
 
+  // 공백/특수문자 정리
+  handle = handle.trim().replace(/^@/, '');
   if (!handle) return null;
 
   // 방법 A: YouTube 페이지 fetch (다양한 User-Agent 시도)
