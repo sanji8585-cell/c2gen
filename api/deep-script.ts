@@ -2,6 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
+// Vercel Fluid Compute — 스트리밍 응답 활성화
+export const config = { supportsResponseStreaming: true };
+
 // ── 유틸리티 ──
 
 function pickGeminiKey(): string | undefined {
