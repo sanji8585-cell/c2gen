@@ -44,6 +44,32 @@ function sendDone(res: VercelResponse) {
   res.end();
 }
 
+// ── Gemini 재시도 래퍼 (503/429 대응) ──
+
+async function geminiWithRetry(
+  ai: InstanceType<typeof GoogleGenAI>,
+  params: { model: string; contents: string; config: any },
+  maxRetries = 2,
+): Promise<string> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await ai.models.generateContent(params);
+      return response.text ?? '';
+    } catch (err: any) {
+      const msg = err.message || '';
+      const is503 = msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
+      const is429 = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+      if ((is503 || is429) && attempt < maxRetries) {
+        const delay = (attempt + 1) * 5000; // 5초, 10초
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Gemini 최대 재시도 횟수 초과');
+}
+
 // ── 스타일별 역할 설정 ──
 
 const STYLE_ROLES: Record<string, { role: string; arc: string; structure: string }> = {
@@ -224,12 +250,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const deepPrompt = buildDeepPrompt(topic, langName, lengthGuide, styleConfig);
-    const draftResponse = await ai.models.generateContent({
+    const draft = await geminiWithRetry(ai, {
       model: 'gemini-2.5-pro',
       contents: deepPrompt,
       config: { thinkingConfig: { thinkingBudget: 32768 }, maxOutputTokens: 65536 },
     });
-    const draft = draftResponse.text ?? '';
     const draftPreview = draft.split('\n').filter(l => l.trim()).slice(0, 3).join(' ').slice(0, 150);
 
     sendEvent(res, {
@@ -253,12 +278,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const auditPrompt = buildAuditPrompt(draft);
-    const auditResponse = await ai.models.generateContent({
+    const audit = await geminiWithRetry(ai, {
       model: 'gemini-2.5-pro',
       contents: auditPrompt,
       config: { thinkingConfig: { thinkingBudget: 16384 }, maxOutputTokens: 4096 },
     });
-    const audit = auditResponse.text ?? '';
 
     // 개선점 수 파싱
     const improvementCount = (audit.match(/\[개선\]/g) || []).length;
@@ -279,12 +303,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const refinePrompt = buildRefinePrompt(topic, langName, lengthGuide, styleConfig.role, draft, audit);
-    const finalResponse = await ai.models.generateContent({
+    const finalScript = await geminiWithRetry(ai, {
       model: 'gemini-2.5-pro',
       contents: refinePrompt,
       config: { thinkingConfig: { thinkingBudget: 24576 }, maxOutputTokens: 65536 },
     });
-    const finalScript = finalResponse.text ?? '';
 
     sendEvent(res, {
       step: 3, total: 3, status: 'complete',
@@ -295,8 +318,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     logUsage(req, 'deep_script_refined');
     sendDone(res);
   } catch (error: any) {
-    console.error('[api/deep-script] Error:', error.message);
-    sendEvent(res, { error: error.message || 'Internal server error' });
+    const msg = error.message || 'Internal server error';
+    console.error('[api/deep-script] Error:', msg);
+    // 사용자 친화적 에러 메시지
+    const userMsg = msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')
+      ? 'Gemini Pro 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요.'
+      : msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')
+      ? 'API 요청 한도에 도달했습니다. 1~2분 후 다시 시도해주세요.'
+      : msg;
+    sendEvent(res, { error: userMsg });
     sendDone(res);
   }
 }
