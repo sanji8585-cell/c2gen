@@ -17,6 +17,7 @@
     "api/gemini.ts": { "maxDuration": 120 },
     "api/deep-script.ts": { "maxDuration": 180 },
     "api/deep-script-save.ts": { "maxDuration": 30 },
+    "api/channel-analyze.ts": { "maxDuration": 60 },
     "api/elevenlabs.ts": { "maxDuration": 60 },
     "api/fal.ts": { "maxDuration": 120 },
     "api/fal-poll.ts": { "maxDuration": 30 },
@@ -38,6 +39,9 @@
     "api/tiktok-auth.ts": { "maxDuration": 30 },
     "api/tiktok-upload.ts": { "maxDuration": 120 },
     "api/analytics.ts": { "maxDuration": 60 },
-    "api/pilot/save-content.ts": { "maxDuration": 120 }
+    "api/pilot/save-content.ts": { "maxDuration": 120 },
+    "api/toss-script.ts": { "maxDuration": 120 },
+    "api/toss-auth.ts": { "maxDuration": 30 },
+    "api/toss-user.ts": { "maxDuration": 30 }
   }
 }

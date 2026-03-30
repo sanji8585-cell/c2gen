@@ -164,6 +164,15 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
   const [savedList, setSavedList] = useState<Array<{ id: string; topic: string; style: string; duration_sec: number; mode: string; scene_count: number; char_count: number; created_at: string }>>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [channelUrl, setChannelUrl] = useState('');
+  const [channelStyle, setChannelStyle] = useState<{
+    channelName: string; tone: string; hookPattern: string;
+    sentenceStyle: string; structure: string; characteristics: string[];
+    samplePrompt: string;
+  } | null>(null);
+  const [isAnalyzingChannel, setIsAnalyzingChannel] = useState(false);
+  const [channelError, setChannelError] = useState('');
+  const [analyzedCount, setAnalyzedCount] = useState(0);
   const resultRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -174,6 +183,27 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
     if (token) h['x-session-token'] = token;
     return h;
   }, []);
+
+  const handleAnalyzeChannel = useCallback(async () => {
+    if (!channelUrl.trim() || isAnalyzingChannel) return;
+    setIsAnalyzingChannel(true);
+    setChannelError('');
+    setChannelStyle(null);
+    try {
+      const res = await fetch('/api/channel-analyze', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ channelUrl: channelUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setChannelStyle(data.style);
+      setAnalyzedCount(data.analyzedCount || 0);
+    } catch (err: any) {
+      setChannelError(err.message || '채널 분석 실패');
+    } finally {
+      setIsAnalyzingChannel(false);
+    }
+  }, [channelUrl, isAnalyzingChannel, apiHeaders]);
 
   const handleSave = useCallback(async () => {
     if (!result || saveStatus === 'saving') return;
@@ -265,7 +295,7 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
       const response = await fetch('/api/deep-script', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ topic: topic.trim(), language, style, length: String(durationSec), mode }),
+        body: JSON.stringify({ topic: topic.trim(), language, style, length: String(durationSec), mode, channelStylePrompt: channelStyle?.samplePrompt || '' }),
         signal: abortRef.current.signal,
       });
 
@@ -412,6 +442,73 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
           )}
         </div>
       )}
+
+      {/* 참조 채널 (선택사항) */}
+      <div className="rounded-xl border p-4 mb-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+        <label className="block text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
+          🔗 참조 채널 <span className="font-normal">(선택사항 — 유튜브 채널의 대본 스타일을 분석합니다)</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={channelUrl}
+            onChange={e => { setChannelUrl(e.target.value); if (channelStyle) { setChannelStyle(null); setChannelError(''); } }}
+            placeholder="https://youtube.com/@채널명"
+            disabled={isAnalyzingChannel}
+            className="flex-1 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+            style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+          />
+          <button
+            onClick={handleAnalyzeChannel}
+            disabled={!channelUrl.trim() || isAnalyzingChannel}
+            className="px-4 py-2 rounded-lg text-[12px] font-bold transition-all disabled:opacity-40"
+            style={{ backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}
+          >
+            {isAnalyzingChannel ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round" /></svg>
+                분석 중...
+              </span>
+            ) : '분석'}
+          </button>
+        </div>
+
+        {channelError && (
+          <p className="text-[11px] mt-2" style={{ color: '#ef4444' }}>{channelError}</p>
+        )}
+
+        {channelStyle && (
+          <div className="mt-3 rounded-lg px-4 py-3" style={{ backgroundColor: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[12px] font-bold" style={{ color: '#10b981' }}>
+                ✅ "@{channelStyle.channelName}" 스타일 감지 ({analyzedCount}개 영상 분석)
+              </span>
+              <button
+                onClick={() => { setChannelStyle(null); setChannelUrl(''); }}
+                className="text-[10px] px-2 py-0.5 rounded"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                삭제
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              <p><strong style={{ color: 'var(--text-primary)' }}>톤:</strong> {channelStyle.tone}</p>
+              <p><strong style={{ color: 'var(--text-primary)' }}>훅:</strong> {channelStyle.hookPattern}</p>
+              <p><strong style={{ color: 'var(--text-primary)' }}>문장:</strong> {channelStyle.sentenceStyle}</p>
+              <p><strong style={{ color: 'var(--text-primary)' }}>구조:</strong> {channelStyle.structure}</p>
+            </div>
+            {channelStyle.characteristics.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {channelStyle.characteristics.map((c, i) => (
+                  <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 입력 영역 */}
       <div className="rounded-xl border p-5 mb-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>

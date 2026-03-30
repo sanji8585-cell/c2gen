@@ -88,7 +88,7 @@ const STYLE_ROLES: Record<string, { role: string; arc: string; structure: string
 
 // ── 프롬프트 빌더 ──
 
-function buildDeepPrompt(topic: string, langName: string, lengthGuide: string, styleConfig: { role: string; arc: string; structure: string }) {
+function buildDeepPrompt(topic: string, langName: string, lengthGuide: string, styleConfig: { role: string; arc: string; structure: string }, channelStylePrompt = '') {
   const emotionArcGuide = styleConfig.arc !== 'auto'
     ? `\n## 감정 곡선 설계 (${styleConfig.structure})\n씬 전체에 걸쳐 다음 감정 흐름을 따르세요. 3파도 이상의 긴장-이완 리듬을 만드세요.\n단조로운 감정이 3씬 이상 연속되지 않도록 변화를 주세요.`
     : `\n## 감정 곡선 설계\nAI가 주제에 맞는 최적의 감정 흐름을 자동 설계하세요. 3파도 이상의 긴장-이완 리듬을 만드세요.`;
@@ -141,7 +141,7 @@ ${emotionArcGuide}
 
 ## 주제
 ${topic}
-
+${channelStylePrompt ? `\n## 참조 채널 스타일 (이 채널의 대본 패턴을 모방하되, 완전 복사가 아닌 톤/구조만 참고)\n${channelStylePrompt}` : ''}
 완성된 대본만 출력하세요.`;
 }
 
@@ -284,7 +284,7 @@ JSON만 출력하세요. 설명 없이.`;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { topic, language = 'ko', style = 'auto', length = '180', mode = 'deep' } = req.body;
+  const { topic, language = 'ko', style = 'auto', length = '180', mode = 'deep', channelStylePrompt = '' } = req.body;
   if (!topic) return res.status(400).json({ error: 'topic required' });
 
   // API 키
@@ -329,7 +329,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       detail: '주제를 깊이 분석하고 대본 초안을 작성합니다',
     });
 
-    const deepPrompt = buildDeepPrompt(topic, langName, lengthGuide, styleConfig);
+    const deepPrompt = buildDeepPrompt(topic, langName, lengthGuide, styleConfig, channelStylePrompt);
     const draft = await geminiWithRetry(ai, {
       model: 'gemini-2.5-pro',
       contents: deepPrompt,
