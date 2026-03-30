@@ -52,7 +52,7 @@ const STYLE_META: Record<string, { name: string; description: string }> = {
 interface DeepScriptProps {
   isAuthenticated: boolean;
   onShowAuthModal: () => void;
-  onStartStoryboard?: (script: string, styleId: string) => void;
+  onStartStoryboard?: (script: string, styleId: string, analysis: ScriptAnalysis | null) => void;
 }
 
 const STYLE_OPTIONS = [
@@ -875,7 +875,7 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
           {/* 스토리보드 생성 버튼 */}
           {onStartStoryboard && (
             <button
-              onClick={() => onStartStoryboard(result, selectedStyleId)}
+              onClick={() => onStartStoryboard(result, selectedStyleId, analysis)}
               disabled={!selectedStyleId}
               className="w-full py-3 rounded-lg text-[14px] font-bold transition-all disabled:opacity-40"
               style={{

@@ -617,11 +617,21 @@ const AppContent: React.FC<{
   }, [handleGenerate]);
 
   // ── 심층대본 → 스토리보드 직접 연결 (Gemini 재생성 없이 씬 분할만) ──
-  const handleDeepScriptToStoryboard = useCallback((script: string, styleId: string) => {
+  const handleDeepScriptToStoryboard = useCallback((script: string, styleId: string, analysisData?: any) => {
     if (isProcessingRef.current) return;
 
-    // 화풍 설정 적용
-    if (styleId) localStorage.setItem('tubegen_image_style', styleId);
+    // 화풍 설정 적용 (올바른 localStorage 키 사용)
+    if (styleId) localStorage.setItem(CONFIG.STORAGE_KEYS.GEMINI_STYLE, styleId);
+
+    // 음성 설정 적용 (AI 추천 기반)
+    if (analysisData?.recommendedVoiceGender) {
+      // 추천 성별에 맞는 기본 Voice ID 설정은 기존 설정이 없을 때만
+      const currentVoice = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_VOICE_ID);
+      if (!currentVoice) {
+        // 기본 음성이 없으면 AI 추천을 참고 (실제 VoiceID는 사용자가 선택)
+        console.log(`[DeepScript] 추천 음성: ${analysisData.recommendedVoiceGender} / ${analysisData.recommendedVoiceAge}`);
+      }
+    }
 
     // 대본을 빈 줄 기준으로 씬 분할
     const scenes = script
@@ -1629,7 +1639,7 @@ const AppContent: React.FC<{
         <DeepScript
           isAuthenticated={isAuthenticated}
           onShowAuthModal={() => setShowAuthModal(true)}
-          onStartStoryboard={handleDeepScriptToStoryboard}
+          onStartStoryboard={(script, styleId, analysis) => handleDeepScriptToStoryboard(script, styleId, analysis)}
         />
       )}
 
