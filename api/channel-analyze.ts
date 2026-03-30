@@ -144,19 +144,20 @@ async function analyzeChannelStyle(videoData: string, channelName: string, apiKe
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `아래는 유튜브 채널 "${channelName}"의 최근 영상 제목과 설명입니다.
-이 채널의 콘텐츠 스타일을 분석하세요. 제목의 패턴, 주제 선택, 톤, 타겟 시청자를 추론하세요.
+제목 패턴, 주제 선택, 톤, 타겟 시청자, 콘텐츠 장르를 추론하세요.
+제목이 짧더라도 반복되는 패턴, 장르, 키워드, 해시태그에서 채널의 성격을 파악하세요.
 
 ${videoData}
 
 다음 JSON 형식으로 출력하세요 (JSON만, 설명 없이):
 {
   "channelName": "${channelName}",
-  "tone": "이 채널의 톤을 한 문장으로 (예: 친근한 언니 톤, 전문가 뉴스 앵커 톤)",
-  "hookPattern": "도입부(훅) 패턴 (예: 질문형 오프닝, 충격 팩트, 반직관 명제)",
-  "sentenceStyle": "문장 스타일 (예: 짧고 끊어치기, 긴 서술형, 대화체)",
-  "structure": "영상 구조 패턴 (예: 문제제기→반전→CTA, 리스트형→결론)",
-  "characteristics": ["특징1", "특징2", "특징3"],
-  "samplePrompt": "이 채널 스타일로 대본을 생성하기 위한 프롬프트 지시문 (3~5문장)"
+  "tone": "이 채널의 예상 톤 한 문장 (예: 친근하고 유머러스한 톤, 전문적이고 차분한 톤)",
+  "hookPattern": "예상 도입부(훅) 패턴 (예: 질문형, 충격 팩트, 감성 오프닝, 상황극)",
+  "sentenceStyle": "예상 문장 스타일 (예: 짧고 임팩트 있는 문장, 대화체, 스토리텔링)",
+  "structure": "예상 영상 구조 (예: 도입→전개→반전→마무리, 일상 브이로그형, 리스트형)",
+  "characteristics": ["채널 특징 3가지 — 장르, 타겟 시청자, 고유한 스타일 등"],
+  "samplePrompt": "이 채널 스타일을 모방하여 대본을 작성하기 위한 프롬프트 지시문 3~5문장. 채널의 톤, 문장 스타일, 구조 패턴을 구체적으로 지시하세요."
 }`;
 
   const response = await ai.models.generateContent({
@@ -196,28 +197,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // 1. 채널 ID 추출
-    const debugLog: string[] = [];
-    const origResolve = resolveChannelId;
     const resolved = await resolveChannelId(channelUrl);
     if (!resolved) {
-      // 디버그: 어디서 실패했는지 알려주기 위해 간단한 테스트
-      const handle = channelUrl.replace(/^.*@/, '').replace(/^@/, '').split('/')[0].trim();
-      const ytKey = process.env.YOUTUBE_DATA_API_KEY || process.env.GEMINI_API_KEY;
-      let debugMsg = `handle="${handle}", hasApiKey=${!!ytKey}`;
-      try {
-        const testRes = await fetch(`https://www.youtube.com/@${handle}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-        });
-        debugMsg += `, pageFetch=${testRes.status}`;
-      } catch (e: any) { debugMsg += `, pageFetchErr=${e.message}`; }
-      if (ytKey) {
-        try {
-          const ytRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${ytKey}`);
-          const ytText = await ytRes.text();
-          debugMsg += `, ytApi=${ytRes.status}:${ytText.slice(0, 200)}`;
-        } catch (e: any) { debugMsg += `, ytApiErr=${e.message}`; }
-      }
-      return res.status(400).json({ error: `채널을 찾을 수 없습니다. [debug: ${debugMsg}]` });
+      return res.status(400).json({
+        error: '채널을 찾을 수 없습니다. 정확한 YouTube 핸들(@채널명)을 입력해주세요. YouTube에서 채널 페이지 URL을 복사하면 가장 정확합니다.',
+      });
     }
     const { channelId, channelName: resolvedName } = resolved;
 
