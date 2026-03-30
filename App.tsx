@@ -672,13 +672,18 @@ const AppContent: React.FC<{
       }
     }
 
-    // 대본 전처리: 마크다운/메타텍스트/씬 라벨을 공격적으로 제거 후 씬 분할
-    const preprocessed = cleanDeepScriptNarration(script);
+    // 대본 전처리: 헤딩/구분선/빈 라벨만 줄 단위로 제거 (빈 줄은 유지 — 씬 구분자)
+    const preprocessed = script
+      .replace(/^#{1,6}\s+.*$/gm, '')           // 마크다운 헤딩 줄 제거
+      .replace(/^---+$/gm, '')                   // 구분선 제거
+      .replace(/^\*\*최종\s*대본\*\*.*$/gm, '')   // **최종 대본** 라벨 줄 제거
+      .replace(/^\s*$/gm, '\n');                 // 빈 줄 정규화
 
+    // 빈 줄 기준으로 씬 분할 → 각 씬 내부를 cleanDeepScriptNarration으로 정제
     const scenes = preprocessed
       .split(/\n\s*\n/)
-      .map(block => block.trim())
-      .filter(block => block.length > 5);            // 5자 미만 블록 무시 (빈 줄/잔여물)
+      .map(block => cleanDeepScriptNarration(block))
+      .filter(block => block.length > 5);
 
     if (scenes.length === 0) {
       setProgressMessage('대본이 비어있습니다.');
