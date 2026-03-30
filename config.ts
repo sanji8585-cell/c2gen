@@ -496,7 +496,7 @@ export const DIRECTIVE_KEY_MAP: Record<string, string> = {
   '분위기': 'MOOD',
   '배경': 'BACKGROUND', '화면': 'BACKGROUND', '배경색': 'BACKGROUND',
   '스타일': 'STYLE', '화풍': 'STYLE',
-  '텍스트': 'TEXT',
+  '텍스트': 'TEXT', '자막': 'TEXT',
   '카메라': 'CAMERA', '앵글': 'CAMERA',
   '색상': 'COLOR', '색깔': 'COLOR', '색조': 'COLOR',
   '화자': 'SPEAKER', '나레이터': 'SPEAKER',

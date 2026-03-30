@@ -638,9 +638,17 @@ const AppContent: React.FC<{
     const firstLine = scenes[0].split('\n')[0].trim().slice(0, 50);
     setCurrentTopic(firstLine);
 
-    // 각 씬을 ScriptScene 형태로 변환 (디렉티브 파싱 포함)
+    // 각 씬을 ScriptScene 형태로 변환 (디렉티브 파싱 + 마크다운/잔여 괄호 정제)
     const scriptScenes: ScriptScene[] = scenes.map((sceneText, i) => {
-      const { cleanNarration, directives } = parseDirectives(sceneText);
+      const { cleanNarration: parsed, directives } = parseDirectives(sceneText);
+      // 추가 정제: 마크다운(**bold**, ##), 씬 번호(**S#1**), 남은 디렉티브 괄호 제거
+      const cleanNarration = parsed
+        .replace(/\*\*S?#?\d+\*\*/g, '')           // **S#18**, **#1** 등 씬 번호
+        .replace(/\*\*(내레이션|나레이션|Narration)[:\s]?\*\*/gi, '') // **내레이션:** 라벨
+        .replace(/\*\*/g, '')                       // 남은 ** 마크다운 볼드
+        .replace(/\((?:배경|분위기|구도|카메라|색상|텍스트|자막|스타일|화자|이전씬유지|같은장소|시간경과)[^)]*\)/g, '') // 남은 디렉티브 괄호
+        .replace(/\s{2,}/g, ' ')                    // 다중 공백 정리
+        .trim();
       const sentiment = directives.MOOD === '밝음' || directives.MOOD === '따뜻함' ? 'POSITIVE' as const
         : directives.MOOD === '어두움' || directives.MOOD === '긴장' ? 'NEGATIVE' as const
         : 'NEUTRAL' as const;
