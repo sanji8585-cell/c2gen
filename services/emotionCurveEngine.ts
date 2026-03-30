@@ -121,6 +121,71 @@ export const STORY_ARCS: Record<StoryArcType, {
       { timePercent: 95, emotion: 'curiosity', intensity: 0.8, label: '다음편 예고' },
     ],
   },
+  investigative: {
+    name: 'Investigative',
+    nameKo: '탐사/추적형',
+    structure: '단서 발견 → 추적 → 벽에 부딪힘 → 돌파구 → 진실 공개',
+    suitableFor: '미스터리/사건/팩트체크 콘텐츠',
+    defaultPoints: [
+      { timePercent: 0, emotion: 'curiosity', intensity: 0.9, label: '단서 발견' },
+      { timePercent: 25, emotion: 'tension', intensity: 0.7, label: '추적' },
+      { timePercent: 50, emotion: 'fear', intensity: 0.8, label: '벽에 부딪힘' },
+      { timePercent: 75, emotion: 'excitement', intensity: 0.9, label: '돌파구' },
+      { timePercent: 92, emotion: 'surprise', intensity: 1.0, label: '진실 공개' },
+    ],
+  },
+  comparison: {
+    name: 'Comparison',
+    nameKo: '비교/대결형',
+    structure: 'A 소개 → B 소개 → 항목별 대결 → 반전 포인트 → 최종 판정',
+    suitableFor: 'XX vs YY, 제품 비교, 국가 비교 콘텐츠',
+    defaultPoints: [
+      { timePercent: 0, emotion: 'curiosity', intensity: 0.8, label: '대결 소개' },
+      { timePercent: 20, emotion: 'excitement', intensity: 0.7, label: 'A 소개' },
+      { timePercent: 40, emotion: 'excitement', intensity: 0.7, label: 'B 소개' },
+      { timePercent: 70, emotion: 'tension', intensity: 0.8, label: '대결 빌드업' },
+      { timePercent: 90, emotion: 'surprise', intensity: 0.9, label: '반전 판정' },
+    ],
+  },
+  countdown: {
+    name: 'Countdown',
+    nameKo: '카운트다운/랭킹형',
+    structure: 'N위 발표 → 점점 상승 → 3위 서프라이즈 → 1위 충격',
+    suitableFor: 'TOP N, 최악의 X가지, 역대급 순위 콘텐츠',
+    defaultPoints: [
+      { timePercent: 0, emotion: 'curiosity', intensity: 0.7, label: '랭킹 시작' },
+      { timePercent: 25, emotion: 'excitement', intensity: 0.6, label: '중위권' },
+      { timePercent: 55, emotion: 'excitement', intensity: 0.7, label: '상위권' },
+      { timePercent: 80, emotion: 'tension', intensity: 0.9, label: '3위~2위' },
+      { timePercent: 95, emotion: 'surprise', intensity: 1.0, label: '1위 공개' },
+    ],
+  },
+  transformation: {
+    name: 'Transformation',
+    nameKo: '변화/성장형',
+    structure: '비포(최악) → 계기 → 시행착오 → 터닝포인트 → 애프터(변화)',
+    suitableFor: '비포애프터, 성공기, 인생역전 콘텐츠',
+    defaultPoints: [
+      { timePercent: 0, emotion: 'empathy', intensity: 0.8, label: '비포 (최악 상태)' },
+      { timePercent: 20, emotion: 'tension', intensity: 0.7, label: '계기' },
+      { timePercent: 45, emotion: 'fear', intensity: 0.6, label: '시행착오' },
+      { timePercent: 70, emotion: 'excitement', intensity: 0.8, label: '터닝포인트' },
+      { timePercent: 95, emotion: 'warmth', intensity: 1.0, label: '애프터 (변화)' },
+    ],
+  },
+  conspiracy: {
+    name: 'Conspiracy',
+    nameKo: '음모/떡밥형',
+    structure: '의문 제기 → 증거 나열 → 반박 → 더 큰 증거 → 열린 결말',
+    suitableFor: '도시전설, 미해결사건, 논쟁적 주제 콘텐츠',
+    defaultPoints: [
+      { timePercent: 0, emotion: 'curiosity', intensity: 1.0, label: '의문 제기' },
+      { timePercent: 25, emotion: 'tension', intensity: 0.8, label: '증거 나열' },
+      { timePercent: 45, emotion: 'calm', intensity: 0.5, label: '반박/반론' },
+      { timePercent: 70, emotion: 'fear', intensity: 0.9, label: '더 큰 증거' },
+      { timePercent: 95, emotion: 'lingering', intensity: 0.7, label: '열린 결말' },
+    ],
+  },
 };
 
 // ─── 2. Platform Modifiers ──────────────────────────────────────────────────
@@ -159,12 +224,18 @@ const EMOTION_MAPPINGS: Record<EmotionType, {
 /** Select the best story arc type based on topic keywords (local heuristics). */
 export function selectStoryArc(topic: string): StoryArcType {
   const lower = topic.toLowerCase();
-  if (/해결|방법|팁|가이드|how to/i.test(lower)) return 'problem_solution';
+  // 구체적 패턴을 먼저 매칭 (오감지 방지)
+  if (/top\s*\d|순위|랭킹|최고|최악|역대|ranking/i.test(lower)) return 'countdown';
+  if (/vs\s|versus|비교|대결|대\s?결/i.test(lower)) return 'comparison';
+  if (/추적|수사|조사|진실|팩트체크|미스터리|investigate/i.test(lower)) return 'investigative';
+  if (/성장|변화|비포|애프터|역전|성공기|다이어트|transform/i.test(lower)) return 'transformation';
+  if (/음모|떡밥|미해결|도시전설|아무도.*모르|conspiracy/i.test(lower)) return 'conspiracy';
   if (/반전|놀라|충격|shocking/i.test(lower)) return 'reversal';
   if (/감동|눈물|따뜻|touching/i.test(lower)) return 'emotional';
   if (/위험|경고|주의|사건|사고/i.test(lower)) return 'horror_warning';
-  if (/웃긴|유머|ㅋㅋ|funny|meme/i.test(lower)) return 'humor';
-  if (/배우|강의|설명|교육|tutorial/i.test(lower)) return 'educational';
+  if (/웃긴|유머|ㅋㅋ|funny|meme|코미디/i.test(lower)) return 'humor';
+  if (/해결|방법|팁|가이드|how to/i.test(lower)) return 'problem_solution';
+  if (/강의|설명|교육|tutorial|배우기/i.test(lower)) return 'educational';
   if (/일상|브이로그|vlog|daily/i.test(lower)) return 'vlog';
   if (/시리즈|ep\.|episode|편/i.test(lower)) return 'series';
   return 'problem_solution';
@@ -179,13 +250,20 @@ export function generateEmotionCurve(
   const arcDef = STORY_ARCS[arc];
   const modifier = PLATFORM_MODIFIERS[platform];
 
+  let prevTimeSeconds = -1;
   const curvePoints: EmotionCurvePoint[] = arcDef.defaultPoints.map((pt, idx) => {
     // Apply pace multiplier: compress or expand timing around center (50%)
     const adjustedPercent = Math.min(
       100,
       Math.max(0, 50 + (pt.timePercent - 50) * modifier.paceMultiplier),
     );
-    const timeSeconds = (adjustedPercent / 100) * totalDuration;
+    let timeSeconds = (adjustedPercent / 100) * totalDuration;
+
+    // 포인트 겹침 방지: 이전 포인트보다 최소 0.5초 뒤에 배치
+    if (timeSeconds <= prevTimeSeconds) {
+      timeSeconds = prevTimeSeconds + 0.5;
+    }
+    prevTimeSeconds = timeSeconds;
 
     // Boost first point intensity for short-form platforms
     let intensity = pt.intensity;

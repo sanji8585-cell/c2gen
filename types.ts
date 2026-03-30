@@ -404,7 +404,12 @@ export type StoryArcType =
   | 'humor'             // 웃음형
   | 'educational'       // 교육형
   | 'vlog'              // 일상 브이로그
-  | 'series';           // 시리즈 연결형
+  | 'series'            // 시리즈 연결형
+  | 'investigative'     // 탐사/추적형
+  | 'comparison'        // 비교/대결형
+  | 'countdown'         // 카운트다운/랭킹형
+  | 'transformation'    // 변화/성장형
+  | 'conspiracy';       // 음모/떡밥형
 
 export type EmotionType =
   | 'curiosity' | 'tension' | 'surprise' | 'empathy'

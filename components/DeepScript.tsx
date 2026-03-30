@@ -9,11 +9,66 @@ interface DeepScriptProps {
 }
 
 const STYLE_OPTIONS = [
-  { value: 'auto', label: '자동', icon: '🎯' },
-  { value: 'documentary', label: '다큐멘터리', icon: '🎬' },
-  { value: 'storytelling', label: '스토리텔링', icon: '📖' },
-  { value: 'educational', label: '교육용', icon: '📚' },
-  { value: 'viral', label: '바이럴', icon: '🔥' },
+  {
+    value: 'auto', label: '자동', icon: '🎯', summary: 'AI 자동 판단',
+    description: '주제를 분석하여 가장 적합한 스타일을 AI가 자동으로 선택합니다.',
+    examples: ['어떤 주제든 자동으로 최적화', '스타일 고민 없이 빠르게 시작'],
+  },
+  {
+    value: 'documentary', label: '다큐멘터리', icon: '🎬', summary: '팩트 중심',
+    description: '넷플릭스 다큐 PD처럼, 팩트와 데이터 중심으로 객관적이고 신뢰감 있는 대본을 작성합니다.',
+    examples: ['반도체 전쟁의 숨겨진 진실', '한국 출산율 0.6명의 경제적 충격', 'AI가 바꿀 미래 직업 지도'],
+  },
+  {
+    value: 'storytelling', label: '스토리텔링', icon: '📖', summary: '감성 서사',
+    description: '100만 구독자 스토리텔러처럼, 1인칭 경험담과 감정 고저로 시청자를 몰입시킵니다.',
+    examples: ['부모님이 알려주지 않은 인생 교훈', '30대에 깨달은 돈의 진짜 의미', '그날 이후 삶이 완전히 바뀌었다'],
+  },
+  {
+    value: 'educational', label: '교육용', icon: '📚', summary: '단계 설명',
+    description: 'TED 강연 연출가처럼, 복잡한 개념을 비유와 단계적 설명으로 쉽게 풀어냅니다.',
+    examples: ['초보자를 위한 커피 홈브루잉 가이드', '블록체인을 5살도 이해하게 설명하기', '주식 차트 읽는 법 완전 정복'],
+  },
+  {
+    value: 'viral', label: '바이럴', icon: '🔥', summary: '훅+반전',
+    description: 'MrBeast 스타일 콘텐츠 디렉터. 골든 3초 훅과 패턴 인터럽트, 도파민 루프를 설계합니다.',
+    examples: ['이걸 모르면 당신은 이미 돈을 잃고 있습니다', '절대 먹으면 안 되는 건강식품 3가지', '1분 만에 인생이 바뀌는 습관'],
+  },
+  {
+    value: 'investigative', label: '탐사/추적', icon: '🔍', summary: '단서→진실',
+    description: '탐사 저널리스트처럼, 단서를 하나씩 공개하며 진실에 접근하는 긴장감 있는 대본을 작성합니다.',
+    examples: ['삼성전자 반도체 적자의 숨겨진 이유', '사라진 1조원을 추적하다', '가짜 건강식품의 진실을 파헤치다'],
+  },
+  {
+    value: 'countdown', label: '랭킹', icon: '🏆', summary: 'TOP N',
+    description: '에스컬레이션 전문가. 순위가 올라갈수록 강도를 높여 1위에서 폭발시키는 구성입니다.',
+    examples: ['역대 최악의 기업 실수 TOP 10', '한국에서 가장 연봉 높은 직업 5선', '세계에서 가장 위험한 음식 랭킹'],
+  },
+  {
+    value: 'comparison', label: '비교/대결', icon: '⚔️', summary: 'A vs B',
+    description: '공정한 심판관처럼, A와 B를 항목별로 대결시키고 예상을 뒤집는 판정을 내립니다.',
+    examples: ['아이폰 vs 갤럭시 — 2026년 최종 승자', '한국 vs 일본 직장문화 비교', '넷플릭스 vs 유튜브 프리미엄'],
+  },
+  {
+    value: 'transformation', label: '변화/성장', icon: '🦋', summary: '비포애프터',
+    description: '비포애프터 연출가. 최악의 상태에서 시작해 반전의 성공을 보여주는 서사를 만듭니다.',
+    examples: ['빚 2억에서 자산 10억까지', '3개월 만에 체지방 30%→15%', '영어 왕초보가 통역사가 된 과정'],
+  },
+  {
+    value: 'horror_warning', label: '공포/경고', icon: '⚠️', summary: '위기 경보',
+    description: '위기 경보 전문가. 긴장을 극대화하고 충격적 사실로 경각심을 유발합니다.',
+    examples: ['당신의 개인정보가 이미 팔리고 있다', '절대 무시하면 안 되는 몸의 신호 5가지', '이 투자 사기에 10만 명이 당했다'],
+  },
+  {
+    value: 'humor', label: '유머', icon: '😂', summary: '펀치라인',
+    description: '코미디 작가처럼, 설정을 쌓고 기대를 배반하는 펀치라인으로 웃음을 설계합니다.',
+    examples: ['한국 직장인의 하루를 외국인에게 설명하면', '부모님 세대 vs MZ세대 연애 차이', 'AI한테 나의 인생 상담을 맡겨봤다'],
+  },
+  {
+    value: 'conspiracy', label: '음모/떡밥', icon: '🕳️', summary: '열린 결말',
+    description: '미완결의 대가. 증거를 나열하되 결론은 시청자에게 던지는 열린 구조로 댓글을 폭발시킵니다.',
+    examples: ['아무도 말하지 않는 대기업의 비밀', '이 사건은 왜 뉴스에 안 나왔을까', '우리가 모르는 역사의 숨겨진 진실'],
+  },
 ] as const;
 
 const DURATION_PRESETS = [
@@ -47,6 +102,7 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
   const [topic, setTopic] = useState('');
   const [style, setStyle] = useState('auto');
   const [durationSec, setDurationSec] = useState(180);
+  const [mode, setMode] = useState<'fast' | 'deep'>('deep');
   const [language, setLanguage] = useState<string>(() => {
     try { return localStorage.getItem(CONFIG.STORAGE_KEYS.LANGUAGE) || 'ko'; } catch { return 'ko'; }
   });
@@ -65,7 +121,7 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
     setResult('');
 
     try {
-      const script = await generateDeepScript(topic.trim(), language, style, String(durationSec));
+      const script = await generateDeepScript(topic.trim(), language, style, String(durationSec), mode);
       setResult(script);
     } catch (err: any) {
       setError(err.message || '대본 생성에 실패했습니다.');
@@ -135,31 +191,61 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
           </div>
         </div>
 
+        {/* 스타일 그리드 */}
+        <div className="mb-4">
+          <label className="block text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted)' }}>스타일</label>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5">
+            {STYLE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setStyle(opt.value)}
+                disabled={isGenerating}
+                className={`flex flex-col items-center px-2 py-2 rounded-lg text-center transition-all ${
+                  style === opt.value ? 'ring-1 ring-purple-500' : ''
+                }`}
+                style={{
+                  backgroundColor: style === opt.value ? 'rgba(168,85,247,0.15)' : 'var(--bg-elevated)',
+                  color: style === opt.value ? '#a855f7' : 'var(--text-secondary)',
+                  border: `1px solid ${style === opt.value ? 'rgba(168,85,247,0.4)' : 'var(--border-subtle)'}`,
+                }}
+              >
+                <span className="text-base">{opt.icon}</span>
+                <span className="text-[11px] font-bold mt-0.5 leading-tight">{opt.label}</span>
+                <span className="text-[9px] mt-0.5 leading-tight" style={{ color: style === opt.value ? '#c084fc' : 'var(--text-muted)' }}>
+                  {opt.summary}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* 선택된 스타일 설명 카드 */}
+          {(() => {
+            const selected = STYLE_OPTIONS.find(o => o.value === style);
+            if (!selected || selected.value === 'auto') return null;
+            return (
+              <div className="mt-2 rounded-lg px-4 py-3" style={{ backgroundColor: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)' }}>
+                <p className="text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {selected.icon} {selected.description}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {selected.examples.map((ex, i) => (
+                    <span
+                      key={i}
+                      className="text-[10px] px-2 py-0.5 rounded-full cursor-pointer hover:brightness-110 transition-all"
+                      style={{ backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.2)' }}
+                      onClick={() => !isGenerating && setTopic(ex)}
+                    >
+                      {ex}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
         {/* 옵션 행 */}
         <div className="flex flex-wrap gap-3 mb-4">
-          {/* 스타일 */}
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-[11px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>스타일</label>
-            <div className="flex flex-wrap gap-1.5">
-              {STYLE_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setStyle(opt.value)}
-                  disabled={isGenerating}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                    style === opt.value ? 'ring-1 ring-purple-500' : ''
-                  }`}
-                  style={{
-                    backgroundColor: style === opt.value ? 'rgba(168,85,247,0.15)' : 'var(--bg-elevated)',
-                    color: style === opt.value ? '#a855f7' : 'var(--text-secondary)',
-                    border: `1px solid ${style === opt.value ? 'rgba(168,85,247,0.4)' : 'var(--border-subtle)'}`,
-                  }}
-                >
-                  {opt.icon} {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* 영상 길이 */}
           <div className="flex-1 min-w-[200px]">
@@ -240,6 +326,32 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
               <option value="en">English</option>
               <option value="ja">日本語</option>
             </select>
+          </div>
+
+          {/* 생성 모드 */}
+          <div className="min-w-[100px]">
+            <label className="block text-[11px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>생성 모드</label>
+            <div className="flex gap-1.5">
+              {([
+                { value: 'fast' as const, label: '빠른 생성', desc: '1회 생성' },
+                { value: 'deep' as const, label: '심층 생성', desc: '생성→감사→개선' },
+              ]).map(m => (
+                <button
+                  key={m.value}
+                  onClick={() => setMode(m.value)}
+                  disabled={isGenerating}
+                  className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+                  style={{
+                    backgroundColor: mode === m.value ? 'rgba(168,85,247,0.15)' : 'var(--bg-elevated)',
+                    color: mode === m.value ? '#a855f7' : 'var(--text-secondary)',
+                    border: `1px solid ${mode === m.value ? 'rgba(168,85,247,0.4)' : 'var(--border-subtle)'}`,
+                  }}
+                  title={m.desc}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

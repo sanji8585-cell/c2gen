@@ -323,6 +323,18 @@ export const generateAdvancedScript = async (
   return result?.script ?? (typeof result === 'string' ? result : '');
 };
 
+/** 심층대본 생성 (운영자 전용) */
+export const generateDeepScript = async (
+  topic: string,
+  language: string = 'ko',
+  style: string = 'auto',
+  length: string = '180',
+  mode: 'fast' | 'deep' = 'deep',
+): Promise<string> => {
+  const result = await callGeminiProxy('generateDeepScript', { topic, language, style, length, mode });
+  return result?.script ?? '';
+};
+
 /** 분위기 분석 (BGM 자동 선택용) */
 export const analyzeMood = async (narrations: string[]): Promise<{ mood: string; confidence: number }> => {
   return callGeminiProxy('analyzeMood', { narrations });
