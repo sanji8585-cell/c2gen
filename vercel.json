@@ -16,6 +16,7 @@
   "functions": {
     "api/gemini.ts": { "maxDuration": 120 },
     "api/deep-script.ts": { "maxDuration": 180 },
+    "api/deep-script-save.ts": { "maxDuration": 30 },
     "api/elevenlabs.ts": { "maxDuration": 60 },
     "api/fal.ts": { "maxDuration": 120 },
     "api/fal-poll.ts": { "maxDuration": 30 },

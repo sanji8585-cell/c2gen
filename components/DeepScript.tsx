@@ -161,8 +161,85 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
   const [currentStep, setCurrentStep] = useState<StepProgress | null>(null);
   const [analysis, setAnalysis] = useState<ScriptAnalysis | null>(null);
   const [selectedStyleId, setSelectedStyleId] = useState<string>('');
+  const [savedList, setSavedList] = useState<Array<{ id: string; topic: string; style: string; duration_sec: number; mode: string; scene_count: number; char_count: number; created_at: string }>>([]);
+  const [showSaved, setShowSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const resultRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // ── API 헬퍼 ──
+  const apiHeaders = useCallback(() => {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem('c2gen_session_token');
+    if (token) h['x-session-token'] = token;
+    return h;
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!result || saveStatus === 'saving') return;
+    setSaveStatus('saving');
+    try {
+      const res = await fetch('/api/deep-script-save', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({
+          action: 'save', topic, style, durationSec, mode, script: result,
+          analysis, sceneCount: result.split(/\n\s*\n/).filter(s => s.trim()).length,
+          charCount: result.length,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err: any) {
+      setError(err.message || '저장 실패');
+      setSaveStatus('idle');
+    }
+  }, [result, topic, style, durationSec, mode, analysis, apiHeaders]);
+
+  const loadSavedList = useCallback(async () => {
+    try {
+      const res = await fetch('/api/deep-script-save', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ action: 'list' }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSavedList(data.scripts || []);
+    } catch { /* ignore */ }
+  }, [apiHeaders]);
+
+  const handleLoad = useCallback(async (id: string) => {
+    try {
+      const res = await fetch('/api/deep-script-save', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ action: 'load', id }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      const data = await res.json();
+      setTopic(data.topic);
+      setStyle(data.style);
+      setDurationSec(data.duration_sec);
+      setMode(data.mode);
+      setResult(data.script);
+      if (data.analysis) {
+        setAnalysis(data.analysis);
+        setSelectedStyleId(data.analysis.recommendedStyles?.[0] || '');
+      }
+      setShowSaved(false);
+    } catch (err: any) {
+      setError(err.message || '불러오기 실패');
+    }
+  }, [apiHeaders]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await fetch('/api/deep-script-save', {
+        method: 'POST', headers: apiHeaders(),
+        body: JSON.stringify({ action: 'delete', id }),
+      });
+      setSavedList(prev => prev.filter(s => s.id !== id));
+    } catch { /* ignore */ }
+  }, [apiHeaders]);
 
   const handleGenerate = useCallback(async () => {
     if (!isAuthenticated) { onShowAuthModal(); return; }
@@ -288,11 +365,53 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
           <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid rgba(249,115,22,0.3)' }}>
             OPERATOR
           </span>
+          <button
+            onClick={() => { setShowSaved(!showSaved); if (!showSaved) loadSavedList(); }}
+            className="ml-auto px-3 py-1 rounded-lg text-[11px] font-medium transition-all"
+            style={{
+              backgroundColor: showSaved ? 'rgba(59,130,246,0.15)' : 'var(--bg-elevated)',
+              color: showSaved ? '#3b82f6' : 'var(--text-muted)',
+              border: `1px solid ${showSaved ? 'rgba(59,130,246,0.3)' : 'var(--border-subtle)'}`,
+            }}
+          >
+            📂 저장된 대본 {savedList.length > 0 ? `(${savedList.length})` : ''}
+          </button>
         </h1>
         <p className="text-[13px] mt-1" style={{ color: 'var(--text-secondary)' }}>
-          주제를 입력하면 AI가 심층 분석 후 완성도 높은 대본을 생성합니다. 생성된 대본을 복사하여 수동 탭에서 활용하세요.
+          주제를 입력하면 AI가 심층 분석 후 완성도 높은 대본을 생성합니다.
         </p>
       </div>
+
+      {/* 저장된 대본 목록 */}
+      {showSaved && (
+        <div className="rounded-xl border p-4 mb-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+          <h3 className="text-[12px] font-bold mb-3" style={{ color: 'var(--text-secondary)' }}>
+            📂 저장된 심층대본
+          </h3>
+          {savedList.length === 0 ? (
+            <p className="text-[11px] text-center py-4" style={{ color: 'var(--text-muted)' }}>저장된 대본이 없습니다.</p>
+          ) : (
+            <div className="space-y-2">
+              {savedList.map(s => {
+                const styleOpt = STYLE_OPTIONS.find(o => o.value === s.style);
+                return (
+                  <div key={s.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{s.topic}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {styleOpt?.icon} {styleOpt?.label || s.style} · {formatDuration(s.duration_sec)} · {s.scene_count}씬 · {s.char_count.toLocaleString()}자 · {new Date(s.created_at).toLocaleDateString('ko')}
+                      </p>
+                    </div>
+                    <button onClick={() => handleLoad(s.id)} className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>불러오기</button>
+                    <button onClick={async () => { await handleLoad(s.id); }} className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}>스토리보드</button>
+                    <button onClick={() => handleDelete(s.id)} className="px-1.5 py-1 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>✕</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 입력 영역 */}
       <div className="rounded-xl border p-5 mb-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
@@ -608,6 +727,19 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
                 {sceneCount}씬 / {charCount.toLocaleString()}자
               </span>
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saveStatus === 'saving'}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all hover:brightness-110"
+                style={{
+                  backgroundColor: saveStatus === 'saved' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)',
+                  color: saveStatus === 'saved' ? '#10b981' : '#3b82f6',
+                  border: `1px solid ${saveStatus === 'saved' ? 'rgba(16,185,129,0.3)' : 'rgba(59,130,246,0.3)'}`,
+                }}
+              >
+                {saveStatus === 'saving' ? '저장 중...' : saveStatus === 'saved' ? '✓ 저장됨' : '💾 저장'}
+              </button>
             <button
               onClick={handleCopy}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all hover:brightness-110"
