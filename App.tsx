@@ -616,6 +616,87 @@ const AppContent: React.FC<{
     console.log('[Advanced] 디렉티브 저장 완료. sceneDirectivesRef:', dirMap);
   }, [handleGenerate]);
 
+  // ── 심층대본 → 스토리보드 직접 연결 (Gemini 재생성 없이 씬 분할만) ──
+  const handleDeepScriptToStoryboard = useCallback((script: string, styleId: string) => {
+    if (isProcessingRef.current) return;
+
+    // 화풍 설정 적용
+    if (styleId) localStorage.setItem('tubegen_image_style', styleId);
+
+    // 대본을 빈 줄 기준으로 씬 분할
+    const scenes = script
+      .split(/\n\s*\n/)
+      .map(block => block.trim())
+      .filter(block => block.length > 0);
+
+    if (scenes.length === 0) {
+      setProgressMessage('대본이 비어있습니다.');
+      return;
+    }
+
+    const language = (localStorage.getItem(CONFIG.STORAGE_KEYS.LANGUAGE) as Language) || 'ko';
+    const firstLine = scenes[0].split('\n')[0].trim().slice(0, 50);
+    setCurrentTopic(firstLine);
+
+    // 각 씬을 ScriptScene 형태로 변환 (디렉티브 파싱 포함)
+    const scriptScenes: ScriptScene[] = scenes.map((sceneText, i) => {
+      const { cleanNarration, directives } = parseDirectives(sceneText);
+      const sentiment = directives.MOOD === '밝음' || directives.MOOD === '따뜻함' ? 'POSITIVE' as const
+        : directives.MOOD === '어두움' || directives.MOOD === '긴장' ? 'NEGATIVE' as const
+        : 'NEUTRAL' as const;
+
+      return {
+        narration: cleanNarration,
+        visualPrompt: '', // 이미지 생성 시 자동 생성됨
+        analysis: {
+          sentiment,
+          motion_type: '정적' as const,
+          composition_type: (directives.COMPOSITION || 'STANDARD') as any,
+          directives,
+          scene_role: i === 0 ? 'hook' : i === scenes.length - 1 ? 'cta' : 'build',
+        },
+      };
+    });
+
+    // 디렉티브 저장
+    const dirMap: Record<number, any> = {};
+    scriptScenes.forEach((s, i) => {
+      const d = s.analysis?.directives;
+      if (d && Object.keys(d).length > 0) dirMap[i] = d;
+    });
+    sceneDirectivesRef.current = dirMap;
+
+    // initialAssets 생성 (기존 handleGenerate 로직과 동일)
+    const initialAssets = scriptScenes.map((scene, i) => {
+      const sentiment = scene.analysis?.sentiment;
+      let zoomEffect: GeneratedAsset['zoomEffect'];
+      if (sentiment === 'POSITIVE') zoomEffect = 'zoomIn';
+      else if (sentiment === 'NEGATIVE') zoomEffect = i % 2 === 0 ? 'panLeft' : 'panRight';
+      else zoomEffect = 'zoomIn';
+
+      return {
+        ...scene, imageData: null, audioData: null, audioDuration: null,
+        subtitleData: null, videoData: null, videoDuration: null,
+        status: 'pending' as const, zoomEffect,
+      };
+    });
+
+    // 연결 디렉티브 처리
+    const propagated = propagateSceneContext(initialAssets);
+    assetsRef.current = propagated as typeof assetsRef.current;
+    setGeneratedData([...propagated] as typeof assetsRef.current);
+
+    // 수동 대본으로 context 설정
+    const refImgs = { character: [], style: [] } as ReferenceImages;
+    const hasRefImages = false;
+    pendingGenContextRef.current = { targetTopic: firstLine, refImgs, language, hasRefImages, sourceText: script };
+
+    // 스크립트 검토 단계로 진입
+    setViewMode('main');
+    setStep(GenerationStep.SCRIPT_REVIEW);
+    setProgressMessage(`심층대본 ${initialAssets.length}씬이 로드되었습니다. 확인 후 생성을 시작하세요.`);
+  }, []);
+
   // ── Engine V2.0: 고급 대본 전용 에셋 생성 ──
   // Sprint 4: 일관성 모드 시 의존 그래프 기반 이미지 순차 생성
   // 현재는 handleApproveScript에 위임 (Sprint 4에서 순차 로직 추가 예정)
@@ -1540,15 +1621,7 @@ const AppContent: React.FC<{
         <DeepScript
           isAuthenticated={isAuthenticated}
           onShowAuthModal={() => setShowAuthModal(true)}
-          onStartStoryboard={(script, styleId) => {
-            // 심층대본 → 스토리보드 직접 연결
-            if (styleId) localStorage.setItem('tubegen_image_style', styleId);
-            setViewMode('main');
-            // 약간의 딜레이 후 수동 대본으로 생성 시작
-            setTimeout(() => {
-              handleGenerate('Manual Script Input', script);
-            }, 100);
-          }}
+          onStartStoryboard={handleDeepScriptToStoryboard}
         />
       )}
 
