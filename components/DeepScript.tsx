@@ -1,7 +1,22 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { generateDeepScript } from '../services/geminiService';
 import { CONFIG } from '../config';
+
+// ── SSE 진행 상태 타입 ──
+interface StepProgress {
+  step: number;
+  total: number;
+  status: 'working' | 'done' | 'complete';
+  label?: string;
+  icon?: string;
+  detail?: string;
+  preview?: string;
+  charCount?: number;
+  auditPreview?: string;
+  improvements?: number;
+  script?: string;
+  error?: string;
+}
 
 interface DeepScriptProps {
   isAuthenticated: boolean;
@@ -110,25 +125,96 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [steps, setSteps] = useState<StepProgress[]>([]);
+  const [currentStep, setCurrentStep] = useState<StepProgress | null>(null);
   const resultRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     if (!isAuthenticated) { onShowAuthModal(); return; }
     if (!topic.trim()) return;
 
     setIsGenerating(true);
     setError('');
     setResult('');
+    setSteps([]);
+    setCurrentStep(null);
+
+    abortRef.current = new AbortController();
 
     try {
-      const script = await generateDeepScript(topic.trim(), language, style, String(durationSec), mode);
-      setResult(script);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const customKey = localStorage.getItem(CONFIG.STORAGE_KEYS.GEMINI_API_KEY);
+      if (customKey) headers['x-custom-api-key'] = customKey;
+      const sessionToken = localStorage.getItem('c2gen_session_token');
+      if (sessionToken) headers['x-session-token'] = sessionToken;
+
+      const response = await fetch('/api/deep-script', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ topic: topic.trim(), language, style, length: String(durationSec), mode }),
+        signal: abortRef.current.signal,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(errData.error || `HTTP ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Streaming not supported');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (payload === '[DONE]') continue;
+
+          try {
+            const event: StepProgress = JSON.parse(payload);
+            if (event.error) {
+              setError(event.error);
+              continue;
+            }
+
+            if (event.status === 'working') {
+              setCurrentStep(event);
+            } else if (event.status === 'done') {
+              setSteps(prev => [...prev, { ...event, ...(currentStep || {}) }]);
+              setCurrentStep(null);
+            } else if (event.status === 'complete' && event.script) {
+              setResult(event.script);
+              setSteps(prev => [...prev, event]);
+              setCurrentStep(null);
+            }
+          } catch { /* skip malformed */ }
+        }
+      }
     } catch (err: any) {
-      setError(err.message || '대본 생성에 실패했습니다.');
+      if (err.name !== 'AbortError') {
+        setError(err.message || '대본 생성에 실패했습니다.');
+      }
     } finally {
       setIsGenerating(false);
+      abortRef.current = null;
     }
-  };
+  }, [isAuthenticated, onShowAuthModal, topic, language, style, durationSec, mode]);
+
+  const handleAbort = useCallback(() => {
+    abortRef.current?.abort();
+    setIsGenerating(false);
+    setCurrentStep(null);
+  }, []);
 
   const handleCopy = async () => {
     if (!result) return;
@@ -333,8 +419,8 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
             <label className="block text-[11px] font-bold mb-1" style={{ color: 'var(--text-muted)' }}>생성 모드</label>
             <div className="flex gap-1.5">
               {([
-                { value: 'fast' as const, label: '빠른 생성', desc: '1회 생성' },
-                { value: 'deep' as const, label: '심층 생성', desc: '생성→감사→개선' },
+                { value: 'fast' as const, label: '⚡ 빠른 생성' },
+                { value: 'deep' as const, label: '🔬 심층 생성' },
               ]).map(m => (
                 <button
                   key={m.value}
@@ -346,38 +432,118 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
                     color: mode === m.value ? '#a855f7' : 'var(--text-secondary)',
                     border: `1px solid ${mode === m.value ? 'rgba(168,85,247,0.4)' : 'var(--border-subtle)'}`,
                   }}
-                  title={m.desc}
                 >
                   {m.label}
                 </button>
               ))}
             </div>
+            {/* 생성 모드 설명 카드 */}
+            <div className="mt-1.5 rounded-md px-3 py-2" style={{ backgroundColor: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)' }}>
+              {mode === 'fast' ? (
+                <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  ⚡ Gemini Pro 1회 호출로 빠르게 대본을 생성합니다.<br />
+                  소요시간: 약 15~30초
+                </p>
+              ) : (
+                <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  🔬 <strong style={{ color: 'var(--text-secondary)' }}>3단계 Self-Refine</strong> — AI가 초안 작성 → 10가지 기준으로 품질 감사 → 피드백 반영 개선을 거쳐 완성도 높은 대본을 만듭니다.<br />
+                  소요시간: 약 40~90초 · Gemini Pro 3회 호출
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* 생성 버튼 */}
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating || !topic.trim()}
-          className="w-full py-2.5 rounded-lg text-[13px] font-bold transition-all disabled:opacity-40"
-          style={{
-            background: isGenerating
-              ? 'var(--bg-elevated)'
-              : 'linear-gradient(135deg, #a855f7, #7c3aed)',
-            color: isGenerating ? 'var(--text-muted)' : '#ffffff',
-          }}
-        >
-          {isGenerating ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round" />
-              </svg>
-              AI가 심층 대본을 작성 중입니다...
-            </span>
-          ) : (
-            '심층대본 생성'
-          )}
-        </button>
+        {!isGenerating ? (
+          <button
+            onClick={handleGenerate}
+            disabled={!topic.trim()}
+            className="w-full py-2.5 rounded-lg text-[13px] font-bold transition-all disabled:opacity-40"
+            style={{
+              background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+              color: '#ffffff',
+            }}
+          >
+            {mode === 'fast' ? '⚡ 빠른 생성' : '🔬 심층대본 생성'}
+          </button>
+        ) : (
+          /* ── 진행 상태 UI ── */
+          <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)' }}>
+            {/* 프로그레스 바 */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-subtle)' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-700 ease-out"
+                  style={{
+                    width: `${currentStep ? ((currentStep.step - 1) / currentStep.total) * 100 : steps.length > 0 ? (steps[steps.length - 1].step / (steps[steps.length - 1].total || 1)) * 100 : 0}%`,
+                    background: 'linear-gradient(90deg, #a855f7, #7c3aed)',
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleAbort}
+                className="px-2 py-1 rounded text-[10px] font-medium hover:brightness-110"
+                style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+              >
+                중단
+              </button>
+            </div>
+
+            {/* 현재 진행 단계 */}
+            {currentStep && (
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: '#a855f7' }} viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round" />
+                </svg>
+                <span className="text-[12px] font-bold" style={{ color: '#a855f7' }}>
+                  {currentStep.icon} {currentStep.label}
+                </span>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  ({currentStep.step}/{currentStep.total})
+                </span>
+              </div>
+            )}
+            {currentStep?.detail && (
+              <p className="text-[11px] mb-3 ml-6" style={{ color: 'var(--text-muted)' }}>
+                {currentStep.detail}
+              </p>
+            )}
+
+            {/* 완료된 단계들 */}
+            {steps.length > 0 && (
+              <div className="space-y-1.5 ml-1">
+                {steps.map((s, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="text-[11px] flex-shrink-0" style={{ color: '#10b981' }}>✓</span>
+                    <div className="flex-1">
+                      <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        {s.step === 1 && `초안 완료`}
+                        {s.step === 1 && s.charCount && ` (${s.charCount.toLocaleString()}자)`}
+                        {s.step === 2 && `품질 감사 완료`}
+                        {s.step === 2 && s.improvements && ` (개선점 ${s.improvements}건)`}
+                        {s.step === 3 && `최종 개선 완료`}
+                        {s.step === 3 && s.charCount && ` (${s.charCount.toLocaleString()}자)`}
+                      </span>
+                      {/* 초안 미리보기 */}
+                      {s.step === 1 && s.preview && (
+                        <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                          "{s.preview}..."
+                        </p>
+                      )}
+                      {/* 감사 결과 미리보기 */}
+                      {s.step === 2 && s.auditPreview && (
+                        <p className="text-[10px] mt-0.5 whitespace-pre-line" style={{ color: 'var(--text-muted)' }}>
+                          {s.auditPreview.slice(0, 200)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 에러 */}
