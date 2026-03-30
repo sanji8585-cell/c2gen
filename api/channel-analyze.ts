@@ -3,28 +3,73 @@ import { GoogleGenAI } from '@google/genai';
 
 // ── YouTube 채널 ID 추출 ──
 
-async function resolveChannelId(input: string): Promise<string | null> {
-  // @handle 또는 /channel/UCXXX 또는 /c/name 패턴 처리
-  const handleMatch = input.match(/@([\w-]+)/);
-  const channelIdMatch = input.match(/\/channel\/(UC[\w-]+)/);
+async function resolveChannelId(input: string): Promise<{ channelId: string; channelName: string } | null> {
+  const url = input.trim();
 
-  if (channelIdMatch) return channelIdMatch[1];
+  // 1. /channel/UCXXX 직접 패턴
+  const channelIdMatch = url.match(/\/channel\/(UC[\w-]+)/);
+  if (channelIdMatch) return { channelId: channelIdMatch[1], channelName: channelIdMatch[1] };
 
-  // @handle → 채널 페이지에서 channel ID 추출
-  const handle = handleMatch?.[1] || input.replace(/^https?:\/\/(www\.)?youtube\.com\/?/, '').replace(/^@/, '').split('/')[0];
+  // 2. @handle 추출 (한글/유니코드 지원)
+  const handleMatch = url.match(/@([^\s/]+)/);
+  const handle = handleMatch?.[1]
+    || url.replace(/^https?:\/\/(www\.)?youtube\.com\/?/, '').replace(/^@/, '').split('/')[0].split('?')[0];
+
   if (!handle) return null;
 
-  try {
-    const res = await fetch(`https://www.youtube.com/@${handle}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; C2Gen/1.0)' },
-    });
-    const html = await res.text();
-    // channelId는 meta 태그 또는 JSON에 포함
-    const cidMatch = html.match(/"channelId":"(UC[\w-]+)"/);
-    return cidMatch?.[1] || null;
-  } catch {
-    return null;
+  // 방법 A: YouTube 페이지 fetch (다양한 User-Agent 시도)
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+  ];
+
+  for (const ua of userAgents) {
+    try {
+      const res = await fetch(`https://www.youtube.com/@${encodeURIComponent(handle)}`, {
+        headers: {
+          'User-Agent': ua,
+          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8',
+          'Accept': 'text/html',
+        },
+        redirect: 'follow',
+      });
+      const html = await res.text();
+
+      // channelId 추출 (여러 패턴 시도)
+      const patterns = [
+        /"channelId":"(UC[\w-]+)"/,
+        /channel_id=(UC[\w-]+)/,
+        /"externalId":"(UC[\w-]+)"/,
+        /data-channel-external-id="(UC[\w-]+)"/,
+        /<meta\s+itemprop="channelId"\s+content="(UC[\w-]+)"/,
+        /browse_id":"(UC[\w-]+)"/,
+      ];
+
+      for (const pat of patterns) {
+        const m = html.match(pat);
+        if (m) {
+          // 채널 이름도 추출 시도
+          const nameMatch = html.match(/"title":"([^"]+)"/) || html.match(/<title>([^<]+)/);
+          const name = nameMatch?.[1]?.replace(/ - YouTube$/, '').trim() || handle;
+          return { channelId: m[1], channelName: name };
+        }
+      }
+    } catch { /* 다음 UA 시도 */ }
   }
+
+  // 방법 B: YouTube oembed API (handle → 채널 정보)
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/@${encodeURIComponent(handle)}&format=json`;
+    const res = await fetch(oembedUrl);
+    if (res.ok) {
+      const data = await res.json();
+      // oembed는 channelId를 직접 주지 않지만 author_url에서 추출 가능
+      const cidMatch = data.author_url?.match(/\/channel\/(UC[\w-]+)/);
+      if (cidMatch) return { channelId: cidMatch[1], channelName: data.author_name || handle };
+    }
+  } catch { /* ignore */ }
+
+  return null;
 }
 
 // ── RSS 피드로 최근 영상 가져오기 (API 키 불필요) ──
@@ -147,10 +192,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // 1. 채널 ID 추출
-    const channelId = await resolveChannelId(channelUrl);
-    if (!channelId) {
-      return res.status(400).json({ error: '채널을 찾을 수 없습니다. URL을 확인해주세요.' });
+    const resolved = await resolveChannelId(channelUrl);
+    if (!resolved) {
+      return res.status(400).json({ error: '채널을 찾을 수 없습니다. URL을 확인해주세요. (예: https://youtube.com/@채널명)' });
     }
+    const { channelId, channelName: resolvedName } = resolved;
 
     // 2. 최근 영상 목록 (RSS, API 키 불필요)
     const videos = await getRecentVideos(channelId, 8);
@@ -175,7 +221,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 4. Gemini 스타일 분석
-    const channelName = channelUrl.match(/@([\w-]+)/)?.[1] || channelId;
+    const channelName = resolvedName || channelId;
     const style = await analyzeChannelStyle(transcripts, channelName, apiKey);
 
     return res.json({
