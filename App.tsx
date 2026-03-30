@@ -633,11 +633,17 @@ const AppContent: React.FC<{
       }
     }
 
-    // 대본을 빈 줄 기준으로 씬 분할
-    const scenes = script
+    // 대본 전처리: 메타 텍스트/마크다운 헤딩 제거 후 씬 분할
+    const preprocessed = script
+      .replace(/^#{1,4}\s+.*$/gm, '')               // ### 최종 대본 등 마크다운 헤딩 줄 제거
+      .replace(/^---+$/gm, '')                       // --- 구분선 제거
+      .replace(/^\*\*최종\s*대본\*\*.*$/gm, '')       // **최종 대본** 라벨 줄 제거
+      .trim();
+
+    const scenes = preprocessed
       .split(/\n\s*\n/)
       .map(block => block.trim())
-      .filter(block => block.length > 0);
+      .filter(block => block.length > 5);            // 5자 미만 블록 무시 (빈 줄/잔여물)
 
     if (scenes.length === 0) {
       setProgressMessage('대본이 비어있습니다.');
@@ -653,11 +659,18 @@ const AppContent: React.FC<{
       const { cleanNarration: parsed, directives } = parseDirectives(sceneText);
       // 추가 정제: 마크다운(**bold**, ##), 씬 번호(**S#1**), 남은 디렉티브 괄호 제거
       const cleanNarration = parsed
-        .replace(/\*\*S?#?\d+\*\*/g, '')           // **S#18**, **#1** 등 씬 번호
-        .replace(/\*\*(내레이션|나레이션|Narration)[:\s]?\*\*/gi, '') // **내레이션:** 라벨
-        .replace(/\*\*/g, '')                       // 남은 ** 마크다운 볼드
-        .replace(/\((?:배경|분위기|구도|카메라|색상|텍스트|자막|스타일|화자|이전씬유지|같은장소|시간경과)[^)]*\)/g, '') // 남은 디렉티브 괄호
-        .replace(/\s{2,}/g, ' ')                    // 다중 공백 정리
+        .replace(/^#{1,4}\s+.*$/gm, '')             // ### 최종 대본, ## 제목 등 마크다운 헤딩 (줄 전체 제거)
+        .replace(/\*\*\(?씬\s*\d+\)?\*\*/g, '')     // **(씬 1)**, **(씬 2)** 패턴
+        .replace(/\*\*S?#?\d+\*\*/g, '')            // **S#18**, **#1** 등 씬 번호
+        .replace(/\*\*(내레이션|나레이션|Narration|최종\s*대본)[:\s]?\*\*/gi, '') // **내레이션:**, **최종 대본** 라벨
+        .replace(/\*\*/g, '')                        // 남은 ** 마크다운 볼드
+        .replace(/\((?:배경|분위기|구도|카메라|색상|텍스트|자막|스타일|화자|이전씬유지|같은장소|시간경과|색조|앵글)[^)]*\)/g, '') // 남은 디렉티브 괄호
+        .replace(/^["\s]*\(씬\s*\d+\)\s*/gm, '')    // (씬 1) (볼드 없는 버전)
+        .replace(/^씬\s*\d+[.:]\s*/gm, '')           // 씬 1: 또는 씬 1.
+        .replace(/"\)\s*$/g, '')                     // 끝에 붙은 ")
+        .replace(/^\s*"\s*/gm, '')                   // 줄 시작의 홀따옴표
+        .replace(/\n{2,}/g, ' ')                     // 여러 줄바꿈 → 공백
+        .replace(/\s{2,}/g, ' ')                     // 다중 공백 정리
         .trim();
       const sentiment = directives.MOOD === '밝음' || directives.MOOD === '따뜻함' ? 'POSITIVE' as const
         : directives.MOOD === '어두움' || directives.MOOD === '긴장' ? 'NEGATIVE' as const
