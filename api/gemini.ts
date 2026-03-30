@@ -757,6 +757,84 @@ ${userIntent}
         return res.json({ script: response.text ?? '', creditBalance: advCreditResult.balance });
       }
 
+      case 'generateDeepScript': {
+        const { topic, language, style, length } = params;
+        if (!topic) return res.status(400).json({ error: 'topic required' });
+
+        // 운영자 전용 — 크레딧 차감 없음 (Pro 모델 사용)
+        const langName = language === 'en' ? 'English' : language === 'ja' ? '日本語' : '한국어';
+
+        // length를 초 단위로 파싱 → 씬 수 자동 계산
+        const durationSec = parseInt(length, 10) || 180;
+        const secPerScene = 12;
+        const minScenes = Math.max(1, Math.floor(durationSec / (secPerScene + 3)));
+        const maxScenes = Math.max(minScenes, Math.ceil(durationSec / (secPerScene - 3)));
+        const durationMin = Math.floor(durationSec / 60);
+        const durationRemSec = durationSec % 60;
+        const durationStr = durationMin > 0
+          ? (durationRemSec > 0 ? `${durationMin}분 ${durationRemSec}초` : `${durationMin}분`)
+          : `${durationSec}초`;
+        const lengthGuide = `${minScenes}~${maxScenes}씬 (${durationStr} 영상)`;
+
+        const styleGuide = style === 'documentary' ? '다큐멘터리 (객관적, 정보 중심, 전문가 톤)'
+          : style === 'storytelling' ? '스토리텔링 (감성적, 서사 구조, 몰입감)'
+          : style === 'educational' ? '교육용 (명확한 설명, 단계적 구성, 쉬운 용어)'
+          : style === 'viral' ? '바이럴 (훅 강조, 짧은 문장, 감정 롤러코스터)'
+          : '자연스러운 톤 (주제에 맞게 자동 선택)';
+
+        const deepPrompt = `당신은 최고 수준의 영상 대본 작가입니다. 주제를 깊이 분석하고, 시청자를 끝까지 몰입시키는 심층 대본을 작성하세요.
+
+## 작성 언어
+${langName}
+
+## 대본 스타일
+${styleGuide}
+
+## 대본 길이
+${lengthGuide}
+
+## 핵심 원칙
+1. **리서치 퀄리티**: 주제에 대한 깊이 있는 정보, 통계, 사례를 포함하세요
+2. **구조적 완성도**: 도입(훅) → 문제 제기 → 전개 → 클라이맥스 → 결론/CTA 흐름을 따르세요
+3. **감정 곡선**: 씬마다 감정 강도를 조절하세요 (긴장→이완→긴장→카타르시스)
+4. **시각화 고려**: 각 문장이 하나의 이미지로 표현될 것임을 고려하세요
+5. **디렉티브 포함**: 연출 지시를 적절히 배치하세요
+
+## 디렉티브 문법
+각 문장 끝에 괄호로 연출 지시를 넣을 수 있습니다:
+- (배경: 설명) — 배경 장면
+- (분위기: 밝음/어두움/중립) — 이미지 톤
+- (구도: 클로즈업/미디엄샷/와이드샷/캐릭터없음) — 카메라 구도
+- (이전씬유지) — 이전 씬과 같은 배경 유지
+- (텍스트: "표시할 내용") — 이미지 내 텍스트
+- (색상: 설명) — 색상 강조
+
+## 작성 규칙
+- 한 문장 = 1개 씬 (마침표로 구분)
+- 씬과 씬 사이에 빈 줄 1개
+- 첫 씬은 반드시 강력한 훅으로 시작
+- 3~4씬마다 패턴 전환 (톤, 속도, 시점 변화)
+- 마지막 씬은 CTA 또는 여운이 남는 마무리
+- 설명, 주석, 메타 코멘트 없이 대본만 출력
+
+## 주제
+${topic}
+
+완성된 대본만 출력하세요.`;
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-pro',
+          contents: deepPrompt,
+          config: {
+            thinkingConfig: { thinkingBudget: 32768 },
+            maxOutputTokens: 65536,
+          },
+        });
+
+        logUsage(req, 'deep_script', 0);
+        return res.json({ script: response.text ?? '' });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
