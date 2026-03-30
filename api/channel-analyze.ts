@@ -163,7 +163,7 @@ ${videoData}
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: prompt,
-    config: { maxOutputTokens: 2048 },
+    config: { maxOutputTokens: 2048, responseMimeType: 'application/json' },
   });
 
   const text = response.text ?? '';
@@ -171,10 +171,29 @@ ${videoData}
 
   try {
     return JSON.parse(cleaned);
-  } catch {
+  } catch (parseErr) {
+    console.error('[channel-analyze] JSON parse failed. Raw:', text.slice(0, 500));
+    // Gemini 응답이 JSON이 아닌 경우: 텍스트에서 직접 추출 시도
+    const extractField = (key: string) => {
+      const m = text.match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i'));
+      return m?.[1] || '';
+    };
+    const extractedTone = extractField('tone');
+    if (extractedTone) {
+      // 부분 파싱 성공
+      return {
+        channelName,
+        tone: extractedTone,
+        hookPattern: extractField('hookPattern') || '추론 불가',
+        sentenceStyle: extractField('sentenceStyle') || '추론 불가',
+        structure: extractField('structure') || '추론 불가',
+        characteristics: [extractField('characteristics') || '제목 기반 분석'].filter(Boolean),
+        samplePrompt: extractField('samplePrompt') || '',
+      };
+    }
     return {
       channelName,
-      tone: '분석 실패 — 자막이 충분하지 않습니다',
+      tone: '분석 실패 — 제목 정보가 충분하지 않습니다',
       hookPattern: '알 수 없음',
       sentenceStyle: '알 수 없음',
       structure: '알 수 없음',
