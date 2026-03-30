@@ -10,65 +10,57 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; cha
   const channelIdMatch = url.match(/\/channel\/(UC[\w-]+)/);
   if (channelIdMatch) return { channelId: channelIdMatch[1], channelName: channelIdMatch[1] };
 
-  // 2. @handle 추출 (한글/유니코드 지원)
-  // 지원 형식: @슈카월드, 슈카월드, https://youtube.com/@슈카월드, youtube.com/@슈카월드
+  // 2. @handle 또는 검색어 추출
   const handleMatch = url.match(/@([^\s/]+)/);
   let handle = handleMatch?.[1]
     || url.replace(/^https?:\/\/(www\.)?youtube\.com\/?/, '').replace(/^@/, '').split('/')[0].split('?')[0];
-
-  // 공백/특수문자 정리
   handle = handle.trim().replace(/^@/, '');
   if (!handle) return null;
 
-  // 방법 A: YouTube 페이지 fetch (다양한 User-Agent 시도)
-  const userAgents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-  ];
-
-  for (const ua of userAgents) {
+  // YouTube Data API v3로 채널 검색 (가장 안정적)
+  const ytApiKey = process.env.YOUTUBE_DATA_API_KEY || process.env.GEMINI_API_KEY;
+  if (ytApiKey) {
     try {
-      const res = await fetch(`https://www.youtube.com/@${encodeURIComponent(handle)}`, {
-        headers: {
-          'User-Agent': ua,
-          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8',
-          'Accept': 'text/html',
-        },
-        redirect: 'follow',
-      });
+      // @handle로 직접 조회 시도
+      const handleRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${ytApiKey}`
+      );
+      if (handleRes.ok) {
+        const data = await handleRes.json();
+        const item = data.items?.[0];
+        if (item) {
+          return {
+            channelId: item.snippet.channelId || item.id.channelId,
+            channelName: item.snippet.channelTitle || handle,
+          };
+        }
+      }
+    } catch { /* 폴백으로 진행 */ }
+  }
+
+  // 폴백: YouTube 페이지 직접 fetch (Vercel에서는 봇 감지로 실패할 수 있음)
+  try {
+    const res = await fetch(`https://www.youtube.com/@${handle}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept-Language': 'ko-KR,ko;q=0.9',
+      },
+    });
+    if (res.ok) {
       const html = await res.text();
-
-      // channelId 추출 (여러 패턴 시도)
       const patterns = [
-        /"channelId":"(UC[\w-]+)"/,
+        /<link rel="canonical" href="[^"]*\/channel\/(UC[\w-]+)"/,
+        /"browseId":"(UC[\w-]+)"/,
         /channel_id=(UC[\w-]+)/,
-        /"externalId":"(UC[\w-]+)"/,
-        /data-channel-external-id="(UC[\w-]+)"/,
-        /<meta\s+itemprop="channelId"\s+content="(UC[\w-]+)"/,
-        /browse_id":"(UC[\w-]+)"/,
+        /"channelId":"(UC[\w-]+)"/,
       ];
-
       for (const pat of patterns) {
         const m = html.match(pat);
         if (m) {
-          // 채널 이름도 추출 시도
-          const nameMatch = html.match(/"title":"([^"]+)"/) || html.match(/<title>([^<]+)/);
-          const name = nameMatch?.[1]?.replace(/ - YouTube$/, '').trim() || handle;
-          return { channelId: m[1], channelName: name };
+          const nameMatch = html.match(/<title>([^<]+)/);
+          return { channelId: m[1], channelName: nameMatch?.[1]?.replace(/ - YouTube$/, '').trim() || handle };
         }
       }
-    } catch { /* 다음 UA 시도 */ }
-  }
-
-  // 방법 B: YouTube oembed API (handle → 채널 정보)
-  try {
-    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/@${encodeURIComponent(handle)}&format=json`;
-    const res = await fetch(oembedUrl);
-    if (res.ok) {
-      const data = await res.json();
-      // oembed는 channelId를 직접 주지 않지만 author_url에서 추출 가능
-      const cidMatch = data.author_url?.match(/\/channel\/(UC[\w-]+)/);
-      if (cidMatch) return { channelId: cidMatch[1], channelName: data.author_name || handle };
     }
   } catch { /* ignore */ }
 
