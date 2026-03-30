@@ -107,23 +107,8 @@ async function getRecentVideos(channelId: string, maxResults = 15): Promise<Vide
   return videos;
 }
 
-// ── 영상 설명 추출 (자막 대안 — YouTube 봇 방지로 자막 직접 추출 불가) ──
-
-async function getVideoDescription(videoId: string): Promise<string | null> {
-  try {
-    // oembed API로 제목 가져오기
-    const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-    if (oembedRes.ok) {
-      const data = await oembedRes.json();
-      return data.title || null;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// ── Gemini로 스타일 분석 ──
+// ── Gemini로 YouTube 영상 대사 추출 + 스타일 분석 ──
+// Gemini는 YouTube URL을 직접 이해하고 대사를 추출할 수 있음
 
 function pickGeminiKey(): string | undefined {
   const keys = [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2].filter(Boolean) as string[];
@@ -140,30 +125,34 @@ interface ChannelStyle {
   samplePrompt: string;
 }
 
-async function analyzeChannelStyle(videoData: string, channelName: string, apiKey: string): Promise<ChannelStyle> {
+async function analyzeChannelStyle(videos: VideoInfo[], channelName: string, apiKey: string): Promise<ChannelStyle> {
   const ai = new GoogleGenAI({ apiKey });
 
-  const prompt = `아래는 유튜브 채널 "${channelName}"의 최근 영상 제목과 설명입니다.
-제목 패턴, 주제 선택, 톤, 타겟 시청자, 콘텐츠 장르를 추론하세요.
-제목이 짧더라도 반복되는 패턴, 장르, 키워드, 해시태그에서 채널의 성격을 파악하세요.
+  // Gemini에게 YouTube URL을 직접 주고 대사 추출 + 스타일 분석 요청
+  const videoUrls = videos.slice(0, 5).map((v, i) =>
+    `[영상 ${i + 1}] "${v.title}" — https://www.youtube.com/watch?v=${v.id}`
+  ).join('\n');
 
-${videoData}
+  const prompt = `아래 유튜브 채널 "${channelName}"의 영상들을 분석해주세요.
+각 영상의 URL에 접근하여 대사/나레이션을 추출하고, 이 채널의 대본 스타일을 분석하세요.
 
-다음 JSON 형식으로 출력하세요 (JSON만, 설명 없이):
+${videoUrls}
+
+다음 JSON 형식으로 출력하세요:
 {
   "channelName": "${channelName}",
-  "tone": "이 채널의 예상 톤 한 문장 (예: 친근하고 유머러스한 톤, 전문적이고 차분한 톤)",
-  "hookPattern": "예상 도입부(훅) 패턴 (예: 질문형, 충격 팩트, 감성 오프닝, 상황극)",
-  "sentenceStyle": "예상 문장 스타일 (예: 짧고 임팩트 있는 문장, 대화체, 스토리텔링)",
-  "structure": "예상 영상 구조 (예: 도입→전개→반전→마무리, 일상 브이로그형, 리스트형)",
-  "characteristics": ["채널 특징 3가지 — 장르, 타겟 시청자, 고유한 스타일 등"],
-  "samplePrompt": "이 채널 스타일을 모방하여 대본을 작성하기 위한 프롬프트 지시문 3~5문장. 채널의 톤, 문장 스타일, 구조 패턴을 구체적으로 지시하세요."
+  "tone": "이 채널의 톤 (예: 친근한 언니 톤, 전문가 뉴스 앵커 톤, 유머러스한 예능 톤)",
+  "hookPattern": "도입부(훅) 패턴 (예: 질문형 오프닝, 충격 팩트, 감성적 시작, 상황극)",
+  "sentenceStyle": "문장 스타일 (예: 짧고 끊어치기, 대화체, 서술형 나레이션, 감탄사 활용)",
+  "structure": "영상 구조 (예: 도입→전개→반전→마무리, 리스트형, 일상 브이로그형)",
+  "characteristics": ["특징1", "특징2", "특징3"],
+  "samplePrompt": "이 채널 스타일로 대본을 생성하기 위한 구체적 프롬프트 지시문 3~5문장. 톤, 문장 길이, 훅 패턴, 구조를 명확히 지시하세요."
 }`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: prompt,
-    config: { maxOutputTokens: 2048, responseMimeType: 'application/json' },
+    config: { maxOutputTokens: 4096, responseMimeType: 'application/json' },
   });
 
   const text = response.text ?? '';
@@ -171,29 +160,11 @@ ${videoData}
 
   try {
     return JSON.parse(cleaned);
-  } catch (parseErr) {
+  } catch {
     console.error('[channel-analyze] JSON parse failed. Raw:', text.slice(0, 500));
-    // Gemini 응답이 JSON이 아닌 경우: 텍스트에서 직접 추출 시도
-    const extractField = (key: string) => {
-      const m = text.match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i'));
-      return m?.[1] || '';
-    };
-    const extractedTone = extractField('tone');
-    if (extractedTone) {
-      // 부분 파싱 성공
-      return {
-        channelName,
-        tone: extractedTone,
-        hookPattern: extractField('hookPattern') || '추론 불가',
-        sentenceStyle: extractField('sentenceStyle') || '추론 불가',
-        structure: extractField('structure') || '추론 불가',
-        characteristics: [extractField('characteristics') || '제목 기반 분석'].filter(Boolean),
-        samplePrompt: extractField('samplePrompt') || '',
-      };
-    }
     return {
       channelName,
-      tone: '분석 실패 — 제목 정보가 충분하지 않습니다',
+      tone: '분석 실패',
       hookPattern: '알 수 없음',
       sentenceStyle: '알 수 없음',
       structure: '알 수 없음',
@@ -230,21 +201,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: '채널에서 영상을 찾을 수 없습니다.' });
     }
 
-    // 3. 제목 + 설명 기반 분석 데이터 구성
-    const videoData = videos.map((v, i) =>
-      `[${i + 1}] 제목: ${v.title}${v.description && v.description.length > 3 ? `\n    설명: ${v.description.slice(0, 200)}` : ''}`
-    ).join('\n');
-    const analyzedTitles = videos.map(v => v.title);
-
-    // 4. Gemini 스타일 분석
+    // 3. Gemini에게 YouTube URL 직접 전달 → 대사 추출 + 스타일 분석
     const channelName = resolvedName || channelId;
-    const style = await analyzeChannelStyle(videoData, channelName, apiKey);
+    const style = await analyzeChannelStyle(videos, channelName, apiKey);
+    const analyzedTitles = videos.slice(0, 5).map(v => v.title);
 
     return res.json({
       success: true,
       style,
-      analyzedCount: videos.length,
-      analyzedTitles: analyzedTitles.slice(0, 5),
+      analyzedCount: Math.min(videos.length, 5),
+      analyzedTitles,
     });
   } catch (error: any) {
     console.error('[channel-analyze]', error.message);
