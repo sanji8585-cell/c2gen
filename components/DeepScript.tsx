@@ -164,6 +164,8 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
   const [savedList, setSavedList] = useState<Array<{ id: string; topic: string; style: string; duration_sec: number; mode: string; scene_count: number; char_count: number; created_at: string }>>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [refMode, setRefMode] = useState<'channel' | 'script'>('channel');
+  const [refScript, setRefScript] = useState('');
   const [channelUrl, setChannelUrl] = useState('');
   const [channelStyle, setChannelStyle] = useState<{
     channelName: string; tone: string; hookPattern: string;
@@ -204,6 +206,57 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
       setIsAnalyzingChannel(false);
     }
   }, [channelUrl, isAnalyzingChannel, apiHeaders]);
+
+  const handleAnalyzeScript = useCallback(async () => {
+    if (!refScript.trim() || isAnalyzingChannel) return;
+    setIsAnalyzingChannel(true);
+    setChannelError('');
+    setChannelStyle(null);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const customKey = localStorage.getItem(CONFIG.STORAGE_KEYS.GEMINI_API_KEY);
+      if (customKey) headers['x-custom-api-key'] = customKey;
+
+      const res = await fetch('/api/gemini', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          action: 'generateAdvancedScript',
+          userIntent: `아래 대본의 스타일을 분석해줘. JSON으로 출력:
+{"channelName":"참조 대본","tone":"톤","hookPattern":"훅 패턴","sentenceStyle":"문장 스타일","structure":"구조","characteristics":["특징1","특징2"],"samplePrompt":"이 스타일로 대본을 생성하기 위한 프롬프트 지시문 3~5문장"}
+
+대본:
+${refScript.slice(0, 3000)}`,
+          settings: { format: 'free', speakerCount: '1', mood: 'neutral', sceneConnection: 'independent' },
+          language: 'ko',
+          assistMode: 'create',
+        }),
+      });
+      const data = await res.json();
+      const scriptText = data.script || '';
+      const jsonMatch = scriptText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        setChannelStyle(parsed);
+        setAnalyzedCount(1);
+      } else {
+        // Gemini가 JSON이 아닌 텍스트로 응답한 경우
+        setChannelStyle({
+          channelName: '참조 대본',
+          tone: scriptText.slice(0, 100),
+          hookPattern: '대본에서 추출',
+          sentenceStyle: '대본에서 추출',
+          structure: '대본에서 추출',
+          characteristics: ['직접 입력 대본 기반'],
+          samplePrompt: scriptText.slice(0, 300),
+        });
+        setAnalyzedCount(1);
+      }
+    } catch (err: any) {
+      setChannelError(err.message || '대본 분석 실패');
+    } finally {
+      setIsAnalyzingChannel(false);
+    }
+  }, [refScript, isAnalyzingChannel]);
 
   const handleSave = useCallback(async () => {
     if (!result || saveStatus === 'saving') return;
@@ -443,35 +496,96 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
         </div>
       )}
 
-      {/* 참조 채널 (선택사항) */}
+      {/* 참조 스타일 (선택사항) */}
       <div className="rounded-xl border p-4 mb-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
-        <label className="block text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
-          🔗 참조 채널 <span className="font-normal">(선택사항 — 유튜브 채널의 대본 스타일을 분석합니다)</span>
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={channelUrl}
-            onChange={e => { setChannelUrl(e.target.value); if (channelStyle) { setChannelStyle(null); setChannelError(''); } }}
-            placeholder="@슈카월드 또는 채널 URL"
-            disabled={isAnalyzingChannel}
-            className="flex-1 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-            style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
-          />
-          <button
-            onClick={handleAnalyzeChannel}
-            disabled={!channelUrl.trim() || isAnalyzingChannel}
-            className="px-4 py-2 rounded-lg text-[12px] font-bold transition-all disabled:opacity-40"
-            style={{ backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}
-          >
-            {isAnalyzingChannel ? (
-              <span className="flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round" /></svg>
-                분석 중...
-              </span>
-            ) : '분석'}
-          </button>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>🔗 참조 스타일</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>(선택사항)</span>
+          <div className="flex gap-1 ml-auto">
+            <button
+              onClick={() => setRefMode('channel')}
+              className="px-2.5 py-1 rounded text-[10px] font-medium transition-all"
+              style={{
+                backgroundColor: refMode === 'channel' ? 'rgba(168,85,247,0.15)' : 'var(--bg-elevated)',
+                color: refMode === 'channel' ? '#a855f7' : 'var(--text-muted)',
+                border: `1px solid ${refMode === 'channel' ? 'rgba(168,85,247,0.3)' : 'var(--border-subtle)'}`,
+              }}
+            >
+              채널 URL
+            </button>
+            <button
+              onClick={() => setRefMode('script')}
+              className="px-2.5 py-1 rounded text-[10px] font-medium transition-all"
+              style={{
+                backgroundColor: refMode === 'script' ? 'rgba(168,85,247,0.15)' : 'var(--bg-elevated)',
+                color: refMode === 'script' ? '#a855f7' : 'var(--text-muted)',
+                border: `1px solid ${refMode === 'script' ? 'rgba(168,85,247,0.3)' : 'var(--border-subtle)'}`,
+              }}
+            >
+              대본 직접 입력
+            </button>
+          </div>
         </div>
+
+        {/* 채널 URL 모드 */}
+        {refMode === 'channel' && (
+          <>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={channelUrl}
+                onChange={e => { setChannelUrl(e.target.value); if (channelStyle) { setChannelStyle(null); setChannelError(''); } }}
+                placeholder="@채널명 또는 채널 URL"
+                disabled={isAnalyzingChannel}
+                className="flex-1 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+              />
+              <button
+                onClick={handleAnalyzeChannel}
+                disabled={!channelUrl.trim() || isAnalyzingChannel}
+                className="px-4 py-2 rounded-lg text-[12px] font-bold transition-all disabled:opacity-40"
+                style={{ backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}
+              >
+                {isAnalyzingChannel ? '분석 중...' : '분석'}
+              </button>
+            </div>
+            <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              채널 제목 기반 스타일 추론입니다. 더 정확한 분석은 "대본 직접 입력"을 이용하세요.
+            </p>
+          </>
+        )}
+
+        {/* 대본 직접 입력 모드 */}
+        {refMode === 'script' && (
+          <>
+            <textarea
+              value={refScript}
+              onChange={e => { setRefScript(e.target.value); if (channelStyle) { setChannelStyle(null); setChannelError(''); } }}
+              placeholder={"참조할 대본을 붙여넣으세요.\n\nTip: Gemini(gemini.google.com)에서 YouTube 쇼츠 URL을 주고\n\"이 영상의 대사를 추출해줘\"라고 하면 대본을 받을 수 있습니다."}
+              disabled={isAnalyzingChannel}
+              className="w-full rounded-lg px-3 py-2.5 text-[12px] resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+              style={{
+                backgroundColor: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-primary)',
+                minHeight: '100px',
+              }}
+            />
+            <div className="flex items-center justify-between mt-1.5">
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                {refScript.length > 0 ? `${refScript.length}자` : ''}
+              </p>
+              <button
+                onClick={handleAnalyzeScript}
+                disabled={refScript.trim().length < 30 || isAnalyzingChannel}
+                className="px-4 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40"
+                style={{ backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}
+              >
+                {isAnalyzingChannel ? '분석 중...' : '스타일 분석'}
+              </button>
+            </div>
+          </>
+        )}
 
         {channelError && (
           <p className="text-[11px] mt-2" style={{ color: '#ef4444' }}>{channelError}</p>
