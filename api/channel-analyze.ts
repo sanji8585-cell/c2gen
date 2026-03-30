@@ -196,9 +196,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // 1. 채널 ID 추출
+    const debugLog: string[] = [];
+    const origResolve = resolveChannelId;
     const resolved = await resolveChannelId(channelUrl);
     if (!resolved) {
-      return res.status(400).json({ error: '채널을 찾을 수 없습니다. URL을 확인해주세요. (예: https://youtube.com/@채널명)' });
+      // 디버그: 어디서 실패했는지 알려주기 위해 간단한 테스트
+      const handle = channelUrl.replace(/^.*@/, '').replace(/^@/, '').split('/')[0].trim();
+      const ytKey = process.env.YOUTUBE_DATA_API_KEY || process.env.GEMINI_API_KEY;
+      let debugMsg = `handle="${handle}", hasApiKey=${!!ytKey}`;
+      try {
+        const testRes = await fetch(`https://www.youtube.com/@${handle}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        });
+        debugMsg += `, pageFetch=${testRes.status}`;
+      } catch (e: any) { debugMsg += `, pageFetchErr=${e.message}`; }
+      if (ytKey) {
+        try {
+          const ytRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${ytKey}`);
+          const ytText = await ytRes.text();
+          debugMsg += `, ytApi=${ytRes.status}:${ytText.slice(0, 200)}`;
+        } catch (e: any) { debugMsg += `, ytApiErr=${e.message}`; }
+      }
+      return res.status(400).json({ error: `채널을 찾을 수 없습니다. [debug: ${debugMsg}]` });
     }
     const { channelId, channelName: resolvedName } = resolved;
 
