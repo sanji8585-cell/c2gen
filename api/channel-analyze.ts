@@ -21,12 +21,13 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; cha
   const ytApiKey = process.env.YOUTUBE_DATA_API_KEY || process.env.GEMINI_API_KEY;
   if (ytApiKey) {
     try {
-      // @handle로 직접 조회 시도
-      const handleRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${ytApiKey}`
-      );
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${ytApiKey}`;
+      console.log('[channel-analyze] YouTube API search:', handle);
+      const handleRes = await fetch(searchUrl);
+      const responseText = await handleRes.text();
+      console.log('[channel-analyze] YouTube API status:', handleRes.status, 'length:', responseText.length);
       if (handleRes.ok) {
-        const data = await handleRes.json();
+        const data = JSON.parse(responseText);
         const item = data.items?.[0];
         if (item) {
           return {
@@ -34,11 +35,19 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; cha
             channelName: item.snippet.channelTitle || handle,
           };
         }
+        console.log('[channel-analyze] No items in YouTube API response');
+      } else {
+        console.log('[channel-analyze] YouTube API error:', responseText.slice(0, 300));
       }
-    } catch { /* 폴백으로 진행 */ }
+    } catch (e: any) {
+      console.log('[channel-analyze] YouTube API exception:', e.message);
+    }
+  } else {
+    console.log('[channel-analyze] No API key available');
   }
 
   // 폴백: YouTube 페이지 직접 fetch (Vercel에서는 봇 감지로 실패할 수 있음)
+  console.log('[channel-analyze] Trying page fetch for handle:', handle);
   try {
     const res = await fetch(`https://www.youtube.com/@${handle}`, {
       headers: {
@@ -46,8 +55,10 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; cha
         'Accept-Language': 'ko-KR,ko;q=0.9',
       },
     });
+    console.log('[channel-analyze] Page fetch status:', res.status);
     if (res.ok) {
       const html = await res.text();
+      console.log('[channel-analyze] HTML length:', html.length, 'has canonical:', html.includes('canonical'));
       const patterns = [
         /<link rel="canonical" href="[^"]*\/channel\/(UC[\w-]+)"/,
         /"browseId":"(UC[\w-]+)"/,
