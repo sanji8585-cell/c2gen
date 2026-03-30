@@ -77,100 +77,47 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; cha
 
 // ── RSS 피드로 최근 영상 가져오기 (API 키 불필요) ──
 
-interface VideoInfo { id: string; title: string; }
+interface VideoInfo { id: string; title: string; description: string; }
 
-async function getRecentVideos(channelId: string, maxResults = 10): Promise<VideoInfo[]> {
+async function getRecentVideos(channelId: string, maxResults = 15): Promise<VideoInfo[]> {
   const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
   const res = await fetch(rssUrl);
   if (!res.ok) return [];
 
   const xml = await res.text();
   const videos: VideoInfo[] = [];
+  const decode = (s: string) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
 
-  // 간단한 XML 파싱 (정규식)
   const entries = xml.match(/<entry>[\s\S]*?<\/entry>/g) || [];
   for (const entry of entries.slice(0, maxResults)) {
     const idMatch = entry.match(/<yt:videoId>([\w-]+)<\/yt:videoId>/);
     const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
+    const descMatch = entry.match(/<media:description>([\s\S]*?)<\/media:description>/);
     if (idMatch) {
       videos.push({
         id: idMatch[1],
-        title: titleMatch?.[1]?.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>') || '',
+        title: decode(titleMatch?.[1] || ''),
+        description: decode(descMatch?.[1] || ''),
       });
     }
   }
   return videos;
 }
 
-// ── 자막 추출 (YouTube 내부 API 직접 호출 — 패키지 의존 없음) ──
+// ── 영상 설명 추출 (자막 대안 — YouTube 봇 방지로 자막 직접 추출 불가) ──
 
-async function getTranscript(videoId: string): Promise<string | null> {
+async function getVideoDescription(videoId: string): Promise<string | null> {
   try {
-    // 1단계: 영상 페이지에서 자막 트랙 URL 추출
-    const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9',
-      },
-    });
-    const html = await pageRes.text();
-
-    // captionTracks JSON에서 자막 URL 추출
-    const captionMatch = html.match(/"captionTracks":\s*(\[[\s\S]*?\])/);
-    if (!captionMatch) return null;
-
-    let tracks: Array<{ baseUrl: string; languageCode: string }>;
-    try {
-      // JSON 파싱 — 이스케이프 처리
-      const cleaned = captionMatch[1].replace(/\\u0026/g, '&').replace(/\\"/g, '"');
-      tracks = JSON.parse(cleaned);
-    } catch {
-      // 정규식 폴백으로 baseUrl 추출
-      const urlMatch = captionMatch[1].match(/"baseUrl":"(https?:[^"]+)"/);
-      if (!urlMatch) return null;
-      const baseUrl = urlMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/');
-      const captionRes = await fetch(baseUrl);
-      const xml = await captionRes.text();
-      return parseTranscriptXml(xml);
+    // oembed API로 제목 가져오기
+    const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+    if (oembedRes.ok) {
+      const data = await oembedRes.json();
+      return data.title || null;
     }
-
-    if (!tracks || tracks.length === 0) return null;
-
-    // 한국어 자막 우선, 없으면 첫 번째
-    const koTrack = tracks.find(t => t.languageCode === 'ko');
-    const selectedTrack = koTrack || tracks[0];
-    const baseUrl = selectedTrack.baseUrl.replace(/\\u0026/g, '&').replace(/\\\//g, '/');
-
-    // 2단계: 자막 XML 다운로드
-    const captionRes = await fetch(baseUrl);
-    if (!captionRes.ok) return null;
-    const xml = await captionRes.text();
-
-    return parseTranscriptXml(xml);
-  } catch (err) {
-    console.error(`[getTranscript] ${videoId} failed:`, err);
+    return null;
+  } catch {
     return null;
   }
-}
-
-function parseTranscriptXml(xml: string): string | null {
-  // <text start="0.0" dur="3.2">자막 내용</text> 형태 파싱
-  const textMatches = xml.match(/<text[^>]*>([\s\S]*?)<\/text>/g);
-  if (!textMatches || textMatches.length === 0) return null;
-
-  const texts = textMatches.map(t => {
-    const content = t.replace(/<text[^>]*>/, '').replace(/<\/text>/, '');
-    return content
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/<[^>]+>/g, '') // HTML 태그 제거
-      .trim();
-  }).filter(t => t.length > 0);
-
-  return texts.length > 0 ? texts.join(' ') : null;
 }
 
 // ── Gemini로 스타일 분석 ──
@@ -190,15 +137,13 @@ interface ChannelStyle {
   samplePrompt: string;
 }
 
-async function analyzeChannelStyle(transcripts: string[], channelName: string, apiKey: string): Promise<ChannelStyle> {
+async function analyzeChannelStyle(videoData: string, channelName: string, apiKey: string): Promise<ChannelStyle> {
   const ai = new GoogleGenAI({ apiKey });
 
-  const combinedText = transcripts.map((t, i) => `[영상 ${i + 1}]\n${t.slice(0, 1500)}`).join('\n\n');
+  const prompt = `아래는 유튜브 채널 "${channelName}"의 최근 영상 제목과 설명입니다.
+이 채널의 콘텐츠 스타일을 분석하세요. 제목의 패턴, 주제 선택, 톤, 타겟 시청자를 추론하세요.
 
-  const prompt = `아래는 유튜브 채널 "${channelName}"의 최근 쇼츠/영상 자막입니다.
-이 채널의 대본 스타일을 분석하세요.
-
-${combinedText}
+${videoData}
 
 다음 JSON 형식으로 출력하세요 (JSON만, 설명 없이):
 {
@@ -255,36 +200,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { channelId, channelName: resolvedName } = resolved;
 
     // 2. 최근 영상 목록 (RSS, API 키 불필요)
-    const videos = await getRecentVideos(channelId, 8);
+    const videos = await getRecentVideos(channelId, 15);
     if (videos.length === 0) {
       return res.status(400).json({ error: '채널에서 영상을 찾을 수 없습니다.' });
     }
 
-    // 3. 자막 추출 (최대 5개 성공할 때까지)
-    const transcripts: string[] = [];
-    const analyzedTitles: string[] = [];
-    for (const video of videos) {
-      if (transcripts.length >= 5) break;
-      const transcript = await getTranscript(video.id);
-      if (transcript && transcript.length > 50) {
-        transcripts.push(transcript);
-        analyzedTitles.push(video.title);
-      }
-    }
-
-    if (transcripts.length === 0) {
-      return res.status(400).json({ error: '자막을 추출할 수 있는 영상이 없습니다. 자막이 있는 채널을 시도해주세요.' });
-    }
+    // 3. 제목 + 설명 기반 분석 데이터 구성
+    const videoData = videos.map((v, i) =>
+      `[${i + 1}] 제목: ${v.title}${v.description && v.description.length > 3 ? `\n    설명: ${v.description.slice(0, 200)}` : ''}`
+    ).join('\n');
+    const analyzedTitles = videos.map(v => v.title);
 
     // 4. Gemini 스타일 분석
     const channelName = resolvedName || channelId;
-    const style = await analyzeChannelStyle(transcripts, channelName, apiKey);
+    const style = await analyzeChannelStyle(videoData, channelName, apiKey);
 
     return res.json({
       success: true,
       style,
-      analyzedCount: transcripts.length,
-      analyzedTitles,
+      analyzedCount: videos.length,
+      analyzedTitles: analyzedTitles.slice(0, 5),
     });
   } catch (error: any) {
     console.error('[channel-analyze]', error.message);
