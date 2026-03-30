@@ -199,6 +199,86 @@ ${audit}
 개선된 최종 대본만 출력하세요.`;
 }
 
+// ── 화풍 매핑 테이블 (스타일 → 추천 화풍 ID) ──
+
+const STYLE_ART_MAP: Record<string, string[]> = {
+  documentary:    ['gemini-infographic', 'gemini-korea-cartoon', 'gemini-retro-news'],
+  storytelling:   ['gemini-watercolor', 'gemini-crayon', 'gemini-minimal-flat'],
+  educational:    ['gemini-infographic', 'gemini-minimal-flat', 'gemini-isometric'],
+  viral:          ['gemini-korea-cartoon', 'gemini-infographic', 'gemini-minimal-flat'],
+  investigative:  ['gemini-retro-news', 'gemini-korea-cartoon', 'gemini-infographic'],
+  countdown:      ['gemini-infographic', 'gemini-korea-cartoon', 'gemini-isometric'],
+  comparison:     ['gemini-infographic', 'gemini-isometric', 'gemini-minimal-flat'],
+  transformation: ['gemini-watercolor', 'gemini-crayon', 'gemini-minimal-flat'],
+  horror_warning: ['gemini-retro-news', 'gemini-korea-cartoon', 'gemini-infographic'],
+  humor:          ['gemini-crayon', 'gemini-minimal-flat', 'gemini-isometric'],
+  conspiracy:     ['gemini-retro-news', 'gemini-korea-cartoon', 'gemini-infographic'],
+  auto:           ['gemini-korea-cartoon', 'gemini-infographic', 'gemini-watercolor'],
+};
+
+// ── 캐릭터/화풍/음성 분석 ──
+
+async function analyzeScriptForSuggestions(
+  ai: InstanceType<typeof GoogleGenAI>,
+  script: string,
+  style: string,
+): Promise<Record<string, any>> {
+  // 화풍 추천 (코드 매핑 — AI 호출 불필요)
+  const recommendedStyles = STYLE_ART_MAP[style] || STYLE_ART_MAP.auto;
+
+  // 캐릭터 + 음성 분석 (Gemini Flash — 빠르고 저렴)
+  const analysisPrompt = `아래 영상 대본을 분석하여, 등장 캐릭터와 적합한 나레이터 음성을 제안하세요.
+
+## 대본
+${script.slice(0, 5000)}
+
+## 출력 JSON (이 형식을 정확히 따르세요)
+{
+  "needsCharacter": true 또는 false,
+  "characters": [
+    {
+      "role": "메인 나레이터" 또는 "화자1" 등,
+      "gender": "male" 또는 "female",
+      "ageRange": "20대" / "30대" / "40대" / "50대+",
+      "personality": "성격/톤 한 줄 설명",
+      "visualDescription": "외모/의상 묘사 한 줄",
+      "voiceTone": "차분한" / "활기찬" / "따뜻한" / "긴장감 있는" / "유머러스한"
+    }
+  ],
+  "narrationStyle": "단독 나레이션" / "대화형" / "인터뷰형",
+  "overallMood": "진지한" / "밝은" / "감성적" / "긴장감" / "유머러스",
+  "recommendedVoiceGender": "male" 또는 "female",
+  "recommendedVoiceAge": "young" / "middle" / "mature"
+}
+
+JSON만 출력하세요. 설명 없이.`;
+
+  try {
+    const result = await geminiWithRetry(ai, {
+      model: 'gemini-2.5-flash',
+      contents: analysisPrompt,
+      config: { maxOutputTokens: 2048 },
+    });
+
+    // JSON 파싱 (마크다운 코드블록 제거)
+    const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return { ...parsed, recommendedStyles };
+  } catch (err) {
+    console.error('[deep-script] analysis parse error:', err);
+    // 파싱 실패 시 기본 제안
+    return {
+      needsCharacter: true,
+      characters: [{ role: '메인 나레이터', gender: 'male', ageRange: '30대', personality: '신뢰감 있는 전문가', visualDescription: '깔끔한 셔츠, 단정한 헤어', voiceTone: '차분한' }],
+      narrationStyle: '단독 나레이션',
+      overallMood: '진지한',
+      recommendedVoiceGender: 'male',
+      recommendedVoiceAge: 'middle',
+      recommendedStyles,
+    };
+  }
+}
+
 // ── 메인 핸들러 ──
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -239,7 +319,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'X-Accel-Buffering': 'no',
   });
 
-  const totalSteps = mode === 'fast' ? 1 : 3;
+  const totalSteps = mode === 'fast' ? 2 : 4; // fast: 생성+분석, deep: 초안+감사+개선+분석
 
   try {
     // ── Step 1: 초안 생성 ──
@@ -262,9 +342,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       preview: draftPreview, charCount: draft.length,
     });
 
-    // 빠른 생성 → 여기서 종료
+    // 빠른 생성 → 대본 전달 후 분석 단계로
     if (mode === 'fast') {
-      sendEvent(res, { step: 1, total: 1, status: 'complete', script: draft });
+      sendEvent(res, { step: 1, total: 2, status: 'done', script: draft, charCount: draft.length });
+
+      // ── Step 2 (fast): 캐릭터/화풍/음성 분석 ──
+      sendEvent(res, {
+        step: 2, total: 2, status: 'working',
+        label: '캐릭터·화풍 분석 중', icon: '🎨',
+        detail: '대본에 어울리는 캐릭터, 화풍, 음성을 추천합니다',
+      });
+
+      const analysisResult = await analyzeScriptForSuggestions(ai, draft, style);
+      sendEvent(res, { step: 2, total: 2, status: 'complete', analysis: analysisResult });
+
       logUsage(req, 'deep_script_fast');
       sendDone(res);
       return;
@@ -310,10 +401,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     sendEvent(res, {
-      step: 3, total: 3, status: 'complete',
+      step: 3, total: 4, status: 'done',
       script: finalScript,
       charCount: finalScript.length,
     });
+
+    // ── Step 4: 캐릭터/화풍/음성 분석 ──
+    sendEvent(res, {
+      step: 4, total: 4, status: 'working',
+      label: '캐릭터·화풍 분석 중', icon: '🎨',
+      detail: '대본에 어울리는 캐릭터, 화풍, 음성을 추천합니다',
+    });
+
+    const analysisResult = await analyzeScriptForSuggestions(ai, finalScript, style);
+    sendEvent(res, { step: 4, total: 4, status: 'complete', analysis: analysisResult });
 
     logUsage(req, 'deep_script_refined');
     sendDone(res);

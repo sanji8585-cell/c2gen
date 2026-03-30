@@ -16,11 +16,43 @@ interface StepProgress {
   improvements?: number;
   script?: string;
   error?: string;
+  analysis?: ScriptAnalysis;
 }
+
+interface CharacterSuggestion {
+  role: string;
+  gender: 'male' | 'female';
+  ageRange: string;
+  personality: string;
+  visualDescription: string;
+  voiceTone: string;
+}
+
+interface ScriptAnalysis {
+  needsCharacter: boolean;
+  characters: CharacterSuggestion[];
+  narrationStyle: string;
+  overallMood: string;
+  recommendedVoiceGender: string;
+  recommendedVoiceAge: string;
+  recommendedStyles: string[];
+}
+
+// ── 화풍 메타데이터 (config.ts의 GEMINI_STYLE_CATEGORIES에서 추출) ──
+const STYLE_META: Record<string, { name: string; description: string }> = {
+  'gemini-crayon': { name: '크레용', description: '따뜻한 크레용 질감, 손그림 느낌' },
+  'gemini-watercolor': { name: '수채화', description: '부드러운 번짐, 몽환적 분위기' },
+  'gemini-minimal-flat': { name: '미니멀 플랫', description: '깔끔한 도형, 모던 디자인풍' },
+  'gemini-korea-cartoon': { name: '한국 경제 카툰', description: '웹툰풍, 굵은 외곽선' },
+  'gemini-infographic': { name: '인포그래픽', description: '차트/데이터 시각화' },
+  'gemini-retro-news': { name: '레트로 뉴스', description: '80-90년대 복고풍' },
+  'gemini-isometric': { name: '3D 아이소메트릭', description: '미니어처 블록, 입체 도시' },
+};
 
 interface DeepScriptProps {
   isAuthenticated: boolean;
   onShowAuthModal: () => void;
+  onStartStoryboard?: (script: string, styleId: string) => void;
 }
 
 const STYLE_OPTIONS = [
@@ -112,7 +144,7 @@ function estimateScenes(sec: number): string {
   return min === max ? `${min}씬` : `${min}~${max}씬`;
 }
 
-const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModal }) => {
+const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModal, onStartStoryboard }) => {
   const { t } = useTranslation();
   const [topic, setTopic] = useState('');
   const [style, setStyle] = useState('auto');
@@ -127,6 +159,8 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
   const [copied, setCopied] = useState(false);
   const [steps, setSteps] = useState<StepProgress[]>([]);
   const [currentStep, setCurrentStep] = useState<StepProgress | null>(null);
+  const [analysis, setAnalysis] = useState<ScriptAnalysis | null>(null);
+  const [selectedStyleId, setSelectedStyleId] = useState<string>('');
   const resultRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -139,6 +173,8 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
     setResult('');
     setSteps([]);
     setCurrentStep(null);
+    setAnalysis(null);
+    setSelectedStyleId('');
 
     abortRef.current = new AbortController();
 
@@ -190,10 +226,16 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
             if (event.status === 'working') {
               setCurrentStep(event);
             } else if (event.status === 'done') {
+              // done 이벤트에 script가 있으면 결과 저장 (Step 1 fast / Step 3 deep)
+              if (event.script) setResult(event.script);
               setSteps(prev => [...prev, { ...event, ...(currentStep || {}) }]);
               setCurrentStep(null);
-            } else if (event.status === 'complete' && event.script) {
-              setResult(event.script);
+            } else if (event.status === 'complete') {
+              if (event.script) setResult(event.script);
+              if (event.analysis) {
+                setAnalysis(event.analysis);
+                setSelectedStyleId(event.analysis.recommendedStyles?.[0] || '');
+              }
               setSteps(prev => [...prev, event]);
               setCurrentStep(null);
             }
@@ -520,10 +562,12 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
                       <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                         {s.step === 1 && `초안 완료`}
                         {s.step === 1 && s.charCount && ` (${s.charCount.toLocaleString()}자)`}
-                        {s.step === 2 && `품질 감사 완료`}
-                        {s.step === 2 && s.improvements && ` (개선점 ${s.improvements}건)`}
+                        {s.step === 2 && s.total > 2 && `품질 감사 완료`}
+                        {s.step === 2 && s.total > 2 && s.improvements && ` (개선점 ${s.improvements}건)`}
+                        {s.step === 2 && s.total <= 2 && `캐릭터·화풍 분석 완료`}
                         {s.step === 3 && `최종 개선 완료`}
                         {s.step === 3 && s.charCount && ` (${s.charCount.toLocaleString()}자)`}
+                        {s.step === 4 && `캐릭터·화풍 분석 완료`}
                       </span>
                       {/* 초안 미리보기 */}
                       {s.step === 1 && s.preview && (
@@ -600,6 +644,117 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
             위 대본을 복사한 후, <strong style={{ color: 'var(--text-secondary)' }}>스토리보드 &gt; 수동</strong> 탭에 붙여넣어 이미지/음성을 생성하세요.
             대본을 직접 수정할 수도 있습니다.
           </div>
+        </div>
+      )}
+
+      {/* ── AI 제안 카드 (캐릭터 + 화풍 + 음성) ── */}
+      {analysis && result && !isGenerating && (
+        <div className="rounded-xl border p-5 mb-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)' }}>
+          <h3 className="text-[13px] font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            🎨 AI 추천 설정
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-normal" style={{ backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
+              대본 분석 기반
+            </span>
+          </h3>
+
+          {/* 캐릭터 카드 */}
+          {analysis.needsCharacter && analysis.characters.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
+                👤 등장 캐릭터 · {analysis.narrationStyle}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {analysis.characters.map((char, i) => (
+                  <div key={i} className="rounded-lg px-3 py-2.5" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[13px]">{char.gender === 'female' ? '👩' : '👨'}</span>
+                      <span className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>{char.role}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
+                        {char.ageRange} {char.gender === 'female' ? '여성' : '남성'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      {char.personality}
+                    </p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      👔 {char.visualDescription}
+                    </p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      🎙️ {char.voiceTone} 톤
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!analysis.needsCharacter && (
+            <div className="mb-4 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                👤 캐릭터 없음 — 이 대본은 데이터/사물 중심이므로 캐릭터가 등장하지 않습니다.
+              </p>
+            </div>
+          )}
+
+          {/* 화풍 추천 */}
+          <div className="mb-4">
+            <label className="block text-[11px] font-bold mb-2" style={{ color: 'var(--text-muted)' }}>
+              🎨 추천 화풍
+              <span className="ml-1 font-normal">({analysis.overallMood} 분위기 기반)</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {analysis.recommendedStyles.map((sid, i) => {
+                const meta = STYLE_META[sid];
+                if (!meta) return null;
+                const isSelected = selectedStyleId === sid;
+                return (
+                  <button
+                    key={sid}
+                    onClick={() => setSelectedStyleId(sid)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+                    style={{
+                      backgroundColor: isSelected ? 'rgba(168,85,247,0.15)' : 'var(--bg-elevated)',
+                      border: `1px solid ${isSelected ? 'rgba(168,85,247,0.4)' : 'var(--border-subtle)'}`,
+                      color: isSelected ? '#a855f7' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {i === 0 && <span className="text-[9px] px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(250,204,21,0.15)', color: '#eab308' }}>추천</span>}
+                    <div className="text-left">
+                      <p className="text-[11px] font-bold">{meta.name}</p>
+                      <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{meta.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 음성 추천 */}
+          <div className="mb-4 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+            <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              🎙️ 추천 음성: <strong>{analysis.recommendedVoiceGender === 'female' ? '여성' : '남성'}</strong> · {analysis.recommendedVoiceAge === 'young' ? '젊은' : analysis.recommendedVoiceAge === 'mature' ? '성숙한' : '중간'} 톤
+              <span className="ml-2" style={{ color: 'var(--text-muted)' }}>
+                (스토리보드에서 음성 변경 가능)
+              </span>
+            </p>
+          </div>
+
+          {/* 스토리보드 생성 버튼 */}
+          {onStartStoryboard && (
+            <button
+              onClick={() => onStartStoryboard(result, selectedStyleId)}
+              disabled={!selectedStyleId}
+              className="w-full py-3 rounded-lg text-[14px] font-bold transition-all disabled:opacity-40"
+              style={{
+                background: selectedStyleId
+                  ? 'linear-gradient(135deg, #10b981, #059669)'
+                  : 'var(--bg-elevated)',
+                color: selectedStyleId ? '#ffffff' : 'var(--text-muted)',
+              }}
+            >
+              🚀 이 설정으로 스토리보드 생성
+            </button>
+          )}
         </div>
       )}
 

@@ -40,6 +40,7 @@ import CreditShop from './components/CreditShop';
 import UserProfile from './components/UserProfile';
 import PaymentSuccess from './components/PaymentSuccess';
 import PilotDashboard from './components/PilotDashboard';
+import DeepScript from './components/DeepScript';
 import LandingPage from './components/landing/LandingPage';
 import * as FileSaver from 'file-saver';
 
@@ -49,7 +50,7 @@ import { AI_PERSONALITY, PRO_TIPS, launchConfetti, getStorytellingPhase, getTime
 import { GalleryErrorBoundary, GlobalErrorBoundary, setupGlobalErrorReporting } from './components/ErrorBoundaries';
 setupGlobalErrorReporting();
 
-type ViewMode = 'main' | 'gallery' | 'playground' | 'pilot';
+type ViewMode = 'main' | 'gallery' | 'playground' | 'pilot' | 'deepscript';
 
 // 인증 래퍼
 const App: React.FC = () => {
@@ -1531,6 +1532,23 @@ const AppContent: React.FC<{
           isAuthenticated={isAuthenticated}
           onShowAuthModal={() => setShowAuthModal(true)}
           savedProjects={savedProjects}
+        />
+      )}
+
+      {/* 심층대본 뷰 (운영자 전용) */}
+      {viewMode === 'deepscript' && (
+        <DeepScript
+          isAuthenticated={isAuthenticated}
+          onShowAuthModal={() => setShowAuthModal(true)}
+          onStartStoryboard={(script, styleId) => {
+            // 심층대본 → 스토리보드 직접 연결
+            if (styleId) localStorage.setItem('tubegen_image_style', styleId);
+            setViewMode('main');
+            // 약간의 딜레이 후 수동 대본으로 생성 시작
+            setTimeout(() => {
+              handleGenerate('Manual Script Input', script);
+            }, 100);
+          }}
         />
       )}
 
