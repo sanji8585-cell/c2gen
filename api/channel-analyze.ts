@@ -102,22 +102,75 @@ async function getRecentVideos(channelId: string, maxResults = 10): Promise<Vide
   return videos;
 }
 
-// ── 자막 추출 (youtube-transcript 패키지) ──
+// ── 자막 추출 (YouTube 내부 API 직접 호출 — 패키지 의존 없음) ──
 
 async function getTranscript(videoId: string): Promise<string | null> {
   try {
-    // ESM 패키지 동적 import
-    const { YoutubeTranscript } = await import('youtube-transcript');
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'ko' });
-    if (!transcript || transcript.length === 0) {
-      // 한국어 없으면 기본 언어로 재시도
-      const fallback = await YoutubeTranscript.fetchTranscript(videoId);
-      return fallback?.map((t: any) => t.text).join(' ') || null;
+    // 1단계: 영상 페이지에서 자막 트랙 URL 추출
+    const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept-Language': 'ko-KR,ko;q=0.9',
+      },
+    });
+    const html = await pageRes.text();
+
+    // captionTracks JSON에서 자막 URL 추출
+    const captionMatch = html.match(/"captionTracks":\s*(\[[\s\S]*?\])/);
+    if (!captionMatch) return null;
+
+    let tracks: Array<{ baseUrl: string; languageCode: string }>;
+    try {
+      // JSON 파싱 — 이스케이프 처리
+      const cleaned = captionMatch[1].replace(/\\u0026/g, '&').replace(/\\"/g, '"');
+      tracks = JSON.parse(cleaned);
+    } catch {
+      // 정규식 폴백으로 baseUrl 추출
+      const urlMatch = captionMatch[1].match(/"baseUrl":"(https?:[^"]+)"/);
+      if (!urlMatch) return null;
+      const baseUrl = urlMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/');
+      const captionRes = await fetch(baseUrl);
+      const xml = await captionRes.text();
+      return parseTranscriptXml(xml);
     }
-    return transcript.map((t: any) => t.text).join(' ');
-  } catch {
+
+    if (!tracks || tracks.length === 0) return null;
+
+    // 한국어 자막 우선, 없으면 첫 번째
+    const koTrack = tracks.find(t => t.languageCode === 'ko');
+    const selectedTrack = koTrack || tracks[0];
+    const baseUrl = selectedTrack.baseUrl.replace(/\\u0026/g, '&').replace(/\\\//g, '/');
+
+    // 2단계: 자막 XML 다운로드
+    const captionRes = await fetch(baseUrl);
+    if (!captionRes.ok) return null;
+    const xml = await captionRes.text();
+
+    return parseTranscriptXml(xml);
+  } catch (err) {
+    console.error(`[getTranscript] ${videoId} failed:`, err);
     return null;
   }
+}
+
+function parseTranscriptXml(xml: string): string | null {
+  // <text start="0.0" dur="3.2">자막 내용</text> 형태 파싱
+  const textMatches = xml.match(/<text[^>]*>([\s\S]*?)<\/text>/g);
+  if (!textMatches || textMatches.length === 0) return null;
+
+  const texts = textMatches.map(t => {
+    const content = t.replace(/<text[^>]*>/, '').replace(/<\/text>/, '');
+    return content
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/<[^>]+>/g, '') // HTML 태그 제거
+      .trim();
+  }).filter(t => t.length > 0);
+
+  return texts.length > 0 ? texts.join(' ') : null;
 }
 
 // ── Gemini로 스타일 분석 ──
