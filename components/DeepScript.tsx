@@ -756,6 +756,7 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
               )}
             </button>
           </div>
+          </div>
 
           {/* 대본 내용 */}
           <textarea
