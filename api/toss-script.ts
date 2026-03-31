@@ -231,7 +231,7 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
         return res.json({
           scenes: scenes.slice(0, count),
           character: finalCharacter,
-          _debug: { extractedName: charKr, hasName, aiCharName: aiCharacter?.name_kr },
+          _debug: { topic, extractedName: charKr, hasName, charObj: char, indexOf의: topic.indexOf('의 '), topicChars: [...topic].map(c => c.charCodeAt(0)) },
         });
       }
 
