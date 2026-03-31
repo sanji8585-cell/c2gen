@@ -33,13 +33,13 @@ async function getUserKey(req: VercelRequest): Promise<string | null> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
+  // CORS (OPTIONS 먼저 — CRIT-5 fix)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
-
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const userKey = await getUserKey(req);
   if (!userKey) return res.status(401).json({ error: 'Invalid session' });
@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── 생성 소비 (컷당 과금) ──
       case 'consumeGeneration': {
-        const sceneCount = params.sceneCount || 4;
+        const sceneCount = Math.max(1, Math.min(10, Math.floor(Number(params.sceneCount) || 4)));
 
         // Rate Limiting: 1분당 최대 5회 생성
         const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
@@ -186,9 +186,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ ok: true, credits: newCredits });
       }
 
-      // ── 생성 실패 환불 ──
+      // ── 생성 실패 환불 (최근 미환불 건에 한해) ──
       case 'refundGeneration': {
-        const sceneCount = params.sceneCount || 4;
+        const sceneCount = Math.max(1, Math.min(10, Math.floor(Number(params.sceneCount) || 4)));
+
+        // 최근 5분 내 미환불된 생성 건이 있는지 확인 (파밍 방지)
+        const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+        const { data: recentGen } = await supabase
+          .from('toss_generations')
+          .select('id')
+          .eq('user_key', userKey)
+          .eq('cost_type', 'credit')
+          .eq('scene_count', sceneCount)
+          .gte('created_at', fiveMinAgo)
+          .limit(1)
+          .single();
+
+        // 이미 환불된 건이 있는지 확인
+        const { data: recentRefund } = await supabase
+          .from('toss_generations')
+          .select('id')
+          .eq('user_key', userKey)
+          .eq('cost_type', 'refund')
+          .eq('scene_count', sceneCount)
+          .gte('created_at', fiveMinAgo)
+          .limit(1)
+          .single();
+
+        if (!recentGen || recentRefund) {
+          return res.status(400).json({ error: '환불 가능한 생성 내역이 없어요' });
+        }
 
         const { data: user } = await supabase
           .from('toss_users')

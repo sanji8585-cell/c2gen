@@ -102,8 +102,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let userKey: string;
         let userName: string | undefined;
 
-        if (referrer === 'SANDBOX' || code === 'dev-test-code') {
-          // 샌드박스/개발용: 가상 유저
+        const isDev = process.env.NODE_ENV !== 'production' || process.env.ALLOW_SANDBOX === 'true';
+        if (isDev && (referrer === 'SANDBOX' || code === 'dev-test-code')) {
+          // 샌드박스/개발용: 가상 유저 (프로덕션에서는 비활성)
           userKey = `dev_${Date.now()}`;
           userName = '테스트 유저';
         } else {
