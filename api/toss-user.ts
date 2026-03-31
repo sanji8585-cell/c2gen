@@ -12,7 +12,6 @@ const SKU_CREDITS: Record<string, number> = {
   cuts_12: 12,
   cuts_30: 30,
   cuts_60: 60,
-  // 하위 호환 (기존 SKU)
   credits_5: 5,
   credits_15: 15,
   credits_50: 50,
@@ -33,12 +32,10 @@ async function getUserKey(req: VercelRequest): Promise<string | null> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS (OPTIONS 먼저 — CRIT-5 fix)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
   if (req.method === 'OPTIONS') return res.status(200).end();
-
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const userKey = await getUserKey(req);
@@ -69,11 +66,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ── 생성 소비 (컷당 과금) ──
+      // ── 생성 소비 (RPC — atomic) ──
       case 'consumeGeneration': {
         const sceneCount = Math.max(1, Math.min(10, Math.floor(Number(params.sceneCount) || 4)));
 
-        // Rate Limiting: 1분당 최대 5회 생성
+        // Rate Limiting: 1분당 최대 5회
         const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
         const { count: recentCount } = await supabase
           .from('toss_generations')
@@ -84,66 +81,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(429).json({ error: '너무 빠르게 생성하고 있어요. 1분 후 다시 시도해주세요.' });
         }
 
-        const { data: user } = await supabase
-          .from('toss_users')
-          .select('credits, is_premium')
-          .eq('user_key', userKey)
-          .single();
-
-        if (!user) return res.status(404).json({ error: 'User not found' });
-
-        // 프리미엄 → 무제한
-        if (user.is_premium) {
-          await supabase.from('toss_generations').insert({
-            user_key: userKey,
-            cost_type: 'premium',
-            scene_count: sceneCount,
-            created_at: new Date().toISOString(),
-          });
-
-          return res.json({
-            credits: user.credits,
-            isPremium: true,
-            freeToday: 0,
-            canGenerate: true,
-          });
-        }
-
-        // 크레딧 차감
-        if (user.credits >= sceneCount) {
-          const newCredits = user.credits - sceneCount;
-          await supabase.from('toss_users')
-            .update({ credits: newCredits })
-            .eq('user_key', userKey);
-
-          await supabase.from('toss_generations').insert({
-            user_key: userKey,
-            cost_type: 'credit',
-            scene_count: sceneCount,
-            credits_used: sceneCount,
-            created_at: new Date().toISOString(),
-          });
-
-          return res.json({
-            credits: newCredits,
-            isPremium: false,
-            freeToday: 0,
-            canGenerate: true,
-          });
-        }
-
-        // 부족
-        return res.json({
-          credits: user.credits,
-          isPremium: false,
-          freeToday: 0,
-          canGenerate: false,
-          available: user.credits,
-          needed: sceneCount,
+        const { data, error } = await supabase.rpc('consume_generation', {
+          p_user_key: userKey,
+          p_scene_count: sceneCount,
         });
+
+        if (error) throw error;
+        return res.json(data);
       }
 
-      // ── IAP 구매 후 크레딧 부여 ──
+      // ── IAP 구매 (RPC — atomic) ──
       case 'grantPurchase': {
         const { orderId, sku } = params;
         if (!orderId || !sku) return res.status(400).json({ error: 'orderId and sku required' });
@@ -151,141 +98,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const creditsToGrant = SKU_CREDITS[sku];
         if (!creditsToGrant) return res.status(400).json({ error: `Unknown sku: ${sku}` });
 
-        // 중복 지급 방지
-        const { data: existing } = await supabase
-          .from('toss_purchases')
-          .select('id')
-          .eq('order_id', orderId)
-          .single();
-
-        if (existing) {
-          return res.json({ ok: true, message: 'Already granted' });
-        }
-
-        // 크레딧 추가
-        const { data: user } = await supabase
-          .from('toss_users')
-          .select('credits')
-          .eq('user_key', userKey)
-          .single();
-
-        const newCredits = (user?.credits ?? 0) + creditsToGrant;
-        await supabase.from('toss_users')
-          .update({ credits: newCredits })
-          .eq('user_key', userKey);
-
-        // 구매 이력 기록
-        await supabase.from('toss_purchases').insert({
-          user_key: userKey,
-          order_id: orderId,
-          sku,
-          credits_granted: creditsToGrant,
-          created_at: new Date().toISOString(),
+        const { data, error } = await supabase.rpc('grant_purchase', {
+          p_user_key: userKey,
+          p_order_id: orderId,
+          p_sku: sku,
+          p_credits_to_grant: creditsToGrant,
         });
 
-        return res.json({ ok: true, credits: newCredits });
+        if (error) throw error;
+        return res.json(data);
       }
 
-      // ── 생성 실패 환불 (최근 미환불 건에 한해) ──
+      // ── 생성 실패 환불 (RPC — atomic) ──
       case 'refundGeneration': {
         const sceneCount = Math.max(1, Math.min(10, Math.floor(Number(params.sceneCount) || 4)));
 
-        // 최근 5분 내 미환불된 생성 건이 있는지 확인 (파밍 방지)
-        const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
-        const { data: recentGen } = await supabase
-          .from('toss_generations')
-          .select('id')
-          .eq('user_key', userKey)
-          .eq('cost_type', 'credit')
-          .eq('scene_count', sceneCount)
-          .gte('created_at', fiveMinAgo)
-          .limit(1)
-          .single();
-
-        // 이미 환불된 건이 있는지 확인
-        const { data: recentRefund } = await supabase
-          .from('toss_generations')
-          .select('id')
-          .eq('user_key', userKey)
-          .eq('cost_type', 'refund')
-          .eq('scene_count', sceneCount)
-          .gte('created_at', fiveMinAgo)
-          .limit(1)
-          .single();
-
-        if (!recentGen || recentRefund) {
-          return res.status(400).json({ error: '환불 가능한 생성 내역이 없어요' });
-        }
-
-        const { data: user } = await supabase
-          .from('toss_users')
-          .select('credits')
-          .eq('user_key', userKey)
-          .single();
-
-        if (!user) return res.status(404).json({ error: 'User not found' });
-
-        const newCredits = user.credits + sceneCount;
-        await supabase.from('toss_users')
-          .update({ credits: newCredits })
-          .eq('user_key', userKey);
-
-        await supabase.from('toss_generations').insert({
-          user_key: userKey,
-          cost_type: 'refund',
-          scene_count: sceneCount,
-          credits_used: -sceneCount,
-          created_at: new Date().toISOString(),
+        const { data, error } = await supabase.rpc('refund_generation', {
+          p_user_key: userKey,
+          p_scene_count: sceneCount,
         });
 
-        return res.json({ credits: newCredits, refunded: sceneCount });
+        if (error) throw error;
+        if (!data.ok) return res.status(400).json({ error: data.error });
+        return res.json(data);
       }
 
-      // ── 공유 보너스 (+2컷) ──
+      // ── 공유 보너스 (RPC — atomic) ──
       case 'grantShareReward': {
-        // 하루 1회 제한
-        const today = new Date().toISOString().split('T')[0];
-        const { data: todayShare } = await supabase
-          .from('toss_generations')
-          .select('id')
-          .eq('user_key', userKey)
-          .eq('cost_type', 'share_reward')
-          .gte('created_at', `${today}T00:00:00`)
-          .limit(1)
-          .single();
-
-        if (todayShare) {
-          return res.status(400).json({ error: '오늘 이미 공유 보너스를 받았어요' });
-        }
-
-        const { data: user } = await supabase
-          .from('toss_users')
-          .select('credits')
-          .eq('user_key', userKey)
-          .single();
-
-        if (!user) return res.status(404).json({ error: 'User not found' });
-
-        const bonus = 2;
-        const newCredits = user.credits + bonus;
-        await supabase.from('toss_users')
-          .update({ credits: newCredits })
-          .eq('user_key', userKey);
-
-        await supabase.from('toss_generations').insert({
-          user_key: userKey,
-          cost_type: 'share_reward',
-          scene_count: 0,
-          credits_used: -bonus,
-          created_at: new Date().toISOString(),
+        const { data, error } = await supabase.rpc('grant_share_reward', {
+          p_user_key: userKey,
         });
 
-        return res.json({ credits: newCredits, granted: bonus });
+        if (error) throw error;
+        if (!data.ok) return res.status(400).json({ error: data.error });
+        return res.json(data);
       }
 
       // ── 크레딧 내역 조회 ──
       case 'getHistory': {
-        // 생성/환불/공유보너스 내역
         const { data: generations } = await supabase
           .from('toss_generations')
           .select('cost_type, scene_count, credits_used, created_at')
@@ -293,7 +143,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .order('created_at', { ascending: false })
           .limit(20);
 
-        // 구매 내역
         const { data: purchases } = await supabase
           .from('toss_purchases')
           .select('sku, credits_granted, created_at')
@@ -301,7 +150,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .order('created_at', { ascending: false })
           .limit(20);
 
-        // 통합 정렬
         const history = [
           ...(generations || []).map((g: any) => ({
             type: g.cost_type as string,
