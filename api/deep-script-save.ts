@@ -45,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .select('id', { count: 'exact', head: true })
           .eq('email', email);
 
-        if (count && count >= MAX_SAVED) {
+        if (count !== null && count >= MAX_SAVED) {
           const { data: oldest } = await supabase
             .from(TABLE)
             .select('id')

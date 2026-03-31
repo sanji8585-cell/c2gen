@@ -18,7 +18,7 @@ async function resolveChannelId(input: string): Promise<{ channelId: string; cha
   if (!handle) return null;
 
   // YouTube Data API v3로 채널 검색 (가장 안정적)
-  const ytApiKey = process.env.YOUTUBE_DATA_API_KEY || process.env.GEMINI_API_KEY;
+  const ytApiKey = process.env.YOUTUBE_DATA_API_KEY || null;
   if (ytApiKey) {
     try {
       const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${ytApiKey}`;
@@ -178,6 +178,9 @@ ${videoUrls}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const sessionToken = req.headers['x-session-token'] as string;
+  if (!sessionToken) return res.status(401).json({ error: '로그인이 필요합니다' });
 
   const { channelUrl } = req.body;
   if (!channelUrl) return res.status(400).json({ error: 'channelUrl required' });

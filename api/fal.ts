@@ -211,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ── Flux 이미지 생성 (동기) ──
       case 'generateFluxImage': {
-        const { prompt: fluxPrompt } = params;
+        const { prompt: fluxPrompt, image_size: reqSize } = params;
         if (!fluxPrompt) return res.status(400).json({ error: 'prompt required' });
 
         const response = await fetch('https://fal.run/fal-ai/flux/schnell', {
@@ -222,7 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           },
           body: JSON.stringify({
             prompt: fluxPrompt,
-            image_size: 'landscape_16_9',
+            image_size: reqSize || 'portrait_16_9',
             num_inference_steps: 4,
             num_images: 1,
             enable_safety_checker: false,

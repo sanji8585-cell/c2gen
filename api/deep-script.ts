@@ -138,6 +138,9 @@ ${emotionArcGuide}
 - 음소거로도 이해 가능하도록 핵심 키워드는 (텍스트:)로 시각화
 - CTA는 단일하고 명확하게 — 하나의 행동만 요청
 - 설명, 주석, 메타 코멘트 없이 대본만 출력
+- 절대 마크다운 문법 사용 금지: ##, **, *, \`\`\` 등 마크다운 마커를 쓰지 마세요
+- "씬 1:", "(씬 N)", "## 최종 대본" 같은 씬 번호 라벨이나 제목 절대 금지
+- 나레이션 텍스트와 (디렉티브) 괄호만 출력하세요
 
 ## 주제
 ${topic}
@@ -337,33 +340,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     const draftPreview = draft.split('\n').filter(l => l.trim()).slice(0, 3).join(' ').slice(0, 150);
 
-    sendEvent(res, {
-      step: 1, total: totalSteps, status: 'done',
-      preview: draftPreview, charCount: draft.length,
-    });
-
     // 빠른 생성 → 대본 전달 후 분석 단계로
     if (mode === 'fast') {
-      sendEvent(res, { step: 1, total: 2, status: 'done', script: draft, charCount: draft.length });
+      sendEvent(res, { step: 1, total: totalSteps, status: 'done', script: draft, charCount: draft.length, preview: draftPreview });
 
       // ── Step 2 (fast): 캐릭터/화풍/음성 분석 ──
       sendEvent(res, {
-        step: 2, total: 2, status: 'working',
+        step: 2, total: totalSteps, status: 'working',
         label: '캐릭터·화풍 분석 중', icon: '🎨',
         detail: '대본에 어울리는 캐릭터, 화풍, 음성을 추천합니다',
       });
 
       const analysisResult = await analyzeScriptForSuggestions(ai, draft, style);
-      sendEvent(res, { step: 2, total: 2, status: 'complete', analysis: analysisResult });
+      sendEvent(res, { step: 2, total: totalSteps, status: 'complete', analysis: analysisResult });
 
       logUsage(req, 'deep_script_fast');
       sendDone(res);
       return;
     }
 
+    sendEvent(res, {
+      step: 1, total: totalSteps, status: 'done',
+      preview: draftPreview, charCount: draft.length,
+    });
+
     // ── Step 2: 품질 감사 ──
     sendEvent(res, {
-      step: 2, total: 3, status: 'working',
+      step: 2, total: totalSteps, status: 'working',
       label: '품질 감사 중', icon: '🔍',
       detail: '훅 강도, 감정 곡선, 리서치 깊이를 평가합니다',
     });
@@ -372,7 +375,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const audit = await geminiWithRetry(ai, {
       model: 'gemini-2.5-pro',
       contents: auditPrompt,
-      config: { thinkingConfig: { thinkingBudget: 16384 }, maxOutputTokens: 4096 },
+      config: { thinkingConfig: { thinkingBudget: 8192 }, maxOutputTokens: 4096 },
     });
 
     // 개선점 수 파싱
@@ -381,14 +384,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const scoreLines = audit.split('\n').filter(l => l.startsWith('[점수]')).slice(0, 3).join('\n');
 
     sendEvent(res, {
-      step: 2, total: 3, status: 'done',
+      step: 2, total: totalSteps, status: 'done',
       auditPreview: scoreLines || audit.slice(0, 200),
       improvements: improvementCount,
     });
 
     // ── Step 3: 피드백 반영 최종본 ──
     sendEvent(res, {
-      step: 3, total: 3, status: 'working',
+      step: 3, total: totalSteps, status: 'working',
       label: '최종 개선 중', icon: '✨',
       detail: `감사 피드백 ${improvementCount}건을 반영하여 대본을 다듬습니다`,
     });

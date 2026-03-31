@@ -213,12 +213,8 @@ const DeepScript: React.FC<DeepScriptProps> = ({ isAuthenticated, onShowAuthModa
     setChannelError('');
     setChannelStyle(null);
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const customKey = localStorage.getItem(CONFIG.STORAGE_KEYS.GEMINI_API_KEY);
-      if (customKey) headers['x-custom-api-key'] = customKey;
-
       const res = await fetch('/api/gemini', {
-        method: 'POST', headers,
+        method: 'POST', headers: apiHeaders(),
         body: JSON.stringify({
           action: 'generateAdvancedScript',
           userIntent: `아래 대본의 스타일을 분석해줘. JSON으로 출력:
@@ -256,7 +252,7 @@ ${refScript.slice(0, 3000)}`,
     } finally {
       setIsAnalyzingChannel(false);
     }
-  }, [refScript, isAnalyzingChannel]);
+  }, [refScript, isAnalyzingChannel, apiHeaders]);
 
   const handleSave = useCallback(async () => {
     if (!result || saveStatus === 'saving') return;
@@ -292,6 +288,10 @@ ${refScript.slice(0, 3000)}`,
   }, [apiHeaders]);
 
   const handleLoad = useCallback(async (id: string) => {
+    setSteps([]);
+    setCurrentStep(null);
+    setError('');
+    setChannelError('');
     try {
       const res = await fetch('/api/deep-script-save', {
         method: 'POST', headers: apiHeaders(),
@@ -410,11 +410,10 @@ ${refScript.slice(0, 3000)}`,
       setIsGenerating(false);
       abortRef.current = null;
     }
-  }, [isAuthenticated, onShowAuthModal, topic, language, style, durationSec, mode]);
+  }, [isAuthenticated, onShowAuthModal, topic, language, style, durationSec, mode, channelStyle]);
 
   const handleAbort = useCallback(() => {
     abortRef.current?.abort();
-    setIsGenerating(false);
     setCurrentStep(null);
   }, []);
 
@@ -486,7 +485,17 @@ ${refScript.slice(0, 3000)}`,
                       </p>
                     </div>
                     <button onClick={() => handleLoad(s.id)} className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>불러오기</button>
-                    <button onClick={async () => { await handleLoad(s.id); }} className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}>스토리보드</button>
+                    <button onClick={async () => {
+                      try {
+                        const res = await fetch('/api/deep-script-save', {
+                          method: 'POST', headers: apiHeaders(),
+                          body: JSON.stringify({ action: 'load', id: s.id }),
+                        });
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        onStartStoryboard?.(data.script, data.analysis?.recommendedStyles?.[0] || '', data.analysis);
+                      } catch {}
+                    }} className="px-2 py-1 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981' }}>스토리보드</button>
                     <button onClick={() => handleDelete(s.id)} className="px-1.5 py-1 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>✕</button>
                   </div>
                 );

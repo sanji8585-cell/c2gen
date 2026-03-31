@@ -92,6 +92,45 @@ const AppRouter: React.FC<{ isDark: boolean; onToggleTheme: () => void }> = ({ i
   return <AppContent isDark={isDark} onToggleTheme={onToggleTheme} />;
 };
 
+// ── 심층대본 나레이션 정제 함수 (마크다운/메타텍스트/씬 라벨 완전 제거) ──
+const cleanDeepScriptNarration = (text: string): string => {
+  return text
+    // 1. 마크다운 헤딩 줄 전체 제거 (## 2026 자동차 최종 대본, ### 최종 대본 등)
+    .replace(/^#{1,6}\s+.*$/gm, '')
+    // 2. 구분선 제거
+    .replace(/^---+$/gm, '')
+    // 3. **씬 N** (나레이션) 또는 **(씬 N)** 패턴 (볼드 씬 라벨 + 나레이션 라벨)
+    .replace(/\*\*\(?씬\s*\d+\)?\*\*\s*(?:\((?:나레이션|내레이션|Narration)\)\s*)?/gi, '')
+    // 4. **S#N**, **#N** 등 영어 씬 번호
+    .replace(/\*\*S?#?\d+\*\*/g, '')
+    // 5. **최종 대본**, **내레이션:**, **나레이션** 등 볼드 라벨
+    .replace(/\*\*(?:내레이션|나레이션|Narration|최종\s*대본)[:\s]?\*\*/gi, '')
+    // 6. 남은 ** 볼드 마크다운 → 내부 텍스트만 유지
+    .replace(/\*\*([^*]*)\*\*/g, '$1')
+    // 7. *이탤릭* 마크다운 → 내부 텍스트만 유지
+    .replace(/\*([^*]+)\*/g, '$1')
+    // 8. (씬 N) 볼드 없는 버전
+    .replace(/^["\s]*\(씬\s*\d+\)\s*/gm, '')
+    // 9. 씬 1: 또는 씬 1. (한국어 씬 번호 라벨)
+    .replace(/^씬\s*\d+[.:]\s*/gm, '')
+    // 10. Scene 1: (영어 씬 번호 라벨)
+    .replace(/^Scene\s*\d+[.:]\s*/gim, '')
+    // 11. (나레이션), (내레이션), (Narration) 독립 라벨
+    .replace(/\((?:나레이션|내레이션|Narration)\)\s*/gi, '')
+    // 12. 남은 디렉티브 괄호 (배경, 분위기, 구도, 카메라 등)
+    .replace(/\((?:배경|분위기|구도|카메라|색상|텍스트|자막|스타일|화자|이전씬유지|같은장소|시간경과|색조|앵글)[^)]*\)/g, '')
+    // 13. 끝에 붙은 ") 패턴
+    .replace(/"\)\s*$/gm, '')
+    // 14. 줄 시작/끝의 홀따옴표
+    .replace(/^\s*"\s*/gm, '')
+    .replace(/\s*"\s*$/gm, '')
+    // 15. 여러 줄바꿈 → 공백
+    .replace(/\n{2,}/g, ' ')
+    // 16. 다중 공백 정리
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 // 메인 앱 콘텐츠
 const AppContent: React.FC<{
   isDark: boolean; onToggleTheme: () => void;
@@ -616,44 +655,6 @@ const AppContent: React.FC<{
     console.log('[Advanced] 디렉티브 저장 완료. sceneDirectivesRef:', dirMap);
   }, [handleGenerate]);
 
-  // ── 심층대본 나레이션 정제 함수 (마크다운/메타텍스트/씬 라벨 완전 제거) ──
-  const cleanDeepScriptNarration = (text: string): string => {
-    return text
-      // 1. 마크다운 헤딩 줄 전체 제거 (## 2026 자동차 최종 대본, ### 최종 대본 등)
-      .replace(/^#{1,6}\s+.*$/gm, '')
-      // 2. 구분선 제거
-      .replace(/^---+$/gm, '')
-      // 3. **씬 N** (나레이션) 또는 **(씬 N)** 패턴 (볼드 씬 라벨 + 나레이션 라벨)
-      .replace(/\*\*\(?씬\s*\d+\)?\*\*\s*(?:\((?:나레이션|내레이션|Narration)\)\s*)?/gi, '')
-      // 4. **S#N**, **#N** 등 영어 씬 번호
-      .replace(/\*\*S?#?\d+\*\*/g, '')
-      // 5. **최종 대본**, **내레이션:**, **나레이션** 등 볼드 라벨
-      .replace(/\*\*(?:내레이션|나레이션|Narration|최종\s*대본)[:\s]?\*\*/gi, '')
-      // 6. 남은 ** 볼드 마크다운 → 내부 텍스트만 유지
-      .replace(/\*\*([^*]*)\*\*/g, '$1')
-      // 7. *이탤릭* 마크다운 → 내부 텍스트만 유지
-      .replace(/\*([^*]+)\*/g, '$1')
-      // 8. (씬 N) 볼드 없는 버전
-      .replace(/^["\s]*\(씬\s*\d+\)\s*/gm, '')
-      // 9. 씬 1: 또는 씬 1. (한국어 씬 번호 라벨)
-      .replace(/^씬\s*\d+[.:]\s*/gm, '')
-      // 10. Scene 1: (영어 씬 번호 라벨)
-      .replace(/^Scene\s*\d+[.:]\s*/gim, '')
-      // 11. (나레이션), (내레이션), (Narration) 독립 라벨
-      .replace(/\((?:나레이션|내레이션|Narration)\)\s*/gi, '')
-      // 12. 남은 디렉티브 괄호 (배경, 분위기, 구도, 카메라 등)
-      .replace(/\((?:배경|분위기|구도|카메라|색상|텍스트|자막|스타일|화자|이전씬유지|같은장소|시간경과|색조|앵글)[^)]*\)/g, '')
-      // 13. 끝에 붙은 ") 패턴
-      .replace(/"\)\s*$/gm, '')
-      // 14. 줄 시작/끝의 홀따옴표
-      .replace(/^\s*"\s*/gm, '')
-      .replace(/\s*"\s*$/gm, '')
-      // 15. 여러 줄바꿈 → 공백
-      .replace(/\n{2,}/g, ' ')
-      // 16. 다중 공백 정리
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-  };
 
   // ── 심층대본 → 스토리보드 직접 연결 (Gemini 재생성 없이 씬 분할만) ──
   const handleDeepScriptToStoryboard = useCallback((script: string, styleId: string, analysisData?: any) => {
@@ -705,8 +706,8 @@ const AppContent: React.FC<{
       const { cleanNarration: parsed, directives } = parseDirectives(sceneText);
       // cleanDeepScriptNarration으로 마크다운/메타텍스트/씬 라벨 완전 제거
       const cleanNarration = cleanDeepScriptNarration(parsed);
-      const sentiment = directives.MOOD === '밝음' || directives.MOOD === '따뜻함' ? 'POSITIVE' as const
-        : directives.MOOD === '어두움' || directives.MOOD === '긴장' ? 'NEGATIVE' as const
+      const sentiment = directives.MOOD === 'POSITIVE' ? 'POSITIVE' as const
+        : directives.MOOD === 'NEGATIVE' ? 'NEGATIVE' as const
         : 'NEUTRAL' as const;
 
       // 나레이션과 디렉티브로 기본 visualPrompt 조립

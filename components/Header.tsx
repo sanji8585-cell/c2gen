@@ -144,8 +144,8 @@ interface HeaderProps {
   onShowAuthModal?: () => void;
   onLogout?: () => void;
   // Tab navigation
-  activeTab?: 'main' | 'gallery' | 'playground' | 'pilot';
-  onTabChange?: (tab: 'main' | 'gallery' | 'playground' | 'pilot') => void;
+  activeTab?: 'main' | 'gallery' | 'playground' | 'pilot' | 'deepscript';
+  onTabChange?: (tab: 'main' | 'gallery' | 'playground' | 'pilot' | 'deepscript') => void;
   projectCount?: number;
   // Gamification shortcuts
   onShowAchievements?: () => void;
@@ -207,11 +207,16 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const { t } = useTranslation();
-  const tabs: { key: 'main' | 'gallery' | 'playground' | 'pilot'; label: string; count?: number }[] = [
+  const tabs: { key: 'main' | 'gallery' | 'playground' | 'pilot' | 'deepscript'; label: string; count?: number }[] = [
     { key: 'main', label: t('header.storyboard') },
     { key: 'gallery', label: t('header.savedProjects'), count: projectCount },
     { key: 'playground', label: t('header.playground') },
   ];
+
+  // 심층대본 탭 — operator만 표시
+  if (plan === 'operator') {
+    tabs.push({ key: 'deepscript', label: t('header.deepScript', '심층대본') });
+  }
 
   // PILOT 탭은 ?tab=pilot URL로만 접근 가능
   if (activeTab === 'pilot') {
