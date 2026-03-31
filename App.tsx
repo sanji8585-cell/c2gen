@@ -709,9 +709,17 @@ const AppContent: React.FC<{
         : directives.MOOD === '어두움' || directives.MOOD === '긴장' ? 'NEGATIVE' as const
         : 'NEUTRAL' as const;
 
+      // 나레이션과 디렉티브로 기본 visualPrompt 조립
+      let vp = cleanNarration;
+      if (directives.BACKGROUND) vp += `. Setting: ${directives.BACKGROUND}`;
+      if (directives.CAMERA) vp += `. Camera: ${directives.CAMERA}`;
+      if (directives.COLOR) vp += `. Color: ${directives.COLOR}`;
+      if (directives.STYLE) vp += `. Style: ${directives.STYLE}`;
+      if (directives.MOOD) vp += `. Mood: ${directives.MOOD}`;
+
       return {
         narration: cleanNarration,
-        visualPrompt: '', // 이미지 생성 시 자동 생성됨
+        visualPrompt: vp,
         analysis: {
           sentiment,
           motion_type: '정적' as const,

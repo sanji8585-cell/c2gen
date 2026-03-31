@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GeneratedAsset, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
+import { GeneratedAsset, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG, SceneDirectives } from '../types';
 import { downloadSrt } from '../services/srtService';
 import { exportAssetsToZip } from '../services/exportService';
 import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier, canAccessResolution, getVideoResolution, setVideoResolution } from '../config';
@@ -85,6 +85,195 @@ interface TableRowProps {
   onDrop?: (index: number) => void;
   onDragEnd?: () => void;
 }
+
+// ── 디렉티브 태그 아이콘/라벨 매핑 ──
+const DIRECTIVE_TAG_CONFIG: Record<string, { icon: string; label: string; color: string; bgColor: string; borderColor: string }> = {
+  BACKGROUND: { icon: '🎬', label: '배경', color: '#818cf8', bgColor: 'rgba(129,140,248,0.08)', borderColor: 'rgba(129,140,248,0.25)' },
+  MOOD: { icon: '🎭', label: '분위기', color: '#a78bfa', bgColor: 'rgba(167,139,250,0.08)', borderColor: 'rgba(167,139,250,0.25)' },
+  COMPOSITION: { icon: '📐', label: '구도', color: '#60a5fa', bgColor: 'rgba(96,165,250,0.08)', borderColor: 'rgba(96,165,250,0.25)' },
+  CAMERA: { icon: '📷', label: '카메라', color: '#67e8f9', bgColor: 'rgba(103,232,249,0.08)', borderColor: 'rgba(103,232,249,0.25)' },
+  COLOR: { icon: '🎨', label: '색상', color: '#c084fc', bgColor: 'rgba(192,132,252,0.08)', borderColor: 'rgba(192,132,252,0.25)' },
+  TEXT: { icon: '📝', label: '텍스트', color: '#93c5fd', bgColor: 'rgba(147,197,253,0.08)', borderColor: 'rgba(147,197,253,0.25)' },
+  STYLE: { icon: '🖌️', label: '스타일', color: '#f0abfc', bgColor: 'rgba(240,171,252,0.08)', borderColor: 'rgba(240,171,252,0.25)' },
+  SPEAKER: { icon: '🎙️', label: '화자', color: '#86efac', bgColor: 'rgba(134,239,172,0.08)', borderColor: 'rgba(134,239,172,0.25)' },
+  KEEP_PREV: { icon: '🔗', label: '이전유지', color: '#fbbf24', bgColor: 'rgba(251,191,36,0.08)', borderColor: 'rgba(251,191,36,0.25)' },
+  SAME_PLACE: { icon: '📍', label: '같은장소', color: '#fb923c', bgColor: 'rgba(251,146,60,0.08)', borderColor: 'rgba(251,146,60,0.25)' },
+  TIME_PASS: { icon: '⏰', label: '시간경과', color: '#fcd34d', bgColor: 'rgba(252,211,77,0.08)', borderColor: 'rgba(252,211,77,0.25)' },
+};
+
+const DIRECTIVE_KEYS = ['BACKGROUND', 'MOOD', 'COMPOSITION', 'CAMERA', 'COLOR', 'TEXT', 'STYLE', 'SPEAKER', 'KEEP_PREV', 'SAME_PLACE', 'TIME_PASS'] as const;
+
+// ── 디렉티브 태그 표시 컴포넌트 ──
+const DirectiveTags: React.FC<{
+  directives?: SceneDirectives;
+  onEditDirectives?: (directives: SceneDirectives) => void;
+}> = ({ directives, onEditDirectives }) => {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editDirs, setEditDirs] = useState<SceneDirectives>({});
+  const [newKey, setNewKey] = useState<string>('');
+
+  if (!directives || Object.keys(directives).length === 0) {
+    // 디렉티브가 없을 때 편집 버튼만 표시
+    if (!onEditDirectives) return null;
+    return (
+      <div className="flex flex-wrap gap-1 mt-1">
+        <button
+          onClick={() => { setEditDirs({}); setIsEditMode(true); }}
+          className="text-[7px] font-bold px-1.5 py-0.5 rounded border transition-all hover:opacity-80"
+          style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+        >+ 디렉티브</button>
+        {isEditMode && (
+          <DirectiveEditor
+            directives={editDirs}
+            onChange={setEditDirs}
+            onSave={() => { onEditDirectives(editDirs); setIsEditMode(false); }}
+            onCancel={() => setIsEditMode(false)}
+            newKey={newKey}
+            onNewKeyChange={setNewKey}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (isEditMode && onEditDirectives) {
+    return (
+      <DirectiveEditor
+        directives={editDirs}
+        onChange={setEditDirs}
+        onSave={() => { onEditDirectives(editDirs); setIsEditMode(false); }}
+        onCancel={() => setIsEditMode(false)}
+        newKey={newKey}
+        onNewKeyChange={setNewKey}
+      />
+    );
+  }
+
+  const entries = Object.entries(directives).filter(
+    ([, v]) => v !== undefined && v !== '' && v !== false
+  );
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {entries.map(([key, val]) => {
+        const cfg = DIRECTIVE_TAG_CONFIG[key];
+        if (!cfg) return null;
+        const displayVal = typeof val === 'boolean' ? '' : ` ${val}`;
+        return (
+          <span
+            key={key}
+            className="text-[7px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-0.5 cursor-default"
+            style={{ color: cfg.color, backgroundColor: cfg.bgColor, borderColor: cfg.borderColor }}
+            title={`${cfg.label}: ${val}`}
+          >
+            {cfg.icon}{displayVal}
+          </span>
+        );
+      })}
+      {onEditDirectives && (
+        <button
+          onClick={() => { setEditDirs({ ...directives }); setNewKey(''); setIsEditMode(true); }}
+          className="text-[7px] font-bold px-1 py-0.5 rounded border transition-all hover:opacity-80"
+          style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+          title="디렉티브 편집"
+        >✎</button>
+      )}
+    </div>
+  );
+};
+
+// ── 디렉티브 인라인 편집 UI ──
+const DirectiveEditor: React.FC<{
+  directives: SceneDirectives;
+  onChange: (d: SceneDirectives) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  newKey: string;
+  onNewKeyChange: (k: string) => void;
+}> = ({ directives, onChange, onSave, onCancel, newKey, onNewKeyChange }) => {
+  const entries = Object.entries(directives).filter(([, v]) => v !== undefined);
+  const usedKeys = new Set(entries.map(([k]) => k));
+  const availableKeys = DIRECTIVE_KEYS.filter(k => !usedKeys.has(k));
+
+  const updateValue = (key: string, value: string | boolean) => {
+    onChange({ ...directives, [key]: value });
+  };
+
+  const removeKey = (key: string) => {
+    const next = { ...directives };
+    delete (next as any)[key];
+    onChange(next);
+  };
+
+  const addKey = () => {
+    if (!newKey) return;
+    const boolKeys = ['KEEP_PREV', 'SAME_PLACE', 'TIME_PASS'];
+    onChange({ ...directives, [newKey]: boolKeys.includes(newKey) ? true : '' });
+    onNewKeyChange('');
+  };
+
+  return (
+    <div className="mt-1.5 rounded-lg border p-2 space-y-1.5" style={{ backgroundColor: 'color-mix(in srgb, var(--bg-elevated) 80%, transparent)', borderColor: 'var(--border-default)' }}>
+      {entries.map(([key, val]) => {
+        const cfg = DIRECTIVE_TAG_CONFIG[key];
+        if (!cfg) return null;
+        const isBool = typeof val === 'boolean';
+        return (
+          <div key={key} className="flex items-center gap-1.5">
+            <span className="text-[8px] font-bold w-14 flex-shrink-0" style={{ color: cfg.color }}>{cfg.icon} {cfg.label}</span>
+            {isBool ? (
+              <button
+                onClick={() => updateValue(key, !val)}
+                className="text-[8px] px-1.5 py-0.5 rounded border"
+                style={{
+                  backgroundColor: val ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                  borderColor: val ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+                  color: val ? '#22c55e' : '#ef4444',
+                }}
+              >{val ? 'ON' : 'OFF'}</button>
+            ) : (
+              <input
+                type="text"
+                value={String(val)}
+                onChange={(e) => updateValue(key, e.target.value)}
+                className="flex-1 text-[8px] px-1.5 py-0.5 rounded border focus:outline-none focus:border-blue-500"
+                style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+            <button onClick={() => removeKey(key)} className="text-[8px] text-red-400 hover:text-red-300 px-0.5" title="삭제">✕</button>
+          </div>
+        );
+      })}
+      {/* 새 디렉티브 추가 */}
+      {availableKeys.length > 0 && (
+        <div className="flex items-center gap-1.5 pt-1 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+          <select
+            value={newKey}
+            onChange={(e) => onNewKeyChange(e.target.value)}
+            className="text-[8px] px-1 py-0.5 rounded border"
+            style={{ backgroundColor: 'var(--bg-base)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="">+ 추가...</option>
+            {availableKeys.map(k => (
+              <option key={k} value={k}>{DIRECTIVE_TAG_CONFIG[k]?.icon} {DIRECTIVE_TAG_CONFIG[k]?.label || k}</option>
+            ))}
+          </select>
+          {newKey && (
+            <button onClick={addKey} className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-500">추가</button>
+          )}
+        </div>
+      )}
+      {/* 저장/취소 */}
+      <div className="flex justify-end gap-1 pt-1">
+        <button onClick={onCancel} className="text-[8px] font-bold px-2 py-0.5 rounded border hover:bg-[var(--bg-hover)]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}>취소</button>
+        <button onClick={onSave} className="text-[8px] font-bold px-2 py-0.5 rounded bg-brand-600 text-white hover:bg-brand-500">저장</button>
+      </div>
+    </div>
+  );
+};
 
 const TableRow: React.FC<TableRowProps> = memo(({
   row, index, isAnimating, isEditing, confirmDelete, isSelected, onToggleSelect,
@@ -253,6 +442,15 @@ const TableRow: React.FC<TableRowProps> = memo(({
               )}
             </div>
           )}
+          {/* 디렉티브 태그 표시 + 편집 */}
+          <DirectiveTags
+            directives={row.analysis?.directives}
+            onEditDirectives={onUpdateAsset ? (newDirs) => {
+              onUpdateAsset(index, {
+                analysis: { ...row.analysis!, directives: newDirs },
+              });
+            } : undefined}
+          />
         </div>
       </td>
 
@@ -1240,6 +1438,15 @@ const ResultTable = React.memo<ResultTableProps>(({
                       {row.analysis.sentiment && <span className={`text-[7px] font-black px-1 py-0.5 rounded border uppercase ${row.analysis.sentiment === 'POSITIVE' ? 'text-green-400 bg-green-400/5 border-green-400/20' : row.analysis.sentiment === 'NEGATIVE' ? 'text-red-400 bg-red-400/5 border-red-400/20' : 'text-gray-400 bg-gray-400/5 border-gray-400/20'}`}>{row.analysis.sentiment}</span>}
                     </div>
                   )}
+                  {/* 모바일 디렉티브 태그 + 편집 */}
+                  <DirectiveTags
+                    directives={row.analysis?.directives}
+                    onEditDirectives={onUpdateAsset ? (newDirs) => {
+                      onUpdateAsset(index, {
+                        analysis: { ...row.analysis!, directives: newDirs },
+                      });
+                    } : undefined}
+                  />
                 </div>
               </div>
 
