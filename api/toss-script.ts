@@ -204,7 +204,7 @@ ${count >= 4 ? '2번 장면: 핵심 내용 1\n3번 장면: 핵심 내용 2\n' : 
         console.log(`[toss-script] Generating: topic="${topic}", type=${type}, char=${charFull || '(AI위임)'}, count=${count}`);
 
         const response = await ai.models.generateContent({
-          model: 'gemini-3.1-pro-preview',
+          model: 'gemini-3-flash-preview',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
