@@ -172,13 +172,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // 캐릭터 참조 이미지
             if (referenceImages?.character?.length) {
-              parts.push({
-                text: '[CHARACTER REFERENCE] Match this character\'s appearance closely. Focus on: face, body shape, clothing, colors.',
-              });
               for (const img of referenceImages.character) {
                 const imageData = img.includes(',') ? img.split(',')[1] : img;
                 parts.push({ inlineData: { data: imageData, mimeType: 'image/jpeg' } });
               }
+              parts.push({
+                text: `[CRITICAL CHARACTER REFERENCE — HIGHEST PRIORITY]
+The image(s) above show the EXACT character that MUST appear in the generated image.
+You MUST replicate this character's appearance with high fidelity:
+- SAME face shape, eye shape, eye color
+- SAME hair style, hair color, hair length
+- SAME skin tone and body proportions
+- SAME clothing style and colors (if visible)
+- SAME species and features (if animal character)
+The generated image must look like the SAME character in a different scene.
+Do NOT create a generic or different-looking character. The reference image is the ground truth.`,
+              });
             }
 
             // 스타일 지시
