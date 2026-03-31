@@ -26,8 +26,9 @@ function extractCharacter(topic: string) {
   // 사전에 없음 → 주제에서 이름 추출 (regex 대신 문자열 검색)
   // "미키의 즐거운 모험" → "미키", "루루와 별의 여행" → "루루"
   let extractedName: string | null = null;
-  const particles = ['이의 ', '의 ', '와 ', '과 '];
-  const prefixes = ['용감한 ', '씩씩한 ', '귀여운 ', '작은 ', '아기 ', '꼬마 '];
+  // 유니코드 이스케이프로 한글 리터럴 문제 우회
+  const particles = ['\uc774\uc758 ', '\uc758 ', '\uc640 ', '\uacfc '];  // 이의, 의, 와, 과
+  const prefixes = ['\uc6a9\uac10\ud55c ', '\uc529\uc529\ud55c ', '\uadc0\uc5ec\uc6b4 ', '\uc791\uc740 ', '\uc544\uae30 ', '\uaf2c\ub9c8 '];  // 용감한, 씩씩한, 귀여운, 작은, 아기, 꼬마
   let cleanTopic = topic;
   for (const pf of prefixes) {
     if (cleanTopic.startsWith(pf)) { cleanTopic = cleanTopic.slice(pf.length); break; }
@@ -231,7 +232,14 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
         return res.json({
           scenes: scenes.slice(0, count),
           character: finalCharacter,
-          _debug: { topic, extractedName: charKr, hasName, charObj: char, indexOf의: topic.indexOf('의 '), topicChars: [...topic].map(c => c.charCodeAt(0)) },
+          _debug: {
+            topicLen: topic.length,
+            indexOf의: topic.indexOf('\uc758 '),
+            indexTest: topic.indexOf('\ud1a0\ub07c'),
+            extractedName: charKr,
+            hasName,
+            particleTest: '\uc758 ',
+          },
         });
       }
 
