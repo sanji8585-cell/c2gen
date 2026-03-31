@@ -23,19 +23,18 @@ function extractCharacter(topic: string) {
       return { kr, en, full: `${mods.map(m => m.trim()).join(' ')} ${kr}`.trim(), type };
     }
   }
-  // 사전에 없음 → 주제에서 이름 추출 시도
+  // 사전에 없음 → 주제에서 이름 추출 (regex 대신 문자열 검색)
   // "미키의 즐거운 모험" → "미키", "루루와 별의 여행" → "루루"
-  // 여러 패턴 시도
   let extractedName: string | null = null;
-  const patterns = [
-    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)의\s/,   // X의 Y
-    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)와\s/,   // X와 Y
-    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)과\s/,   // X과 Y
-    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)이의\s/, // X이의 Y
-  ];
-  for (const p of patterns) {
-    const m = topic.match(p);
-    if (m?.[1]) { extractedName = m[1].trim(); break; }
+  const particles = ['이의 ', '의 ', '와 ', '과 '];
+  const prefixes = ['용감한 ', '씩씩한 ', '귀여운 ', '작은 ', '아기 ', '꼬마 '];
+  let cleanTopic = topic;
+  for (const pf of prefixes) {
+    if (cleanTopic.startsWith(pf)) { cleanTopic = cleanTopic.slice(pf.length); break; }
+  }
+  for (const pt of particles) {
+    const idx = cleanTopic.indexOf(pt);
+    if (idx > 0 && idx <= 10) { extractedName = cleanTopic.slice(0, idx).trim(); break; }
   }
 
   return extractedName
