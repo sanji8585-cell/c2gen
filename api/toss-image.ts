@@ -89,21 +89,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // 세션 인증 (무인증 API 남용 방지)
+  // 세션 인증 필수
   const sessionToken = req.headers['x-session-token'] as string;
-  if (sessionToken) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_KEY;
-    if (url && key) {
-      const supabase = createClient(url, key);
-      const { data } = await supabase
-        .from('toss_sessions')
-        .select('user_key')
-        .eq('token', sessionToken)
-        .single();
-      if (!data?.user_key) {
-        return res.status(401).json({ error: 'Invalid session' });
-      }
+  if (!sessionToken) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const sUrl = process.env.SUPABASE_URL;
+  const sKey = process.env.SUPABASE_SERVICE_KEY;
+  if (sUrl && sKey) {
+    const sb = createClient(sUrl, sKey);
+    const { data: sess } = await sb
+      .from('toss_sessions')
+      .select('user_key')
+      .eq('token', sessionToken)
+      .single();
+    if (!sess?.user_key) {
+      return res.status(401).json({ error: 'Invalid session' });
     }
   }
 
@@ -172,6 +173,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // 캐릭터 참조 이미지
             if (referenceImages?.character?.length) {
+              if (referenceImages.character.length > 3) {
+                return res.status(400).json({ error: 'Max 3 reference images' });
+              }
               for (const img of referenceImages.character) {
                 // 형식: "image/png:base64data" 또는 순수 base64
                 let imageData: string;

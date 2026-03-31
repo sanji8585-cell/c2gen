@@ -111,7 +111,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // 프로덕션: mTLS 인증서로 토스 API 호출
           const hasMtls = !!(process.env.TOSS_MTLS_CERT && process.env.TOSS_MTLS_KEY);
           if (!hasMtls) {
-            console.warn('[toss-auth] mTLS 인증서 미설정! 프로덕션 로그인 불가');
+            console.error('[toss-auth] mTLS 인증서 미설정! 프로덕션 로그인 불가');
+            return res.status(500).json({ error: 'Server configuration error' });
           }
 
           // 1. 토큰 교환

@@ -87,6 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         if (error) throw error;
+        if (!data) return res.status(500).json({ error: 'RPC returned no data' });
         return res.json(data);
       }
 
@@ -106,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         if (error) throw error;
+        if (!data) return res.status(500).json({ error: 'RPC returned no data' });
         return res.json(data);
       }
 
@@ -119,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         if (error) throw error;
+        if (!data) return res.status(500).json({ error: 'RPC returned no data' });
         if (!data.ok) return res.status(400).json({ error: data.error });
         return res.json(data);
       }
@@ -130,6 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         if (error) throw error;
+        if (!data) return res.status(500).json({ error: 'RPC returned no data' });
         if (!data.ok) return res.status(400).json({ error: data.error });
         return res.json(data);
       }
