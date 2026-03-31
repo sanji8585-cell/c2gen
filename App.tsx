@@ -846,6 +846,9 @@ const AppContent: React.FC<{
               if (isAbortedRef.current) return;
               let success = false;
 
+              // 화자 디렉티브를 for 루프 밖에서 선언 (폴백 블록에서 접근 가능하도록)
+              const speakerDirective = sceneDirectivesRef.current[i]?.SPEAKER || assetsRef.current[i].analysis?.directives?.SPEAKER;
+
               for (let attempt = 0; attempt <= MAX_TTS_RETRIES && !success; attempt++) {
                   if (isAbortedRef.current) break;
 
@@ -856,9 +859,6 @@ const AppContent: React.FC<{
 
                       const elSpeed = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_SPEED) || '1.0');
                       const elStability = parseFloat(localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_STABILITY) || '0.6');
-
-                      // V2.0: 화자별 Voice ID 매핑 (독립 ref 우선, assetsRef 폴백)
-                      const speakerDirective = sceneDirectivesRef.current[i]?.SPEAKER || assetsRef.current[i].analysis?.directives?.SPEAKER;
                       let voiceIdForScene: string | undefined;
                       let matchedSpeakerName: string | undefined;
                       let matchedSpeakerColor: string | undefined;
