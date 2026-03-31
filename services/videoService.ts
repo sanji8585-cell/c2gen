@@ -429,6 +429,10 @@ const generateVideoWithMediabunny = async (
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
   const audioCtx = new AudioContextClass();
 
+  // 리소스 추적 — finally에서 정리 보장
+  const videoObjectUrls: string[] = [];
+  let mbOutput: InstanceType<typeof mb.Output> | null = null;
+
   // ── 준비 단계 (기존과 동일) ──
   const preparedScenes: PreparedScene[] = [];
   let timelinePointer = 0;
@@ -462,7 +466,7 @@ const generateVideoWithMediabunny = async (
         video = document.createElement('video');
         video.crossOrigin = 'anonymous'; video.muted = true; video.playsInline = true; video.preload = 'auto';
         if (asset.videoData.startsWith('http')) {
-          try { const resp = await fetch(asset.videoData); const blob = await resp.blob(); video.src = URL.createObjectURL(blob); } catch { video.src = asset.videoData; }
+          try { const resp = await fetch(asset.videoData); const blob = await resp.blob(); const objUrl = URL.createObjectURL(blob); videoObjectUrls.push(objUrl); video.src = objUrl; } catch { video.src = asset.videoData; }
         } else { video.src = asset.videoData; }
         await new Promise<void>((resolve, reject) => {
           video!.oncanplaythrough = () => resolve(); video!.onloadeddata = () => resolve();
@@ -541,8 +545,12 @@ const generateVideoWithMediabunny = async (
     }
   }
 
-  const mixedAudioBuffer = await offlineCtx.startRendering();
-  await audioCtx.close();
+  let mixedAudioBuffer: AudioBuffer;
+  try {
+    mixedAudioBuffer = await offlineCtx.startRendering();
+  } finally {
+    await audioCtx.close().catch(() => {});
+  }
 
   // ── Mediabunny 렌더링 (비실시간) ──
   onProgress("고속 렌더링 시작 (3/3)...");
@@ -559,6 +567,7 @@ const generateVideoWithMediabunny = async (
     format: new mb.Mp4OutputFormat({ fastStart: 'in-memory' }),
     target,
   });
+  mbOutput = output;
 
   const videoSource = new mb.CanvasSource(canvas, {
     codec: 'avc',
@@ -573,116 +582,131 @@ const generateVideoWithMediabunny = async (
   output.addAudioTrack(audioMbSource);
   await output.start();
 
-  // ── 프레임 루프 (비실시간 — for 루프) ──
-  const TARGET_FPS = 30;
-  const totalFrames = Math.ceil(totalDuration * TARGET_FPS);
-  const recordedSubtitles: RecordedSubtitleEntry[] = [];
-  let lastRecordedChunkText: string | null = null;
-  let currentChunkStartTime = 0;
-  let subtitleIndex = 0;
-  let lastPercent = -1;
+  try {
+    // ── 프레임 루프 (비실시간 — for 루프) ──
+    const TARGET_FPS = 30;
+    const totalFrames = Math.ceil(totalDuration * TARGET_FPS);
+    const recordedSubtitles: RecordedSubtitleEntry[] = [];
+    let lastRecordedChunkText: string | null = null;
+    let currentChunkStartTime = 0;
+    let subtitleIndex = 0;
+    let lastPercent = -1;
 
-  for (let frame = 0; frame < totalFrames; frame++) {
-    if (abortRef?.current) { await output.cancel(); return null; }
+    for (let frame = 0; frame < totalFrames; frame++) {
+      if (abortRef?.current) {
+        await output.cancel().catch(() => {});
+        return null;
+      }
 
-    const elapsed = frame / TARGET_FPS;
+      const elapsed = frame / TARGET_FPS;
 
-    // 현재 씬 탐색
-    let currentScene: PreparedScene | undefined = preparedScenes.find(s => elapsed >= s.startTime && elapsed <= s.endTime);
-    let isInGap = false;
-    let gapProgress = 0;
-    let prevSceneForGap: PreparedScene | null = null;
-    let nextSceneForGap: PreparedScene | null = null;
+      // 현재 씬 탐색
+      let currentScene: PreparedScene | undefined = preparedScenes.find(s => elapsed >= s.startTime && elapsed <= s.endTime);
+      let isInGap = false;
+      let gapProgress = 0;
+      let prevSceneForGap: PreparedScene | null = null;
+      let nextSceneForGap: PreparedScene | null = null;
 
-    if (!currentScene) {
-      if (elapsed < preparedScenes[0].startTime) {
-        currentScene = preparedScenes[0];
-      } else {
-        isInGap = true;
-        for (let si = 0; si < preparedScenes.length - 1; si++) {
-          if (elapsed >= preparedScenes[si].endTime && elapsed < preparedScenes[si + 1].startTime) {
-            prevSceneForGap = preparedScenes[si];
-            nextSceneForGap = preparedScenes[si + 1];
-            const gapDuration = nextSceneForGap.startTime - prevSceneForGap.endTime;
-            gapProgress = gapDuration > 0 ? (elapsed - prevSceneForGap.endTime) / gapDuration : 1;
-            break;
+      if (!currentScene) {
+        if (elapsed < preparedScenes[0].startTime) {
+          currentScene = preparedScenes[0];
+        } else {
+          isInGap = true;
+          for (let si = 0; si < preparedScenes.length - 1; si++) {
+            if (elapsed >= preparedScenes[si].endTime && elapsed < preparedScenes[si + 1].startTime) {
+              prevSceneForGap = preparedScenes[si];
+              nextSceneForGap = preparedScenes[si + 1];
+              const gapDuration = nextSceneForGap.startTime - prevSceneForGap.endTime;
+              gapProgress = gapDuration > 0 ? (elapsed - prevSceneForGap.endTime) / gapDuration : 1;
+              break;
+            }
           }
+          if (!prevSceneForGap) { currentScene = preparedScenes[preparedScenes.length - 1]; isInGap = false; }
         }
-        if (!prevSceneForGap) { currentScene = preparedScenes[preparedScenes.length - 1]; isInGap = false; }
+      }
+
+      // 배경
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (isInGap && prevSceneForGap && nextSceneForGap) {
+        renderTransition(ctx, canvas.width, canvas.height, prevSceneForGap, nextSceneForGap, gapProgress);
+      } else if (currentScene) {
+        const sceneProgress = currentScene.duration > 0 ? Math.min(1, Math.max(0, (elapsed - currentScene.startTime) / currentScene.duration)) : 0;
+
+        // 영상 씬: seek 후 그리기
+        if (currentScene.isAnimated && currentScene.video) {
+          const sceneElapsed = elapsed - currentScene.startTime;
+          currentScene.video.currentTime = sceneElapsed;
+          // seek 완료 대기 (빠른 폴백)
+          await new Promise<void>(resolve => {
+            const v = currentScene!.video!;
+            if (v.readyState >= 2) { resolve(); return; }
+            v.onseeked = () => resolve();
+            setTimeout(() => resolve(), 50);
+          });
+        }
+
+        drawSceneFrame(ctx, canvas.width, canvas.height, currentScene, sceneProgress);
+      }
+
+      // 자막
+      const activeScene = isInGap ? null : currentScene;
+      const sceneElapsed = activeScene ? elapsed - activeScene.startTime : 0;
+      if (activeScene) {
+        renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config, activeScene.speakerColor);
+      }
+
+      // 자막 타이밍 기록
+      const currentChunk = activeScene ? getCurrentChunk(activeScene.subtitleChunks, sceneElapsed) : null;
+      const currentChunkText = currentChunk?.text || null;
+      if (currentChunkText !== lastRecordedChunkText) {
+        if (lastRecordedChunkText !== null) {
+          recordedSubtitles.push({ index: subtitleIndex, startTime: currentChunkStartTime, endTime: elapsed, text: lastRecordedChunkText });
+          subtitleIndex++;
+        }
+        if (currentChunkText !== null) currentChunkStartTime = elapsed;
+        lastRecordedChunkText = currentChunkText;
+      }
+
+      // 프레임 인코딩
+      await videoSource.add(elapsed, 1 / TARGET_FPS);
+
+      // 프로그레스 + UI 양보
+      const percent = Math.floor((frame / totalFrames) * 100);
+      if (percent > lastPercent + 4) {
+        onProgress(`고속 렌더링 중: ${percent}%`);
+        lastPercent = percent;
+        // 메인 스레드 양보 (UI 업데이트)
+        await new Promise(r => setTimeout(r, 0));
       }
     }
 
-    // 배경
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (isInGap && prevSceneForGap && nextSceneForGap) {
-      renderTransition(ctx, canvas.width, canvas.height, prevSceneForGap, nextSceneForGap, gapProgress);
-    } else if (currentScene) {
-      const sceneProgress = currentScene.duration > 0 ? Math.min(1, Math.max(0, (elapsed - currentScene.startTime) / currentScene.duration)) : 0;
-
-      // 영상 씬: seek 후 그리기
-      if (currentScene.isAnimated && currentScene.video) {
-        const sceneElapsed = elapsed - currentScene.startTime;
-        currentScene.video.currentTime = sceneElapsed;
-        // seek 완료 대기 (빠른 폴백)
-        await new Promise<void>(resolve => {
-          const v = currentScene!.video!;
-          if (v.readyState >= 2) { resolve(); return; }
-          v.onseeked = () => resolve();
-          setTimeout(() => resolve(), 50);
-        });
-      }
-
-      drawSceneFrame(ctx, canvas.width, canvas.height, currentScene, sceneProgress);
+    // 마지막 자막 종료
+    if (lastRecordedChunkText !== null) {
+      recordedSubtitles.push({ index: subtitleIndex, startTime: currentChunkStartTime, endTime: totalDuration, text: lastRecordedChunkText });
     }
 
-    // 자막
-    const activeScene = isInGap ? null : currentScene;
-    const sceneElapsed = activeScene ? elapsed - activeScene.startTime : 0;
-    if (activeScene) {
-      renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config, activeScene.speakerColor);
+    // 오디오 추가 + finalize
+    await audioMbSource.add(mixedAudioBuffer);
+    await output.finalize();
+    mbOutput = null; // finalize 성공 → cancel 불필요
+    onProgress("렌더링 완료! 파일 생성 중...");
+
+    return {
+      videoBlob: new Blob([target.buffer!], { type: 'video/mp4' }),
+      recordedSubtitles,
+    };
+  } finally {
+    // Mediabunny 리소스 정리: finalize 전 에러/abort 시 cancel로 인코더 해제
+    if (mbOutput) {
+      await mbOutput.cancel().catch(() => {});
     }
-
-    // 자막 타이밍 기록
-    const currentChunk = activeScene ? getCurrentChunk(activeScene.subtitleChunks, sceneElapsed) : null;
-    const currentChunkText = currentChunk?.text || null;
-    if (currentChunkText !== lastRecordedChunkText) {
-      if (lastRecordedChunkText !== null) {
-        recordedSubtitles.push({ index: subtitleIndex, startTime: currentChunkStartTime, endTime: elapsed, text: lastRecordedChunkText });
-        subtitleIndex++;
-      }
-      if (currentChunkText !== null) currentChunkStartTime = elapsed;
-      lastRecordedChunkText = currentChunkText;
-    }
-
-    // 프레임 인코딩
-    await videoSource.add(elapsed, 1 / TARGET_FPS);
-
-    // 프로그레스 + UI 양보
-    const percent = Math.floor((frame / totalFrames) * 100);
-    if (percent > lastPercent + 4) {
-      onProgress(`고속 렌더링 중: ${percent}%`);
-      lastPercent = percent;
-      // 메인 스레드 양보 (UI 업데이트)
-      await new Promise(r => setTimeout(r, 0));
+    // 비디오 ObjectURL 해제
+    for (const url of videoObjectUrls) {
+      URL.revokeObjectURL(url);
     }
   }
-
-  // 마지막 자막 종료
-  if (lastRecordedChunkText !== null) {
-    recordedSubtitles.push({ index: subtitleIndex, startTime: currentChunkStartTime, endTime: totalDuration, text: lastRecordedChunkText });
-  }
-
-  // 오디오 추가 + finalize
-  await audioMbSource.add(mixedAudioBuffer);
-  await output.finalize();
-  onProgress("렌더링 완료! 파일 생성 중...");
-
-  return {
-    videoBlob: new Blob([target.buffer!], { type: 'video/mp4' }),
-    recordedSubtitles,
-  };
 };
 
 // ── 기존 MediaRecorder 렌더링 (폴백) ──
@@ -1141,13 +1165,33 @@ const generateVideoLegacy = async (
 
 // ── 메인 export: WebCodecs 지원 시 Mediabunny, 미지원 시 MediaRecorder 폴백 ──
 
+/** WebCodecs H.264 인코딩이 실제로 가능한지 검증 (VideoEncoder 존재만으로는 불충분) */
+async function isWebCodecsH264Supported(resolution?: ResolutionTier): Promise<boolean> {
+  if (typeof VideoEncoder === 'undefined') return false;
+  try {
+    const res = resolution ?? '720p';
+    const resConfig = VIDEO_RESOLUTIONS[res];
+    const orientation = getVideoOrientation();
+    const dims = resConfig[orientation];
+    const result = await VideoEncoder.isConfigSupported({
+      codec: 'avc1.42E01E',
+      width: dims.width,
+      height: dims.height,
+      bitrate: resConfig.bitrate,
+    });
+    return result.supported === true;
+  } catch {
+    return false;
+  }
+}
+
 export const generateVideo = async (
   assets: GeneratedAsset[],
   onProgress: (msg: string) => void,
   abortRef?: { current: boolean },
   options?: VideoExportOptions
 ): Promise<VideoGenerationResult | null> => {
-  if (typeof VideoEncoder !== 'undefined') {
+  if (await isWebCodecsH264Supported(options?.resolution)) {
     try {
       return await generateVideoWithMediabunny(assets, onProgress, abortRef, options);
     } catch (e) {
