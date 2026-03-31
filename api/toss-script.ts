@@ -52,9 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const isKnownChar = char !== null;
 
         // 캐릭터 정보 — 사전 매칭 or AI 위임
-        const charKr = isKnownChar ? char.kr : '';
-        const charEn = isKnownChar ? char.en : '';
-        const charFull = isKnownChar ? char.full : '';
+        const charKr = isKnownChar ? char!.kr : '';
+        const charEn = isKnownChar ? char!.en : '';
+        const charFull = isKnownChar ? char!.full : '';
 
         // 캐릭터에 따라 프롬프트 분기
         const charIntro = isKnownChar
