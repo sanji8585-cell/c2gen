@@ -41,6 +41,7 @@
     "api/analytics.ts": { "maxDuration": 60 },
     "api/pilot/save-content.ts": { "maxDuration": 120 },
     "api/toss-script.ts": { "maxDuration": 120 },
+    "api/toss-image.ts": { "maxDuration": 120 },
     "api/toss-auth.ts": { "maxDuration": 30 },
     "api/toss-user.ts": { "maxDuration": 30 }
   }

@@ -2,8 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
 
 // ── 캐릭터 추출 ──
+const HUMAN_CHARACTERS = new Set(['princess', 'prince', 'girl', 'boy']);
+
 function extractCharacter(topic: string) {
-  const animals: Record<string, string> = {
+  const characters: Record<string, string> = {
     '토끼': 'rabbit', '고양이': 'cat', '강아지': 'puppy', '곰': 'bear',
     '펭귄': 'penguin', '여우': 'fox', '다람쥐': 'squirrel', '사자': 'lion',
     '코끼리': 'elephant', '돌고래': 'dolphin', '부엉이': 'owl', '판다': 'panda',
@@ -14,13 +16,14 @@ function extractCharacter(topic: string) {
     '반딧불이': 'firefly', '달팽이': 'snail', '곰돌이': 'teddy bear',
   };
 
-  for (const [kr, en] of Object.entries(animals)) {
+  for (const [kr, en] of Object.entries(characters)) {
     if (topic.includes(kr)) {
       const mods = topic.match(/(아기|작은|꼬마|어린|용감한|씩씩한|귀여운|하얀|검은|빨간|분홍)\s*/g) || [];
-      return { kr, en, full: `${mods.map(m => m.trim()).join(' ')} ${kr}`.trim() };
+      const type = HUMAN_CHARACTERS.has(en) ? 'human' as const : 'animal' as const;
+      return { kr, en, full: `${mods.map(m => m.trim()).join(' ')} ${kr}`.trim(), type };
     }
   }
-  return { kr: topic, en: topic, full: topic };
+  return { kr: topic, en: topic, full: topic, type: 'animal' as const };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -152,7 +155,10 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
           }
         }
 
-        return res.json(scenes.slice(0, count));
+        return res.json({
+          scenes: scenes.slice(0, count),
+          character: { kr: char.kr, en: char.en, type: char.type },
+        });
       }
 
       default:
