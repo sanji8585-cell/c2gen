@@ -201,7 +201,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             parts.push({ text: scenePrompt });
 
-            const model = imageModelId || 'gemini-3.1-flash-image-preview';
+            const model = imageModelId || 'gemini-2.5-flash-image';
             const response = await ai.models.generateContent({
               model,
               contents: { parts },

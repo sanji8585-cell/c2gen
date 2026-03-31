@@ -117,7 +117,7 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
         console.log(`[toss-script] Generating: topic="${topic}", type=${type}, char=${char.full}, count=${count}`);
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.1-pro-preview',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
