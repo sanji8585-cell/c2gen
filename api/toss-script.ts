@@ -160,8 +160,16 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
 - 구체적 감각 (계절, 날씨, 장소, 음식)
 - 꾸미지 않은 솔직한 진심
 
-■ visualPrompt: 영어, 뒷모습/실루엣/풍경, "warm emotional illustration style"
-■ JSON: {"scenes":[{"sceneNumber":1, "narration":"...", "visualPrompt":"...", "duration":5}]}`
+■ visualPrompt 규칙:
+- 영어로 작성, 최소 80단어 이상으로 상세하게
+- 나레이션의 감정과 내용에 맞는 장면을 구체적으로 묘사
+- 각 장면마다 완전히 다른 배경/장소 (카페→공원→해변→거리→하늘 등)
+- 사람은 자연스럽게 등장 가능 (앞모습, 옆모습, 뒷모습 모두 OK)
+- 스타일: "warm emotional illustration, soft lighting, gentle color palette, cinematic composition, no text, no captions, no speech bubbles"
+- 감정이 느껴지는 디테일: 표정, 손동작, 빛의 방향, 계절감
+
+■ JSON 형식:
+{"scenes":[{"sceneNumber":1, "narration":"50~80자 한국어", "visualPrompt":"상세 영어 장면 묘사", "duration":5}]}`
 
           : type === 'free'
           ? `${count}장면 쇼츠 영상 대본을 JSON으로 만들어주세요.
