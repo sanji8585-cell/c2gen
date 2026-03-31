@@ -25,8 +25,18 @@ function extractCharacter(topic: string) {
   }
   // 사전에 없음 → 주제에서 이름 추출 시도
   // "미키의 즐거운 모험" → "미키", "루루와 별의 여행" → "루루"
-  const nameMatch = topic.match(/^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)(?:의|와|과|이의|가|는|은)\s/);
-  const extractedName = nameMatch?.[1]?.trim() || null;
+  // 여러 패턴 시도
+  let extractedName: string | null = null;
+  const patterns = [
+    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)의\s/,   // X의 Y
+    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)와\s/,   // X와 Y
+    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)과\s/,   // X과 Y
+    /^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)이의\s/, // X이의 Y
+  ];
+  for (const p of patterns) {
+    const m = topic.match(p);
+    if (m?.[1]) { extractedName = m[1].trim(); break; }
+  }
 
   return extractedName
     ? { kr: extractedName, en: '', full: extractedName, type: 'unknown' as const }
@@ -222,7 +232,7 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
         return res.json({
           scenes: scenes.slice(0, count),
           character: finalCharacter,
-          _debug: { charKr, charEn, charFull, isKnownSpecies, hasName, aiCharacter },
+          _debug: { extractedName: charKr, hasName, aiCharName: aiCharacter?.name_kr },
         });
       }
 
