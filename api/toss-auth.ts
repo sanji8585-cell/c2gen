@@ -21,8 +21,11 @@ function tossApiRequest(
   path: string,
   options: { method?: string; body?: object; headers?: Record<string, string> },
 ): Promise<any> {
-  const cert = process.env.TOSS_MTLS_CERT?.replace(/\\n/g, '\n');
-  const key = process.env.TOSS_MTLS_KEY?.replace(/\\n/g, '\n');
+  // Vercel 환경변수에서 줄바꿈 복원 (리터럴 \n, 이스케이프된 \\n 모두 처리)
+  const rawCert = process.env.TOSS_MTLS_CERT || '';
+  const rawKey = process.env.TOSS_MTLS_KEY || '';
+  const cert = rawCert.replace(/\\n/g, '\n').replace(/\\r/g, '');
+  const key = rawKey.replace(/\\n/g, '\n').replace(/\\r/g, '');
 
   return new Promise((resolve, reject) => {
     const data = options.body ? JSON.stringify(options.body) : '';
