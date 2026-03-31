@@ -549,6 +549,7 @@ export const MOOD_VALUE_MAP: Record<string, string> = {
   '호기심': 'POSITIVE', '선망': 'POSITIVE', '깨달음': 'POSITIVE', '감동': 'POSITIVE',
   '유머': 'POSITIVE', '재미': 'POSITIVE', '성취': 'POSITIVE', '자신감': 'POSITIVE',
   '따뜻함': 'POSITIVE', '기대': 'POSITIVE', '안도': 'POSITIVE', '감사': 'POSITIVE',
+  '신뢰': 'POSITIVE', '행복': 'POSITIVE', '평화': 'POSITIVE', '사랑': 'POSITIVE',
   // 한국어 NEGATIVE
   '어두움': 'NEGATIVE', '긴장': 'NEGATIVE', '긴장감': 'NEGATIVE', '무거움': 'NEGATIVE',
   '공포': 'NEGATIVE', '슬픔': 'NEGATIVE', '우울': 'NEGATIVE', '불안': 'NEGATIVE', '극적인': 'NEGATIVE',
@@ -556,7 +557,7 @@ export const MOOD_VALUE_MAP: Record<string, string> = {
   '긴장 고조': 'NEGATIVE', '위기': 'NEGATIVE', '분노': 'NEGATIVE', '혼란': 'NEGATIVE',
   '위험': 'NEGATIVE', '파괴': 'NEGATIVE', '몰락': 'NEGATIVE', '비극': 'NEGATIVE', '절박': 'NEGATIVE',
   // 한국어 NEUTRAL
-  '중립': 'NEUTRAL', '차분한': 'NEUTRAL', '잔잔한': 'NEUTRAL', '진지한': 'NEUTRAL',
+  '중립': 'NEUTRAL', '차분한': 'NEUTRAL', '차분함': 'NEUTRAL', '잔잔한': 'NEUTRAL', '진지한': 'NEUTRAL',
   '고조': 'NEUTRAL', '변화': 'NEUTRAL', '전환': 'NEUTRAL', '성찰': 'NEUTRAL',
   '여운': 'NEUTRAL', '회고': 'NEUTRAL', '관조': 'NEUTRAL', '담담': 'NEUTRAL',
   // English POSITIVE

@@ -74,7 +74,14 @@ export function parseDirectives(narration: string): ParseResult {
       const mapped = COMPOSITION_VALUE_MAP[value] || COMPOSITION_VALUE_MAP[value.toLowerCase()];
       (directives as any)[internalKey] = mapped || value.toUpperCase();
     } else if (internalKey === 'MOOD') {
-      const mapped = MOOD_VALUE_MAP[value] || MOOD_VALUE_MAP[value.toLowerCase()];
+      // 쉼표로 복합 분위기 값 처리 ("긴장, 절망" → 첫 번째 값으로 매핑)
+      const moodParts = value.split(/[,，]\s*/);
+      let mapped: string | undefined;
+      for (const part of moodParts) {
+        const trimmed = part.trim();
+        mapped = MOOD_VALUE_MAP[trimmed] || MOOD_VALUE_MAP[trimmed.toLowerCase()];
+        if (mapped) break;
+      }
       (directives as any)[internalKey] = mapped || value.toUpperCase();
     } else {
       // BACKGROUND, STYLE, TEXT, CAMERA, COLOR, SPEAKER — 자유 텍스트
