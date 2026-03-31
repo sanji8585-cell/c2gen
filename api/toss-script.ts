@@ -146,7 +146,8 @@ ${charVisualRule}
 ■ JSON 형식:
 {"scenes":[{"sceneNumber":1, "narration":"50~80자 한국어", "visualPrompt":"상세 영어 장면 묘사", "duration":5}]${jsonCharField}}`
 
-          : `${count}장면 영상 편지를 JSON 배열로 만들어주세요.
+          : type === 'shorts'
+          ? `${count}장면 영상 편지를 JSON으로 만들어주세요.
 
 ■ 주제: ${topic}
 ■ 이것은 동화가 아닙니다. 소중한 사람에게 보내는 진심 어린 편지입니다.
@@ -197,6 +198,8 @@ ${count >= 4 ? '2번 장면: 핵심 내용 1\n3번 장면: 핵심 내용 2\n' : 
 
 ■ JSON 형식:
 {"scenes":[{"sceneNumber":1, "narration":"50~80자 한국어", "visualPrompt":"상세 영어 장면 묘사", "duration":5}]}`
+
+          : `${count}장면 쇼츠를 JSON으로 만들어주세요. 주제: ${topic}. 한국어 나레이션 50~80자, 영어 visualPrompt 80단어+. JSON: {"scenes":[{"sceneNumber":1,"narration":"...","visualPrompt":"...","duration":5}]}`;
 
         console.log(`[toss-script] Generating: topic="${topic}", type=${type}, char=${charFull || '(AI위임)'}, count=${count}`);
 
