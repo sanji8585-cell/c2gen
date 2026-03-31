@@ -18,12 +18,26 @@ async function logUsage(_req: VercelRequest, action: string, costUsd: number) {
     if (!url || !key) return;
 
     const supabase = createClient(url, key);
+    const now = new Date();
     await supabase.from('toss_usage').insert({
       action,
       cost_usd: costUsd,
       count: 1,
-      created_at: new Date().toISOString(),
+      created_at: now.toISOString(),
     });
+
+    // 일일 비용 모니터링 (10분에 1번만 체크 — Math.random 확률)
+    if (Math.random() < 0.1) {
+      const todayStart = `${now.toISOString().split('T')[0]}T00:00:00`;
+      const { data } = await supabase
+        .from('toss_usage')
+        .select('cost_usd')
+        .gte('created_at', todayStart);
+      const totalCost = (data || []).reduce((sum: number, r: any) => sum + (r.cost_usd || 0), 0);
+      if (totalCost > 10) { // $10/일 초과 시 경고
+        console.warn(`[COST ALERT] Daily cost: $${totalCost.toFixed(2)} (threshold: $10)`);
+      }
+    }
   } catch (e) {
     console.error('[toss-image] logUsage error:', e);
   }

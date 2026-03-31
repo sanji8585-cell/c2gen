@@ -73,6 +73,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'consumeGeneration': {
         const sceneCount = params.sceneCount || 4;
 
+        // Rate Limiting: 1분당 최대 5회 생성
+        const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
+        const { count: recentCount } = await supabase
+          .from('toss_generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_key', userKey)
+          .gte('created_at', oneMinAgo);
+        if ((recentCount ?? 0) >= 5) {
+          return res.status(429).json({ error: '너무 빠르게 생성하고 있어요. 1분 후 다시 시도해주세요.' });
+        }
+
         const { data: user } = await supabase
           .from('toss_users')
           .select('credits, is_premium')
