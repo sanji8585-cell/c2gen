@@ -104,22 +104,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const today = new Date().toISOString().split('T')[0];
 
         if (!existingUser) {
-          // 신규 유저: 무료 크레딧 부여
+          // 신규 유저: 가입 보너스 4컷
           await supabase.from('toss_users').insert({
             user_key: userKey,
             name: userName,
-            credits: 0,
+            credits: 4,
             is_premium: false,
-            free_today: 2,
+            free_today: 0,
             free_reset_date: today,
             created_at: new Date().toISOString(),
           });
-        } else if (existingUser.free_reset_date !== today) {
-          // 날짜 바뀜 → 무료 횟수 리셋
-          await supabase.from('toss_users')
-            .update({ free_today: 2, free_reset_date: today })
-            .eq('user_key', userKey);
         }
+        // 일일 무료 리셋 삭제 — 크레딧 전용 과금
 
         // 4. 세션 생성
         const sessionToken = generateSessionToken();

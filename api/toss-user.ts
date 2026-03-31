@@ -6,8 +6,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY!
 );
 
-// ── 크레딧 매핑 (sku → 생성 횟수) ──
+// ── 크레딧 매핑 (sku → 컷 수) ──
 const SKU_CREDITS: Record<string, number> = {
+  cuts_4: 4,
+  cuts_12: 12,
+  cuts_30: 30,
+  cuts_60: 60,
+  // 하위 호환 (기존 SKU)
   credits_5: 5,
   credits_15: 15,
   credits_50: 50,
@@ -25,22 +30,6 @@ async function getUserKey(req: VercelRequest): Promise<string | null> {
     .single();
 
   return data?.user_key || null;
-}
-
-// ── 무료 횟수 리셋 체크 ──
-async function checkFreeReset(userKey: string) {
-  const today = new Date().toISOString().split('T')[0];
-  const { data } = await supabase
-    .from('toss_users')
-    .select('free_reset_date')
-    .eq('user_key', userKey)
-    .single();
-
-  if (data && data.free_reset_date !== today) {
-    await supabase.from('toss_users')
-      .update({ free_today: 8, free_reset_date: today })
-      .eq('user_key', userKey);
-  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -63,11 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ── 프로필 조회 ──
       case 'getProfile':
       case 'getCredits': {
-        await checkFreeReset(userKey);
-
         const { data: user } = await supabase
           .from('toss_users')
-          .select('credits, is_premium, free_today, name')
+          .select('credits, is_premium, name')
           .eq('user_key', userKey)
           .single();
 
@@ -76,20 +63,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({
           credits: user.credits,
           isPremium: user.is_premium,
-          freeToday: user.free_today,
+          freeToday: 0,
           name: user.name,
-          canGenerate: user.is_premium || user.free_today > 0 || user.credits > 0,
+          canGenerate: user.is_premium || user.credits > 0,
         });
       }
 
-      // ── 생성 소비 (컷당 과금: sceneCount만큼 차감) ──
+      // ── 생성 소비 (컷당 과금) ──
       case 'consumeGeneration': {
         const sceneCount = params.sceneCount || 4;
-        await checkFreeReset(userKey);
 
         const { data: user } = await supabase
           .from('toss_users')
-          .select('credits, is_premium, free_today')
+          .select('credits, is_premium')
           .eq('user_key', userKey)
           .single();
 
@@ -107,66 +93,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.json({
             credits: user.credits,
             isPremium: true,
-            freeToday: user.free_today,
+            freeToday: 0,
             canGenerate: true,
           });
         }
 
-        // 무료 컷 남음? (free_today = 남은 무료 컷 수)
-        if (user.free_today >= sceneCount) {
+        // 크레딧 차감
+        if (user.credits >= sceneCount) {
+          const newCredits = user.credits - sceneCount;
           await supabase.from('toss_users')
-            .update({ free_today: user.free_today - sceneCount })
+            .update({ credits: newCredits })
             .eq('user_key', userKey);
 
           await supabase.from('toss_generations').insert({
             user_key: userKey,
-            cost_type: 'free',
+            cost_type: 'credit',
             scene_count: sceneCount,
+            credits_used: sceneCount,
             created_at: new Date().toISOString(),
           });
 
           return res.json({
-            credits: user.credits,
-            isPremium: false,
-            freeToday: user.free_today - sceneCount,
-            canGenerate: true,
-          });
-        }
-
-        // 무료 + 크레딧 혼합 사용
-        const freeUsed = user.free_today; // 남은 무료 전부 사용
-        const creditNeeded = sceneCount - freeUsed;
-
-        if (creditNeeded > 0 && user.credits >= creditNeeded) {
-          await supabase.from('toss_users')
-            .update({ free_today: 0, credits: user.credits - creditNeeded })
-            .eq('user_key', userKey);
-
-          await supabase.from('toss_generations').insert({
-            user_key: userKey,
-            cost_type: freeUsed > 0 ? 'mixed' : 'credit',
-            scene_count: sceneCount,
-            free_used: freeUsed,
-            credits_used: creditNeeded,
-            created_at: new Date().toISOString(),
-          });
-
-          return res.json({
-            credits: user.credits - creditNeeded,
+            credits: newCredits,
             isPremium: false,
             freeToday: 0,
             canGenerate: true,
           });
         }
 
-        // 부족 — 총 가용 컷 수 알려주기
-        const totalAvailable = user.free_today + user.credits;
+        // 부족
         return res.json({
           credits: user.credits,
           isPremium: false,
-          freeToday: user.free_today,
+          freeToday: 0,
           canGenerate: false,
-          available: totalAvailable,
+          available: user.credits,
           needed: sceneCount,
         });
       }
@@ -214,37 +175,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ ok: true, credits: newCredits });
       }
 
-      // ── 광고 시청 보상 (무료 생성 1회) ──
-      case 'grantAdReward': {
-        await checkFreeReset(userKey);
+      // ── 생성 실패 환불 ──
+      case 'refundGeneration': {
+        const sceneCount = params.sceneCount || 4;
 
         const { data: user } = await supabase
           .from('toss_users')
-          .select('free_today')
+          .select('credits')
           .eq('user_key', userKey)
           .single();
 
-        // 광고 1회 시청 → 4컷 보상 (하루 최대 20컷: 무료 8컷 + 광고 3회×4컷 = 최대 20컷)
-        const currentFree = user?.free_today ?? 0;
-        if (currentFree >= 20) {
-          return res.status(400).json({ error: '오늘 광고 보상은 최대 3회까지예요' });
-        }
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
+        const newCredits = user.credits + sceneCount;
         await supabase.from('toss_users')
-          .update({ free_today: currentFree + 4 })
+          .update({ credits: newCredits })
           .eq('user_key', userKey);
 
-        const { data: updated } = await supabase
+        await supabase.from('toss_generations').insert({
+          user_key: userKey,
+          cost_type: 'refund',
+          scene_count: sceneCount,
+          credits_used: -sceneCount,
+          created_at: new Date().toISOString(),
+        });
+
+        return res.json({ credits: newCredits, refunded: sceneCount });
+      }
+
+      // ── 공유 보너스 (+2컷) ──
+      case 'grantShareReward': {
+        // 하루 1회 제한
+        const today = new Date().toISOString().split('T')[0];
+        const { data: todayShare } = await supabase
+          .from('toss_generations')
+          .select('id')
+          .eq('user_key', userKey)
+          .eq('cost_type', 'share_reward')
+          .gte('created_at', `${today}T00:00:00`)
+          .limit(1)
+          .single();
+
+        if (todayShare) {
+          return res.status(400).json({ error: '오늘 이미 공유 보너스를 받았어요' });
+        }
+
+        const { data: user } = await supabase
           .from('toss_users')
-          .select('credits, is_premium, free_today')
+          .select('credits')
           .eq('user_key', userKey)
           .single();
 
-        return res.json({
-          credits: updated?.credits ?? 0,
-          isPremium: updated?.is_premium ?? false,
-          freeToday: updated?.free_today ?? 0,
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const bonus = 2;
+        const newCredits = user.credits + bonus;
+        await supabase.from('toss_users')
+          .update({ credits: newCredits })
+          .eq('user_key', userKey);
+
+        await supabase.from('toss_generations').insert({
+          user_key: userKey,
+          cost_type: 'share_reward',
+          scene_count: 0,
+          credits_used: -bonus,
+          created_at: new Date().toISOString(),
         });
+
+        return res.json({ credits: newCredits, granted: bonus });
       }
 
       default:
