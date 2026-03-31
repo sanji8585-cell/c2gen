@@ -1,18 +1,66 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import https from 'https';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
 );
 
-// 토스 API 베이스 URL
-const TOSS_API_BASE = 'https://apps-in-toss-api.toss.im';
+// 토스 API 베이스
+const TOSS_API_HOST = 'apps-in-toss-api.toss.im';
 
 // ── 세션 토큰 생성 ──
 function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
+}
+
+// ── mTLS 인증서로 토스 API 호출 ──
+function tossApiRequest(
+  path: string,
+  options: { method?: string; body?: object; headers?: Record<string, string> },
+): Promise<any> {
+  const cert = process.env.TOSS_MTLS_CERT?.replace(/\\n/g, '\n');
+  const key = process.env.TOSS_MTLS_KEY?.replace(/\\n/g, '\n');
+
+  return new Promise((resolve, reject) => {
+    const data = options.body ? JSON.stringify(options.body) : '';
+    const method = options.method || 'POST';
+
+    const reqOptions: https.RequestOptions = {
+      hostname: TOSS_API_HOST,
+      path,
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(method === 'POST' ? { 'Content-Length': Buffer.byteLength(data).toString() } : {}),
+        ...options.headers,
+      },
+      ...(cert && key ? { cert, key } : {}),
+      rejectUnauthorized: true,
+    };
+
+    const req = https.request(reqOptions, (res) => {
+      let body = '';
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`Toss API ${res.statusCode}: ${body}`));
+        } else {
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            resolve(body);
+          }
+        }
+      });
+    });
+
+    req.on('error', (err) => reject(new Error(`mTLS request failed: ${err.message}`)));
+    if (data && method === 'POST') req.write(data);
+    req.end();
+  });
 }
 
 // ── 세션 검증 ──
@@ -30,12 +78,13 @@ async function validateSession(req: VercelRequest): Promise<string | null> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  // CORS
+  // CORS (OPTIONS 포함 — BUG-9 fix)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { action, ...params } = req.body || {};
 
@@ -47,9 +96,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { code, referrer } = params;
         if (!code) return res.status(400).json({ error: 'code required' });
 
-        // 1. 토스 API로 토큰 교환
-        // 참고: 프로덕션에서는 mTLS 인증서가 필요함
-        // 개발 중에는 sandbox 환경 사용
         let userKey: string;
         let userName: string | undefined;
 
@@ -58,46 +104,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           userKey = `dev_${Date.now()}`;
           userName = '테스트 유저';
         } else {
-          // 프로덕션: 토스 API 호출
-          const tokenRes = await fetch(
-            `${TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/generate-token`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ authorizationCode: code, referrer }),
-            }
-          );
-
-          if (!tokenRes.ok) {
-            const err = await tokenRes.text();
-            return res.status(401).json({ error: `Token exchange failed: ${err}` });
+          // 프로덕션: mTLS 인증서로 토스 API 호출
+          const hasMtls = !!(process.env.TOSS_MTLS_CERT && process.env.TOSS_MTLS_KEY);
+          if (!hasMtls) {
+            console.warn('[toss-auth] mTLS 인증서 미설정! 프로덕션 로그인 불가');
           }
 
-          const tokenData = await tokenRes.json();
+          // 1. 토큰 교환
+          const tokenData = await tossApiRequest(
+            '/api-partner/v1/apps-in-toss/user/oauth2/generate-token',
+            { method: 'POST', body: { authorizationCode: code, referrer } },
+          );
+
+          if (!tokenData?.accessToken) {
+            return res.status(401).json({ error: 'Token exchange failed', detail: tokenData });
+          }
 
           // 2. 사용자 정보 조회
-          const meRes = await fetch(
-            `${TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/login-me`,
-            {
-              method: 'GET',
-              headers: { Authorization: `Bearer ${tokenData.accessToken}` },
-            }
+          const meData = await tossApiRequest(
+            '/api-partner/v1/apps-in-toss/user/oauth2/login-me',
+            { method: 'GET', headers: { Authorization: `Bearer ${tokenData.accessToken}` } },
           );
 
-          if (!meRes.ok) {
-            return res.status(401).json({ error: 'User info fetch failed' });
+          if (!meData?.userKey) {
+            return res.status(401).json({ error: 'User info fetch failed', detail: meData });
           }
 
-          const meData = await meRes.json();
           userKey = meData.userKey;
           // 개인정보는 AES-256-GCM으로 암호화되어 옴 (복호화 키 필요)
-          // 여기서는 userKey만 사용
         }
 
         // 3. DB에 유저 upsert
         const { data: existingUser } = await supabase
           .from('toss_users')
-          .select('user_key, credits, is_premium, free_today, free_reset_date')
+          .select('user_key, credits, is_premium')
           .eq('user_key', userKey)
           .single();
 
@@ -115,7 +155,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             created_at: new Date().toISOString(),
           });
         }
-        // 일일 무료 리셋 삭제 — 크레딧 전용 과금
 
         // 4. 세션 생성
         const sessionToken = generateSessionToken();
@@ -128,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 최신 유저 정보 조회
         const { data: user } = await supabase
           .from('toss_users')
-          .select('credits, is_premium, free_today, name')
+          .select('credits, is_premium, name')
           .eq('user_key', userKey)
           .single();
 
@@ -136,9 +175,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           userKey,
           sessionToken,
           name: user?.name || userName,
-          credits: user?.credits ?? 0,
+          credits: user?.credits ?? 4,
           isPremium: user?.is_premium ?? false,
-          freeToday: user?.free_today ?? 2,
+          freeToday: 0,
         });
       }
 
