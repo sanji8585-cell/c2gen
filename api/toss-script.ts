@@ -202,12 +202,21 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
             }
           }
         } else {
-          // AI가 정한 캐릭터
+          // AI가 정한 캐릭터 (이름이 추출됐으면 그 이름을 우선 사용)
           finalCharacter = {
-            kr: aiCharacter?.name_kr || aiCharacter?.species || topic,
+            kr: charKr || aiCharacter?.name_kr || aiCharacter?.species || topic,
             en: aiCharacter?.species || aiCharacter?.name_en || 'creature',
             type: (aiCharacter?.type === 'human' ? 'human' : 'animal') as 'animal' | 'human',
           };
+
+          // AI가 이름을 무시하고 다른 이름을 지었으면 나레이션에서 교체
+          if (charKr && aiCharacter?.name_kr && aiCharacter.name_kr !== charKr) {
+            for (const scene of scenes) {
+              if (scene.narration) {
+                scene.narration = scene.narration.replaceAll(aiCharacter.name_kr, charKr);
+              }
+            }
+          }
         }
 
         return res.json({
