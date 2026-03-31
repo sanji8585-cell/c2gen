@@ -23,8 +23,14 @@ function extractCharacter(topic: string) {
       return { kr, en, full: `${mods.map(m => m.trim()).join(' ')} ${kr}`.trim(), type };
     }
   }
-  // 사전에 없는 캐릭터 → AI에게 위임 (null 반환)
-  return null;
+  // 사전에 없음 → 주제에서 이름 추출 시도
+  // "미키의 즐거운 모험" → "미키", "루루와 별의 여행" → "루루"
+  const nameMatch = topic.match(/^(?:용감한|씩씩한|귀여운|작은|아기|꼬마)?\s*(.+?)(?:의|와|과|이의|가|는|은)\s/);
+  const extractedName = nameMatch?.[1]?.trim() || null;
+
+  return extractedName
+    ? { kr: extractedName, en: '', full: extractedName, type: 'unknown' as const }
+    : null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -49,44 +55,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const count = Math.max(3, Math.min(10, sceneCount));
         const ai = new GoogleGenAI({ apiKey });
         const char = extractCharacter(topic);
-        const isKnownChar = char !== null;
-
-        // 캐릭터 정보 — 사전 매칭 or AI 위임
+        // 3가지 경우: 사전 매칭(토끼 등), 이름만 추출(미키 등), 완전 위임(null)
+        const isKnownSpecies = char !== null && char.type !== 'unknown'; // 사전에서 종까지 매칭
+        const hasName = char !== null; // 이름이라도 추출됨
         const charKr = char?.kr || '';
         const charEn = char?.en || '';
         const charFull = char?.full || '';
 
         // 캐릭터에 따라 프롬프트 분기
-        const charIntro = isKnownChar
+        const charIntro = isKnownSpecies
           ? `■ 주인공: ${charFull} (영어: ${charEn})\n■ 주인공 이름: 귀여운 한국어 이름을 하나 지어주세요`
+          : hasName
+          ? `■ 주인공 이름: "${charKr}" (이 이름을 반드시 사용하세요!)\n■ "${charKr}"가 어떤 캐릭터인지는 네가 정해주세요. 동물이면 종류를, 사람이면 소년/소녀를 정하세요.\n■ 주제: ${topic}`
           : `■ 주인공: "${topic}"에 어울리는 주인공 캐릭터를 네가 정해주세요.\n  - 동물이면 귀여운 동물, 사람이면 아이/소년/소녀로\n  - 캐릭터의 한국어 이름과 영어 종류(species)를 정해주세요`;
 
-        const charNarrationRule = isKnownChar
+        const charNarrationRule = isKnownSpecies
           ? `- 모든 장면에서 주인공은 "${charKr}"입니다. 절대 다른 동물로 바꾸지 마세요.`
+          : hasName
+          ? `- 모든 장면에서 주인공 이름은 반드시 "${charKr}"입니다. 다른 이름으로 바꾸지 마세요.`
           : `- 모든 장면에서 주인공은 1번 장면에서 정한 캐릭터입니다. 절대 바꾸지 마세요.`;
 
-        const charVisualRule = isKnownChar
+        const charVisualRule = isKnownSpecies
           ? `- 캐릭터는 반드시 "a small cute anthropomorphic ${charEn}"으로 표현하세요.`
           : `- 캐릭터는 "a small cute anthropomorphic [네가 정한 영어 species]"으로 표현하세요. 사람 캐릭터면 "a small cute [child/girl/boy]"으로.`;
 
-        const charVisualExample = isKnownChar
+        const charVisualExample = isKnownSpecies
           ? `a small cute anthropomorphic ${charEn}`
           : `a small cute anthropomorphic [species]`;
 
-        const charForbidRule = isKnownChar && char?.type === 'animal'
+        const charForbidRule = isKnownSpecies && char?.type === 'animal'
           ? `- 절대 금지 단어: human, person, child, girl, boy, woman, man, people, kid. 모든 캐릭터는 동물입니다.`
           : `- 캐릭터가 동물이면 human/person/child 단어를 쓰지 마세요. 캐릭터가 사람이면 상관없습니다.`;
 
-        const sceneIntro = isKnownChar
+        const sceneIntro = isKnownSpecies
           ? `1번 장면: ${charFull}를 소개하세요. 어디에 사는지, 어떤 성격인지, 뭘 좋아하는지. 반드시 "${charKr}"가 나레이션에 포함되어야 합니다.`
+          : hasName
+          ? `1번 장면: "${charKr}"를 소개하세요. 어디에 사는지, 어떤 캐릭터인지, 뭘 좋아하는지. 반드시 "${charKr}"가 나레이션에 포함되어야 합니다.`
           : `1번 장면: 주인공을 소개하세요. 이름, 어디에 사는지, 어떤 성격인지, 뭘 좋아하는지.`;
 
-        const sceneMid = isKnownChar ? charFull : '주인공';
+        const sceneMid = hasName ? charKr : '주인공';
 
-        // JSON 추가 필드 (AI 위임 시 캐릭터 정보 반환)
-        const jsonCharField = isKnownChar
+        // JSON 추가 필드 (사전 미매칭 시 캐릭터 정보 반환)
+        const jsonCharField = isKnownSpecies
           ? ''
-          : `, "character": {"name_kr":"한국어이름", "name_en":"영어이름", "species":"영어종류", "type":"animal 또는 human"}`;
+          : `, "character": {"name_kr":"${hasName ? charKr : '한국어이름'}", "name_en":"영어이름", "species":"영어종류", "type":"animal 또는 human"}`;
 
         const prompt = type === 'fairytale'
           ? `${count}장면 잠자리 동화를 JSON으로 만들어주세요.
