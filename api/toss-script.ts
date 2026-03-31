@@ -190,8 +190,8 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
 
         // 캐릭터 정보 결정
         let finalCharacter: { kr: string; en: string; type: 'animal' | 'human' };
-        if (isKnownChar) {
-          finalCharacter = { kr: char?.kr || '', en: char?.en || '', type: char?.type || 'animal' };
+        if (isKnownSpecies) {
+          finalCharacter = { kr: char?.kr || '', en: char?.en || '', type: (char?.type === 'human' ? 'human' : 'animal') as 'animal' | 'human' };
           // 후처리: visualPrompt에 올바른 영어 캐릭터명 보장
           for (const scene of scenes) {
             if (scene.visualPrompt && !scene.visualPrompt.toLowerCase().includes(charEn.toLowerCase())) {
