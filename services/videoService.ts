@@ -2,6 +2,13 @@
 import { GeneratedAsset, SubtitleData, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
 import { getVideoOrientation, VIDEO_RESOLUTIONS, ResolutionTier } from '../config';
 
+// Mediabunny — WebCodecs 기반 비실시간 인코딩 (5~10배 빠름, 항상 MP4)
+let mediabunnyModule: typeof import('mediabunny') | null = null;
+async function loadMediabunny() {
+  if (!mediabunnyModule) mediabunnyModule = await import('mediabunny');
+  return mediabunnyModule;
+}
+
 /**
  * 고정밀 오디오 디코딩: ElevenLabs(MP3)와 Gemini(PCM) 통합 처리
  */
@@ -385,7 +392,302 @@ export interface VideoGenerationResult {
   recordedSubtitles: RecordedSubtitleEntry[];
 }
 
-export const generateVideo = async (
+// ── Mediabunny 렌더링 (WebCodecs 기반, 5~10배 빠름) ──
+
+const generateVideoWithMediabunny = async (
+  assets: GeneratedAsset[],
+  onProgress: (msg: string) => void,
+  abortRef?: { current: boolean },
+  options?: VideoExportOptions
+): Promise<VideoGenerationResult | null> => {
+  const mb = await loadMediabunny();
+  const enableSubtitles = options?.enableSubtitles ?? true;
+  const sceneGap = options?.sceneGap ?? 0.4;
+  const config: SubtitleConfig = { ...DEFAULT_SUBTITLE_CONFIG, ...options?.subtitleConfig };
+
+  const resolution = options?.resolution ?? '720p';
+  const resConfig = VIDEO_RESOLUTIONS[resolution];
+  const orientation = getVideoOrientation();
+  const resDims = resConfig[orientation];
+  const baseHeight = orientation === 'portrait' ? 1280 : 720;
+  const resolutionScale = resDims.height / baseHeight;
+  if (resolutionScale > 1) {
+    if (!options?.subtitleConfig?.fontSize) config.fontSize = Math.round(DEFAULT_SUBTITLE_CONFIG.fontSize * resolutionScale);
+    if (!options?.subtitleConfig?.bottomMargin) config.bottomMargin = Math.round(DEFAULT_SUBTITLE_CONFIG.bottomMargin * resolutionScale);
+  }
+  if (orientation === 'portrait') {
+    if (!options?.subtitleConfig?.fontSize) config.fontSize = Math.round(config.fontSize * 1.2);
+    if (!options?.subtitleConfig?.bottomMargin) config.bottomMargin = Math.round(config.bottomMargin * 1.5);
+  }
+
+  const validAssets = assets.filter(a => a.imageData || a.imageUrl);
+  if (validAssets.length === 0) throw new Error("에셋이 준비되지 않았습니다.");
+
+  onProgress("에셋 사전 로딩 중 (1/3)...");
+
+  // AudioContext (디코딩 전용)
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  const audioCtx = new AudioContextClass();
+
+  // ── 준비 단계 (기존과 동일) ──
+  const preparedScenes: PreparedScene[] = [];
+  let timelinePointer = 0;
+  const DEFAULT_DURATION = 3;
+  const dims = resDims;
+
+  for (let i = 0; i < validAssets.length; i++) {
+    const asset = validAssets[i];
+    onProgress(`데이터 디코딩 중 (${i + 1}/${validAssets.length})...`);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const imgData = asset.imageData || asset.imageUrl || '';
+    img.src = imgData.startsWith('http') || imgData.startsWith('data:') ? imgData : `data:image/jpeg;base64,${imgData}`;
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => (img.width === 0 || img.height === 0) ? reject(new Error('zero dims')) : resolve();
+      img.onerror = () => reject(new Error('load failed'));
+      setTimeout(() => reject(new Error('timeout')), 5000);
+    }).catch(() => {
+      const pc = document.createElement('canvas');
+      pc.width = dims.width; pc.height = dims.height;
+      const pCtx = pc.getContext('2d');
+      if (pCtx) { pCtx.fillStyle = '#1a1a2e'; pCtx.fillRect(0, 0, dims.width, dims.height); pCtx.fillStyle = '#fff'; pCtx.font = 'bold 48px sans-serif'; pCtx.textAlign = 'center'; pCtx.fillText(`씬 ${i + 1}`, dims.width / 2, dims.height / 2); }
+      img.src = pc.toDataURL();
+    });
+
+    let video: HTMLVideoElement | null = null;
+    let isAnimated = false;
+    if (asset.videoData) {
+      try {
+        video = document.createElement('video');
+        video.crossOrigin = 'anonymous'; video.muted = true; video.playsInline = true; video.preload = 'auto';
+        if (asset.videoData.startsWith('http')) {
+          try { const resp = await fetch(asset.videoData); const blob = await resp.blob(); video.src = URL.createObjectURL(blob); } catch { video.src = asset.videoData; }
+        } else { video.src = asset.videoData; }
+        await new Promise<void>((resolve, reject) => {
+          video!.oncanplaythrough = () => resolve(); video!.onloadeddata = () => resolve();
+          video!.onerror = () => reject(new Error('Video load failed'));
+          setTimeout(() => reject(new Error('timeout')), 15000);
+        });
+        isAnimated = true;
+      } catch { video = null; isAnimated = false; }
+    }
+
+    let audioBuffer: AudioBuffer | null = null;
+    let duration = DEFAULT_DURATION;
+    let audioSource = asset.audioData;
+    if (!audioSource && asset.audioUrl && asset.audioUrl.startsWith('http')) {
+      try { const r = await fetch(asset.audioUrl); const ab = await r.arrayBuffer(); const u8 = new Uint8Array(ab); let bin = ''; for (let j = 0; j < u8.length; j++) bin += String.fromCharCode(u8[j]); audioSource = btoa(bin); } catch {}
+    }
+    if (audioSource) {
+      try { audioBuffer = await decodeAudio(audioSource, audioCtx); duration = audioBuffer.duration; if (asset.audioMuted) audioBuffer = null; } catch { /* 기본 3초 */ }
+    } else if (asset.audioDuration && asset.audioDuration > 0) { duration = asset.audioDuration; }
+    if (asset.customDuration && asset.customDuration > 0) duration = asset.customDuration;
+
+    const subtitleChunks = enableSubtitles ? createSubtitleChunks(asset.subtitleData, config) : [];
+    const startTime = timelinePointer;
+    const endTime = startTime + duration;
+    preparedScenes.push({ img, video, isAnimated, audioBuffer, subtitleChunks, speakerColor: asset.speakerColor, zoomEffect: (asset.zoomEffect || 'zoomIn') as ZoomEffect, transition: (asset.transition || 'none') as TransitionType, startTime, endTime, duration });
+    timelinePointer = endTime + (i < validAssets.length - 1 ? sceneGap : 0);
+  }
+
+  const totalDuration = timelinePointer;
+
+  // ── BGM 디코딩 ──
+  let bgmBuffer: AudioBuffer | null = null;
+  if (options?.bgmData) {
+    try { onProgress("BGM 로딩 중..."); bgmBuffer = await decodeAudio(options.bgmData, audioCtx); } catch {}
+  }
+
+  // ── OfflineAudioContext로 전체 오디오 사전 믹싱 ──
+  onProgress("오디오 믹싱 중 (2/3)...");
+  const sampleRate = 44100;
+  const totalSamples = Math.ceil(sampleRate * (totalDuration + 0.5));
+  const offlineCtx = new OfflineAudioContext(2, totalSamples, sampleRate);
+
+  // 나레이션 배치
+  for (const scene of preparedScenes) {
+    if (!scene.audioBuffer) continue;
+    const src = offlineCtx.createBufferSource();
+    src.buffer = scene.audioBuffer;
+    src.connect(offlineCtx.destination);
+    src.start(scene.startTime);
+  }
+
+  // BGM + 덕킹
+  if (bgmBuffer) {
+    const baseVolume = options?.bgmVolume ?? 0.25;
+    const bgmGain = offlineCtx.createGain();
+    bgmGain.gain.value = baseVolume;
+    bgmGain.connect(offlineCtx.destination);
+    const bgmSrc = offlineCtx.createBufferSource();
+    bgmSrc.buffer = bgmBuffer;
+    bgmSrc.loop = true;
+    bgmSrc.connect(bgmGain);
+    bgmSrc.start(0);
+    bgmSrc.stop(totalDuration);
+
+    if (options?.bgmDuckingEnabled) {
+      const duckingAmount = options?.bgmDuckingAmount ?? 0.3;
+      const duckVolume = baseVolume * duckingAmount;
+      const RAMP_TIME = 0.3;
+      for (const scene of preparedScenes) {
+        if (!scene.audioBuffer) continue;
+        bgmGain.gain.setValueAtTime(baseVolume, scene.startTime);
+        bgmGain.gain.linearRampToValueAtTime(duckVolume, scene.startTime + RAMP_TIME);
+        bgmGain.gain.setValueAtTime(duckVolume, scene.endTime);
+        bgmGain.gain.linearRampToValueAtTime(baseVolume, scene.endTime + RAMP_TIME);
+      }
+    }
+  }
+
+  const mixedAudioBuffer = await offlineCtx.startRendering();
+  await audioCtx.close();
+
+  // ── Mediabunny 렌더링 (비실시간) ──
+  onProgress("고속 렌더링 시작 (3/3)...");
+
+  const canvas = document.createElement('canvas');
+  canvas.width = dims.width;
+  canvas.height = dims.height;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error("캔버스 초기화 실패");
+
+  const actualBitrate = options?.bitrateOverride ?? resConfig.bitrate;
+  const target = new mb.BufferTarget();
+  const output = new mb.Output({
+    format: new mb.Mp4OutputFormat({ fastStart: 'in-memory' }),
+    target,
+  });
+
+  const videoSource = new mb.CanvasSource(canvas, {
+    codec: 'avc1',
+    bitrate: actualBitrate,
+  });
+  const audioMbSource = new mb.AudioBufferSource({
+    codec: 'aac',
+    bitrate: 128_000,
+  });
+
+  output.addVideoTrack(videoSource, { frameRate: 30 });
+  output.addAudioTrack(audioMbSource);
+  await output.start();
+
+  // ── 프레임 루프 (비실시간 — for 루프) ──
+  const TARGET_FPS = 30;
+  const totalFrames = Math.ceil(totalDuration * TARGET_FPS);
+  const recordedSubtitles: RecordedSubtitleEntry[] = [];
+  let lastRecordedChunkText: string | null = null;
+  let currentChunkStartTime = 0;
+  let subtitleIndex = 0;
+  let lastPercent = -1;
+
+  for (let frame = 0; frame < totalFrames; frame++) {
+    if (abortRef?.current) { await output.cancel(); return null; }
+
+    const elapsed = frame / TARGET_FPS;
+
+    // 현재 씬 탐색
+    let currentScene: PreparedScene | undefined = preparedScenes.find(s => elapsed >= s.startTime && elapsed <= s.endTime);
+    let isInGap = false;
+    let gapProgress = 0;
+    let prevSceneForGap: PreparedScene | null = null;
+    let nextSceneForGap: PreparedScene | null = null;
+
+    if (!currentScene) {
+      if (elapsed < preparedScenes[0].startTime) {
+        currentScene = preparedScenes[0];
+      } else {
+        isInGap = true;
+        for (let si = 0; si < preparedScenes.length - 1; si++) {
+          if (elapsed >= preparedScenes[si].endTime && elapsed < preparedScenes[si + 1].startTime) {
+            prevSceneForGap = preparedScenes[si];
+            nextSceneForGap = preparedScenes[si + 1];
+            const gapDuration = nextSceneForGap.startTime - prevSceneForGap.endTime;
+            gapProgress = gapDuration > 0 ? (elapsed - prevSceneForGap.endTime) / gapDuration : 1;
+            break;
+          }
+        }
+        if (!prevSceneForGap) { currentScene = preparedScenes[preparedScenes.length - 1]; isInGap = false; }
+      }
+    }
+
+    // 배경
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (isInGap && prevSceneForGap && nextSceneForGap) {
+      renderTransition(ctx, canvas.width, canvas.height, prevSceneForGap, nextSceneForGap, gapProgress);
+    } else if (currentScene) {
+      const sceneProgress = currentScene.duration > 0 ? Math.min(1, Math.max(0, (elapsed - currentScene.startTime) / currentScene.duration)) : 0;
+
+      // 영상 씬: seek 후 그리기
+      if (currentScene.isAnimated && currentScene.video) {
+        const sceneElapsed = elapsed - currentScene.startTime;
+        currentScene.video.currentTime = sceneElapsed;
+        // seek 완료 대기 (빠른 폴백)
+        await new Promise<void>(resolve => {
+          const v = currentScene!.video!;
+          if (v.readyState >= 2) { resolve(); return; }
+          v.onseeked = () => resolve();
+          setTimeout(() => resolve(), 50);
+        });
+      }
+
+      drawSceneFrame(ctx, canvas.width, canvas.height, currentScene, sceneProgress);
+    }
+
+    // 자막
+    const activeScene = isInGap ? null : currentScene;
+    const sceneElapsed = activeScene ? elapsed - activeScene.startTime : 0;
+    if (activeScene) {
+      renderSubtitle(ctx, canvas, activeScene.subtitleChunks, sceneElapsed, config, activeScene.speakerColor);
+    }
+
+    // 자막 타이밍 기록
+    const currentChunk = activeScene ? getCurrentChunk(activeScene.subtitleChunks, sceneElapsed) : null;
+    const currentChunkText = currentChunk?.text || null;
+    if (currentChunkText !== lastRecordedChunkText) {
+      if (lastRecordedChunkText !== null) {
+        recordedSubtitles.push({ index: subtitleIndex, startTime: currentChunkStartTime, endTime: elapsed, text: lastRecordedChunkText });
+        subtitleIndex++;
+      }
+      if (currentChunkText !== null) currentChunkStartTime = elapsed;
+      lastRecordedChunkText = currentChunkText;
+    }
+
+    // 프레임 인코딩
+    await videoSource.add(elapsed, 1 / TARGET_FPS);
+
+    // 프로그레스 + UI 양보
+    const percent = Math.floor((frame / totalFrames) * 100);
+    if (percent > lastPercent + 4) {
+      onProgress(`고속 렌더링 중: ${percent}%`);
+      lastPercent = percent;
+      // 메인 스레드 양보 (UI 업데이트)
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  // 마지막 자막 종료
+  if (lastRecordedChunkText !== null) {
+    recordedSubtitles.push({ index: subtitleIndex, startTime: currentChunkStartTime, endTime: totalDuration, text: lastRecordedChunkText });
+  }
+
+  // 오디오 추가 + finalize
+  await audioMbSource.add(mixedAudioBuffer);
+  await output.finalize();
+  onProgress("렌더링 완료! 파일 생성 중...");
+
+  return {
+    videoBlob: new Blob([target.buffer!], { type: 'video/mp4' }),
+    recordedSubtitles,
+  };
+};
+
+// ── 기존 MediaRecorder 렌더링 (폴백) ──
+
+const generateVideoLegacy = async (
   assets: GeneratedAsset[],
   onProgress: (msg: string) => void,
   abortRef?: { current: boolean },
@@ -835,4 +1137,24 @@ export const generateVideo = async (
 
     frameTimer = setInterval(renderFrame, FRAME_INTERVAL);
   });
+};
+
+// ── 메인 export: WebCodecs 지원 시 Mediabunny, 미지원 시 MediaRecorder 폴백 ──
+
+export const generateVideo = async (
+  assets: GeneratedAsset[],
+  onProgress: (msg: string) => void,
+  abortRef?: { current: boolean },
+  options?: VideoExportOptions
+): Promise<VideoGenerationResult | null> => {
+  if (typeof VideoEncoder !== 'undefined') {
+    try {
+      return await generateVideoWithMediabunny(assets, onProgress, abortRef, options);
+    } catch (e) {
+      console.warn('[Video] Mediabunny 렌더링 실패, MediaRecorder 폴백:', e);
+      onProgress('고속 렌더링 실패 — 기존 방식으로 재시도...');
+      return generateVideoLegacy(assets, onProgress, abortRef, options);
+    }
+  }
+  return generateVideoLegacy(assets, onProgress, abortRef, options);
 };
