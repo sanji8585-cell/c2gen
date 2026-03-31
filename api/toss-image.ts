@@ -89,6 +89,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // 세션 인증 (무인증 API 남용 방지)
+  const sessionToken = req.headers['x-session-token'] as string;
+  if (sessionToken) {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (url && key) {
+      const supabase = createClient(url, key);
+      const { data } = await supabase
+        .from('toss_sessions')
+        .select('user_key')
+        .eq('token', sessionToken)
+        .single();
+      if (!data?.user_key) {
+        return res.status(401).json({ error: 'Invalid session' });
+      }
+    }
+  }
+
   const apiKey = pickGeminiKey();
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
 
