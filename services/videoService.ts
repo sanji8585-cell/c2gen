@@ -561,7 +561,7 @@ const generateVideoWithMediabunny = async (
   });
 
   const videoSource = new mb.CanvasSource(canvas, {
-    codec: 'avc1',
+    codec: 'avc',
     bitrate: actualBitrate,
   });
   const audioMbSource = new mb.AudioBufferSource({
