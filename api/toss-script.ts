@@ -257,12 +257,22 @@ ${count >= 4 ? '2번 장면: 핵심 내용 1\n3번 장면: 핵심 내용 2\n' : 
             type: (aiCharacter?.type === 'human' ? 'human' : 'animal') as 'animal' | 'human',
           };
 
-          // AI가 이름을 무시하고 다른 이름을 지었으면 나레이션에서 교체
-          if (charKr && aiCharacter?.name_kr && aiCharacter.name_kr !== charKr) {
-            for (const scene of scenes) {
-              if (scene.narration) {
-                scene.narration = scene.narration.replaceAll(aiCharacter.name_kr, charKr);
-              }
+          // AI가 이름을 무시했으면 나레이션에서 강제 교체
+          if (charKr) {
+            // AI가 반환한 이름 (character 필드 또는 첫 나레이션에서 추출)
+            const aiName = aiCharacter?.name_kr || null;
+            // 첫 나레이션에서 "꼬마 용 미르가" 같은 패턴으로 AI가 지은 이름 추출
+            const firstNarr = scenes[0]?.narration || '';
+            const nameInNarr = !firstNarr.includes(charKr)
+              ? firstNarr.match(/(?:꼬마|아기|작은|귀여운)?\s*(?:\S+)\s+(\S+?)(?:가|는|은|이|의|와|도|를)\s/)?.[1] || aiName
+              : null;
+            const wrongName = aiName || nameInNarr;
+
+            if (wrongName && wrongName !== charKr) {
+              for (const scene of scenes) {
+                if (scene.narration) {
+                  scene.narration = scene.narration.replaceAll(wrongName, charKr);
+                }
             }
           }
         }
