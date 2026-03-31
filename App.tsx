@@ -679,10 +679,16 @@ const AppContent: React.FC<{
       .replace(/^\*\*최종\s*대본\*\*.*$/gm, '')   // **최종 대본** 라벨 줄 제거
       .replace(/^\s*$/gm, '\n');                 // 빈 줄 정규화
 
-    // 빈 줄 기준으로 씬 분할 → 각 씬 내부를 cleanDeepScriptNarration으로 정제
+    // 빈 줄 기준으로 씬 분할 (디렉티브는 유지 — parseDirectives가 먼저 처리)
     const scenes = preprocessed
       .split(/\n\s*\n/)
-      .map(block => cleanDeepScriptNarration(block))
+      .map(block => block
+        .replace(/\*\*\(?씬\s*\d+\)?\*\*\s*/g, '')       // **씬 N** 라벨만 제거
+        .replace(/\*\*(나레이션|내레이션)[:\s]?\*\*\s*/gi, '') // **나레이션:** 라벨만 제거
+        .replace(/\*\*([^*]*)\*\*/g, '$1')                // **볼드** → 내부 텍스트 (디렉티브 괄호는 유지!)
+        .replace(/\*([^*]+)\*/g, '$1')                    // *이탤릭* → 내부 텍스트
+        .trim()
+      )
       .filter(block => block.length > 5);
 
     if (scenes.length === 0) {
