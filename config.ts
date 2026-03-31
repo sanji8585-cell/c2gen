@@ -546,19 +546,30 @@ export const MOOD_VALUE_MAP: Record<string, string> = {
   // 한국어 POSITIVE
   '밝음': 'POSITIVE', '희망적': 'POSITIVE', '희망': 'POSITIVE', '설렘': 'POSITIVE',
   '신나는': 'POSITIVE', '경쾌한': 'POSITIVE', '활기찬': 'POSITIVE', '따뜻한': 'POSITIVE',
+  '호기심': 'POSITIVE', '선망': 'POSITIVE', '깨달음': 'POSITIVE', '감동': 'POSITIVE',
+  '유머': 'POSITIVE', '재미': 'POSITIVE', '성취': 'POSITIVE', '자신감': 'POSITIVE',
+  '따뜻함': 'POSITIVE', '기대': 'POSITIVE', '안도': 'POSITIVE', '감사': 'POSITIVE',
   // 한국어 NEGATIVE
   '어두움': 'NEGATIVE', '긴장': 'NEGATIVE', '긴장감': 'NEGATIVE', '무거움': 'NEGATIVE',
   '공포': 'NEGATIVE', '슬픔': 'NEGATIVE', '우울': 'NEGATIVE', '불안': 'NEGATIVE', '극적인': 'NEGATIVE',
+  '충격': 'NEGATIVE', '절망': 'NEGATIVE', '상실': 'NEGATIVE', '격변': 'NEGATIVE', '경고': 'NEGATIVE',
+  '긴장 고조': 'NEGATIVE', '위기': 'NEGATIVE', '분노': 'NEGATIVE', '혼란': 'NEGATIVE',
+  '위험': 'NEGATIVE', '파괴': 'NEGATIVE', '몰락': 'NEGATIVE', '비극': 'NEGATIVE', '절박': 'NEGATIVE',
   // 한국어 NEUTRAL
   '중립': 'NEUTRAL', '차분한': 'NEUTRAL', '잔잔한': 'NEUTRAL', '진지한': 'NEUTRAL',
+  '고조': 'NEUTRAL', '변화': 'NEUTRAL', '전환': 'NEUTRAL', '성찰': 'NEUTRAL',
+  '여운': 'NEUTRAL', '회고': 'NEUTRAL', '관조': 'NEUTRAL', '담담': 'NEUTRAL',
   // English POSITIVE
   'bright': 'POSITIVE', 'hopeful': 'POSITIVE', 'happy': 'POSITIVE', 'warm': 'POSITIVE',
   'energetic': 'POSITIVE', 'exciting': 'POSITIVE', 'positive': 'POSITIVE',
+  'curious': 'POSITIVE', 'inspiring': 'POSITIVE', 'cheerful': 'POSITIVE',
   // English NEGATIVE
   'dark': 'NEGATIVE', 'tense': 'NEGATIVE', 'dramatic': 'NEGATIVE', 'anxious': 'NEGATIVE',
   'sad': 'NEGATIVE', 'gloomy': 'NEGATIVE', 'melancholy': 'NEGATIVE', 'negative': 'NEGATIVE',
+  'shock': 'NEGATIVE', 'despair': 'NEGATIVE', 'fear': 'NEGATIVE', 'crisis': 'NEGATIVE',
   // English NEUTRAL
   'neutral': 'NEUTRAL', 'calm': 'NEUTRAL', 'serious': 'NEUTRAL',
+  'reflective': 'NEUTRAL', 'contemplative': 'NEUTRAL',
   // 日本語
   '明るい': 'POSITIVE', '希望': 'POSITIVE',
   '暗い': 'NEGATIVE', '緊張': 'NEGATIVE', '恐怖': 'NEGATIVE', '悲しい': 'NEGATIVE', 'ドラマティック': 'NEGATIVE',
