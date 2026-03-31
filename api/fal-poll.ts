@@ -27,6 +27,10 @@ async function refundCredits(email: string | undefined, creditAmount: number, de
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS — 앱인토스 미니앱 origin 화이트리스트
+  const { handleCors } = await import('./_cors');
+  if (handleCors(req, res)) return;
+
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey = (req.headers['x-custom-api-key'] as string) || process.env.FAL_API_KEY;

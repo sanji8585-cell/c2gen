@@ -110,6 +110,10 @@ async function checkAndDeductCredits(req: VercelRequest, creditAmount: number, d
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS — 앱인토스 미니앱 origin 화이트리스트
+  const { handleCors } = await import('./_cors');
+  if (handleCors(req, res)) return;
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { action, ...params } = req.body;
