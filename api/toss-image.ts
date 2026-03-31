@@ -96,16 +96,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   const sUrl = process.env.SUPABASE_URL;
   const sKey = process.env.SUPABASE_SERVICE_KEY;
-  if (sUrl && sKey) {
-    const sb = createClient(sUrl, sKey);
-    const { data: sess } = await sb
-      .from('toss_sessions')
-      .select('user_key')
-      .eq('token', sessionToken)
-      .single();
-    if (!sess?.user_key) {
-      return res.status(401).json({ error: 'Invalid session' });
-    }
+  if (!sUrl || !sKey) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+  const sb = createClient(sUrl, sKey);
+  const { data: sess } = await sb
+    .from('toss_sessions')
+    .select('user_key')
+    .eq('token', sessionToken)
+    .single();
+  if (!sess?.user_key) {
+    return res.status(401).json({ error: 'Invalid session' });
   }
 
   const apiKey = pickGeminiKey();

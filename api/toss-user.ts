@@ -158,8 +158,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...(generations || []).map((g: any) => ({
             type: g.cost_type as string,
             amount: g.cost_type === 'refund' || g.cost_type === 'share_reward'
-              ? Math.abs(g.credits_used || 0)
-              : -(g.credits_used || g.scene_count || 0),
+              ? Math.abs(g.credits_used ?? 0)
+              : -(g.credits_used != null ? g.credits_used : (g.scene_count ?? 0)),
             desc: g.cost_type === 'credit' ? `동화 생성 (${g.scene_count}컷)`
               : g.cost_type === 'refund' ? `생성 실패 환불 (${g.scene_count}컷)`
               : g.cost_type === 'share_reward' ? '공유 보너스'

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
+import { createClient } from '@supabase/supabase-js';
 
 // ── 캐릭터 추출 ──
 const HUMAN_CHARACTERS = new Set(['princess', 'prince', 'girl', 'boy']);
@@ -50,10 +51,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // 세션 인증 필수
+  // 세션 인증 필수 (DB 검증)
   const sessionToken = req.headers['x-session-token'] as string;
   if (!sessionToken) {
     return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const sUrl = process.env.SUPABASE_URL;
+  const sKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!sUrl || !sKey) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+  const supabase = createClient(sUrl, sKey);
+  const { data: sess } = await supabase
+    .from('toss_sessions')
+    .select('user_key')
+    .eq('token', sessionToken)
+    .single();
+  if (!sess?.user_key) {
+    return res.status(401).json({ error: 'Invalid session' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
