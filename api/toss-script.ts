@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (action) {
 
       case 'generateScript': {
-        const { topic, type = 'fairytale', sceneCount = 4 } = params;
+        const { topic, type = 'fairytale', sceneCount = 4, characterDescription } = params;
         if (!topic) return res.status(400).json({ error: 'topic required' });
 
         const count = Math.max(3, Math.min(10, sceneCount));
@@ -72,8 +72,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const charEn = char?.en || '';
         const charFull = char?.full || '';
 
+        // 캐릭터 참조 이미지에서 분석된 외형 설명 (Vision 결과)
+        const hasVisionDesc = !!characterDescription;
+
         // 캐릭터에 따라 프롬프트 분기
-        const charIntro = isKnownSpecies
+        const charIntro = hasVisionDesc
+          ? (hasName
+            ? `■ 주인공 이름: "${charKr}" (이 이름을 반드시 사용하세요!)\n■ "${charKr}"의 외형 (참조 이미지 분석):\n${characterDescription}\n■ visualPrompt에서 이 외형을 정확히 묘사하세요. 종류를 바꾸거나 추측하지 마세요.`
+            : `■ 주인공 외형 (참조 이미지 분석):\n${characterDescription}\n■ 이 캐릭터에 어울리는 귀여운 한국어 이름을 지어주세요.\n■ visualPrompt에서 이 외형을 정확히 묘사하세요.`)
+          : isKnownSpecies
           ? `■ 주인공: ${charFull} (영어: ${charEn})\n■ 주인공 이름: 귀여운 한국어 이름을 하나 지어주세요`
           : hasName
           ? `■ 주인공 이름: "${charKr}" (이 이름을 반드시 사용하세요!)\n■ "${charKr}"가 어떤 캐릭터인지는 네가 정해주세요. 동물이면 종류를, 사람이면 소년/소녀를 정하세요.\n■ 주제: ${topic}`

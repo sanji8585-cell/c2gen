@@ -258,6 +258,45 @@ Do NOT create a generic or different-looking character. The reference image is t
         throw lastError || new Error('이미지 생성 실패');
       }
 
+      // ── 캐릭터 이미지 분석 (Vision) ──
+      case 'describeCharacter': {
+        const { images } = params; // base64 이미지 배열 ("image/png:base64data" 형식)
+        if (!images?.length) return res.status(400).json({ error: 'images required' });
+
+        const parts: any[] = [];
+        for (const img of images) {
+          let imageData: string;
+          let mimeType = 'image/jpeg';
+          if (img.startsWith('image/')) {
+            const colonIdx = img.indexOf(':');
+            mimeType = img.slice(0, colonIdx);
+            imageData = img.slice(colonIdx + 1);
+          } else {
+            imageData = img;
+          }
+          parts.push({ inlineData: { data: imageData, mimeType } });
+        }
+
+        parts.push({
+          text: `Describe this character's visual appearance in detail for an illustrator. Include:
+- Species/type (human, animal, cartoon character, fantasy creature)
+- Body shape, proportions, and size
+- Colors: skin/fur color, clothing colors, accessory colors
+- Distinctive features: ears, tail, hat, shoes, gloves, etc.
+- Clothing: what they wear, style, colors
+- Art style if apparent (cartoon, realistic, anime, etc.)
+Keep it under 100 words. Be specific and visual. Write in English.`,
+        });
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: { parts },
+        });
+
+        const description = response.text || '';
+        return res.json({ description: description.trim() });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
