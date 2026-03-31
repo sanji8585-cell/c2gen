@@ -222,6 +222,7 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
         return res.json({
           scenes: scenes.slice(0, count),
           character: finalCharacter,
+          _debug: { charKr, charEn, charFull, isKnownSpecies, hasName, aiCharacter },
         });
       }
 
