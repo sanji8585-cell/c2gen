@@ -245,6 +245,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ credits: newCredits, granted: bonus });
       }
 
+      // ── 크레딧 내역 조회 ──
+      case 'getHistory': {
+        // 생성/환불/공유보너스 내역
+        const { data: generations } = await supabase
+          .from('toss_generations')
+          .select('cost_type, scene_count, credits_used, created_at')
+          .eq('user_key', userKey)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        // 구매 내역
+        const { data: purchases } = await supabase
+          .from('toss_purchases')
+          .select('sku, credits_granted, created_at')
+          .eq('user_key', userKey)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        // 통합 정렬
+        const history = [
+          ...(generations || []).map((g: any) => ({
+            type: g.cost_type as string,
+            amount: g.cost_type === 'refund' || g.cost_type === 'share_reward'
+              ? Math.abs(g.credits_used || 0)
+              : -(g.credits_used || g.scene_count || 0),
+            desc: g.cost_type === 'credit' ? `동화 생성 (${g.scene_count}컷)`
+              : g.cost_type === 'refund' ? `생성 실패 환불 (${g.scene_count}컷)`
+              : g.cost_type === 'share_reward' ? '공유 보너스'
+              : g.cost_type === 'premium' ? `프리미엄 생성 (${g.scene_count}컷)`
+              : `생성 (${g.scene_count}컷)`,
+            date: g.created_at,
+          })),
+          ...(purchases || []).map((p: any) => ({
+            type: 'purchase',
+            amount: p.credits_granted,
+            desc: `${SKU_CREDITS[p.sku] ? p.sku.replace('cuts_', '') + '컷 팩' : p.sku} 구매`,
+            date: p.created_at,
+          })),
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 30);
+
+        return res.json({ history });
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
