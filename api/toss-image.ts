@@ -247,6 +247,11 @@ Do NOT create a generic or different-looking character. The reference image is t
               }
             }
 
+            // 이미지 없는 응답 → 재시도 (안전 필터 소프트 거부)
+            if (attempt < MAX_RETRY - 1) {
+              await new Promise(r => setTimeout(r, 1000));
+              continue;
+            }
             return res.json({ imageData: null });
           } catch (error: any) {
             lastError = error;
