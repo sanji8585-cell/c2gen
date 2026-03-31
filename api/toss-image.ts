@@ -173,8 +173,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // 캐릭터 참조 이미지
             if (referenceImages?.character?.length) {
               for (const img of referenceImages.character) {
-                const imageData = img.includes(',') ? img.split(',')[1] : img;
-                parts.push({ inlineData: { data: imageData, mimeType: 'image/jpeg' } });
+                // 형식: "image/png:base64data" 또는 순수 base64
+                let imageData: string;
+                let mimeType = 'image/jpeg';
+                if (img.startsWith('image/')) {
+                  const colonIdx = img.indexOf(':');
+                  mimeType = img.slice(0, colonIdx);
+                  imageData = img.slice(colonIdx + 1);
+                } else if (img.includes(',')) {
+                  imageData = img.split(',')[1];
+                } else {
+                  imageData = img;
+                }
+                parts.push({ inlineData: { data: imageData, mimeType } });
               }
               parts.push({
                 text: `[CRITICAL CHARACTER REFERENCE — HIGHEST PRIORITY]
