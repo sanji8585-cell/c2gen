@@ -61,6 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'generateScript': {
         const { topic, type = 'fairytale', sceneCount = 4, characterDescription } = params;
         if (!topic) return res.status(400).json({ error: 'topic required' });
+        if (typeof topic !== 'string' || topic.length > 200) {
+          return res.status(400).json({ error: 'topic too long (max 200)' });
+        }
 
         const count = Math.max(3, Math.min(10, sceneCount));
         const ai = new GoogleGenAI({ apiKey });
@@ -280,6 +283,7 @@ ${count >= 4 ? '2번 장면: 핵심 내용 1\n3번 장면: 핵심 내용 2\n' : 
                 if (scene.narration) {
                   scene.narration = scene.narration.replaceAll(wrongName, charKr);
                 }
+              }
             }
           }
         }

@@ -4,66 +4,25 @@ import { createClient } from '@supabase/supabase-js';
 
 // ── 크레딧 차감 ──
 
-async function checkAndDeductCredits(req: VercelRequest, creditAmount: number, description: string): Promise<{ ok: boolean; error?: string; balance?: number }> {
-  try {
-    const sessionToken = req.headers['x-session-token'] as string;
-    if (!sessionToken) return { ok: true };
-
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_KEY;
-    if (!url || !key) return { ok: true };
-
-    const supabase = createClient(url, key);
-    const { data: session } = await supabase
-      .from('c2gen_sessions')
-      .select('email')
-      .eq('token', sessionToken)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-    if (!session?.email) return { ok: true };
-
-    const { data: userRow } = await supabase
-      .from('c2gen_users').select('plan').eq('email', session.email).single();
-    if (userRow?.plan === 'operator') return { ok: true };
-
-    const { data } = await supabase.rpc('deduct_credits', {
-      p_email: session.email,
-      p_amount: creditAmount,
-      p_description: description,
-    });
-    if (!data?.success) return { ok: false, error: data?.error, balance: data?.current };
-    return { ok: true, balance: data.balance };
-  } catch (e) {
-    console.error('[toss-image] checkAndDeductCredits error:', e);
-    return { ok: true };
-  }
+// toss 쇼츠메이커는 toss-user.ts에서 크레딧을 관리하므로, 여기서는 스킵
+async function checkAndDeductCredits(_req: VercelRequest, _creditAmount: number, _description: string): Promise<{ ok: boolean; error?: string; balance?: number }> {
+  return { ok: true };
 }
 
 // ── 사용량 로깅 ──
 
-async function logUsage(req: VercelRequest, action: string, costUsd: number) {
+async function logUsage(_req: VercelRequest, action: string, costUsd: number) {
   try {
-    const sessionToken = req.headers['x-session-token'] as string;
-    if (!sessionToken) return;
-
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_KEY;
     if (!url || !key) return;
 
     const supabase = createClient(url, key);
-    const { data: session } = await supabase
-      .from('c2gen_sessions')
-      .select('email')
-      .eq('token', sessionToken)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-    if (!session?.email) return;
-
-    await supabase.from('c2gen_usage').insert({
-      email: session.email,
+    await supabase.from('toss_usage').insert({
       action,
       cost_usd: costUsd,
       count: 1,
+      created_at: new Date().toISOString(),
     });
   } catch (e) {
     console.error('[toss-image] logUsage error:', e);
@@ -136,6 +95,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!visualPrompt) {
           return res.status(400).json({ error: 'visualPrompt required' });
+        }
+
+        // 입력값 검증
+        const ALLOWED_MODELS = ['gemini-2.5-flash-image', 'gemini-2.0-flash-exp-image-generation'];
+        if (imageModelId && !ALLOWED_MODELS.includes(imageModelId)) {
+          return res.status(400).json({ error: 'Invalid imageModelId' });
+        }
+        if (typeof visualPrompt !== 'string' || visualPrompt.length > 5000) {
+          return res.status(400).json({ error: 'visualPrompt too long' });
         }
 
         // 크레딧 차감 (16크레딧)
@@ -234,7 +202,7 @@ Do NOT create a generic or different-looking character. The reference image is t
             const responseParts = response.candidates?.[0]?.content?.parts || [];
             for (const part of responseParts) {
               if (part.inlineData) {
-                logUsage(req, 'toss-image', 0.0315);
+                logUsage(req, 'toss-image', 0.039);
                 return res.json({
                   imageData: part.inlineData.data,
                   creditBalance: creditResult.balance,
