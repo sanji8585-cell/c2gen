@@ -278,14 +278,20 @@ Do NOT create a generic or different-looking character. The reference image is t
         }
 
         parts.push({
-          text: `Describe this character's visual appearance in detail for an illustrator. Include:
-- Species/type (human, animal, cartoon character, fantasy creature)
+          text: `Describe this character's visual appearance in detail so an illustrator can recreate it.
+
+CRITICAL RULE: Do NOT mention the character's name, franchise, studio, or any trademarked/copyrighted names. Only describe what you SEE visually using generic descriptive terms.
+
+Include:
+- Species/type (e.g. "anthropomorphic mouse", not a brand name)
 - Body shape, proportions, and size
 - Colors: skin/fur color, clothing colors, accessory colors
 - Distinctive features: ears, tail, hat, shoes, gloves, etc.
 - Clothing: what they wear, style, colors
 - Art style if apparent (cartoon, realistic, anime, etc.)
-Keep it under 100 words. Be specific and visual. Write in English.`,
+
+Keep it under 100 words. Be specific and visual. Write in English.
+Example: Instead of naming the character, write "A small anthropomorphic mouse with large round black ears, white face, red shorts with white buttons, yellow shoes, and white gloves in classic cartoon style."`,
         });
 
         const response = await ai.models.generateContent({
