@@ -52,9 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const isKnownChar = char !== null;
 
         // 캐릭터 정보 — 사전 매칭 or AI 위임
-        const charKr = isKnownChar ? char!.kr : '';
-        const charEn = isKnownChar ? char!.en : '';
-        const charFull = isKnownChar ? char!.full : '';
+        const charKr = char?.kr || '';
+        const charEn = char?.en || '';
+        const charFull = char?.full || '';
 
         // 캐릭터에 따라 프롬프트 분기
         const charIntro = isKnownChar
@@ -73,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? `a small cute anthropomorphic ${charEn}`
           : `a small cute anthropomorphic [species]`;
 
-        const charForbidRule = isKnownChar && char!.type === 'animal'
+        const charForbidRule = isKnownChar && char?.type === 'animal'
           ? `- 절대 금지 단어: human, person, child, girl, boy, woman, man, people, kid. 모든 캐릭터는 동물입니다.`
           : `- 캐릭터가 동물이면 human/person/child 단어를 쓰지 마세요. 캐릭터가 사람이면 상관없습니다.`;
 
@@ -179,7 +179,7 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
         // 캐릭터 정보 결정
         let finalCharacter: { kr: string; en: string; type: 'animal' | 'human' };
         if (isKnownChar) {
-          finalCharacter = { kr: char!.kr, en: char!.en, type: char!.type };
+          finalCharacter = { kr: char?.kr || '', en: char?.en || '', type: char?.type || 'animal' };
           // 후처리: visualPrompt에 올바른 영어 캐릭터명 보장
           for (const scene of scenes) {
             if (scene.visualPrompt && !scene.visualPrompt.toLowerCase().includes(charEn.toLowerCase())) {
