@@ -64,10 +64,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const count = Math.max(3, Math.min(10, sceneCount));
         const ai = new GoogleGenAI({ apiKey });
-        const char = extractCharacter(topic);
-        // 3가지 경우: 사전 매칭(토끼 등), 이름만 추출(미키 등), 완전 위임(null)
-        const isKnownSpecies = char !== null && char.type !== 'unknown'; // 사전에서 종까지 매칭
-        const hasName = char !== null; // 이름이라도 추출됨
+        // 동화 모드만 캐릭터 추출 (편지/자유는 캐릭터 불필요)
+        const char = type === 'fairytale' ? extractCharacter(topic) : null;
+        const isKnownSpecies = char !== null && char.type !== 'unknown';
+        const hasName = char !== null;
         const charKr = char?.kr || '';
         const charEn = char?.en || '';
         const charFull = char?.full || '';
@@ -161,7 +161,34 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
 - 꾸미지 않은 솔직한 진심
 
 ■ visualPrompt: 영어, 뒷모습/실루엣/풍경, "warm emotional illustration style"
-■ JSON: [{"sceneNumber":1, "narration":"...", "visualPrompt":"...", "duration":5}]`;
+■ JSON: {"scenes":[{"sceneNumber":1, "narration":"...", "visualPrompt":"...", "duration":5}]}`
+
+          : type === 'free'
+          ? `${count}장면 쇼츠 영상 대본을 JSON으로 만들어주세요.
+
+■ 주제: ${topic}
+■ 이것은 자유 주제 쇼츠입니다. 주제에 맞는 흥미롭고 유익한 콘텐츠를 만들어주세요.
+
+■ 장면 구성:
+1번 장면: 주제를 흥미롭게 소개 (시청자의 관심을 끄는 오프닝)
+${count >= 4 ? '2번 장면: 핵심 내용 1\n3번 장면: 핵심 내용 2\n' : '2번 장면: 핵심 내용\n'}${count >= 5 ? '4번 장면: 추가 정보 또는 반전\n' : ''}마지막 장면: 인상적인 마무리 (요약, 교훈, 또는 여운)
+
+■ 나레이션 규칙:
+- 한국어 50~80자 (절대 80자 초과 금지!)
+- "~요/~해요/~이에요" 체 (친근한 정보 전달)
+- 흥미로운 사실, 구체적 수치, 감각적 묘사 활용
+- 시청자가 "오!" 하고 반응할 포인트를 넣으세요
+
+■ visualPrompt 규칙:
+- 영어로 작성, 최소 80단어 이상으로 상세하게
+- 주제에 맞는 장면을 구체적으로 묘사
+- 각 장면마다 완전히 다른 구도와 배경
+- 스타일: "polished modern digital illustration, vivid colors, clean composition, social media style, no text, no captions, no watermarks"
+- 사람이 필요하면 실루엣이나 뒷모습으로 표현
+- 음식/자연/도시/동물 등 주제에 맞는 소재를 생생하게
+
+■ JSON 형식:
+{"scenes":[{"sceneNumber":1, "narration":"50~80자 한국어", "visualPrompt":"상세 영어 장면 묘사", "duration":5}]}`
 
         console.log(`[toss-script] Generating: topic="${topic}", type=${type}, char=${charFull || '(AI위임)'}, count=${count}`);
 
@@ -198,8 +225,8 @@ ${count >= 4 ? '2번 장면: 함께한 구체적인 추억\n3번 장면: 진심 
           return res.status(500).json({ error: 'Script generation failed' });
         }
 
-        // 캐릭터 정보 결정
-        let finalCharacter: { kr: string; en: string; type: 'animal' | 'human' };
+        // 캐릭터 정보 결정 (동화만 — 편지/자유는 캐릭터 없음)
+        let finalCharacter: { kr: string; en: string; type: 'animal' | 'human' } | null = null;
         if (isKnownSpecies) {
           finalCharacter = { kr: char?.kr || '', en: char?.en || '', type: (char?.type === 'human' ? 'human' : 'animal') as 'animal' | 'human' };
           // 후처리: visualPrompt에 올바른 영어 캐릭터명 보장
