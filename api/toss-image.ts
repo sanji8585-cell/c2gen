@@ -83,8 +83,10 @@ function pickGeminiKey(): string | undefined {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS — 앱인토스 미니앱 origin 화이트리스트
-  const { handleCors } = await import('./_cors');
-  if (handleCors(req, res)) return;
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   // 세션 인증 필수
