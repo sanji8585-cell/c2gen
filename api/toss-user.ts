@@ -8,13 +8,13 @@ const supabase = createClient(
 
 // ── 크레딧 매핑 (sku → 컷 수) ──
 const SKU_CREDITS: Record<string, number> = {
-  cuts_4: 4,
-  cuts_12: 12,
-  cuts_30: 30,
-  cuts_60: 60,
-  credits_5: 5,
-  credits_15: 15,
-  credits_50: 50,
+  'ait.0000025327.99c43186.0d2118b4fa.5039928026': 4,
+  'ait.0000025327.ac3e93c6.5a2d1884e8.5040590030': 12,
+  'ait.0000025327.54fa1643.50398b552b.5040834861': 30,
+  'ait.0000025327.d6322a54.fdcc9603a9.5040874928': 60,
+  // 하위 호환
+  cuts_4: 4, cuts_12: 12, cuts_30: 30, cuts_60: 60,
+  credits_5: 5, credits_15: 15, credits_50: 50,
 };
 
 // ── 세션 → userKey ──
