@@ -121,21 +121,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             { method: 'POST', body: { authorizationCode: code, referrer } },
           );
 
-          if (!tokenData?.accessToken) {
+          const accessToken = tokenData?.success?.accessToken || tokenData?.accessToken;
+          if (!accessToken) {
             return res.status(401).json({ error: 'Token exchange failed', detail: tokenData });
           }
 
           // 2. 사용자 정보 조회
           const meData = await tossApiRequest(
             '/api-partner/v1/apps-in-toss/user/oauth2/login-me',
-            { method: 'GET', headers: { Authorization: `Bearer ${tokenData.accessToken}` } },
+            { method: 'GET', headers: { Authorization: `Bearer ${accessToken}` } },
           );
 
-          if (!meData?.userKey) {
+          const userData = meData?.success || meData;
+          if (!userData?.userKey) {
             return res.status(401).json({ error: 'User info fetch failed', detail: meData });
           }
 
-          userKey = meData.userKey;
+          userKey = userData.userKey;
           // 개인정보는 AES-256-GCM으로 암호화되어 옴 (복호화 키 필요)
         }
 
