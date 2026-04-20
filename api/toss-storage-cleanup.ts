@@ -25,21 +25,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cutoff = new Date(Date.now() - TTL_HOURS * 60 * 60 * 1000).toISOString();
 
   try {
-    // storage.objects 테이블 직접 조회 (재귀 폴더 구조 대응)
-    const { data: objects, error } = await sb
-      .schema('storage' as any)
-      .from('objects')
-      .select('name')
-      .eq('bucket_id', 'toss-videos')
-      .lt('created_at', cutoff)
-      .limit(1000);
-
+    // RPC: public.list_old_toss_videos(ttl_hours) SECURITY DEFINER로
+    // storage.objects 조회 (service_role grant). PostgREST 기본 schema 제약 우회.
+    const { data, error } = await sb.rpc('list_old_toss_videos', { ttl_hours: TTL_HOURS });
     if (error) throw error;
-    if (!objects || objects.length === 0) {
+    if (!data || data.length === 0) {
       return res.json({ ok: true, deleted: 0, cutoff });
     }
 
-    const paths = objects.map((o: any) => o.name);
+    const paths = (data as { name: string }[]).map((o) => o.name);
     const { error: delErr } = await sb.storage.from('toss-videos').remove(paths);
     if (delErr) throw delErr;
 

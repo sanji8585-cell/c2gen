@@ -38,6 +38,7 @@ const ja = {
     lightMode: 'ライトモード',
     darkMode: 'ダークモード',
     viewProfile: 'プロフィールを見る',
+    deepScript: '深層台本',
   },
 
   // ── 認証 ──

@@ -38,6 +38,7 @@ const en = {
     lightMode: 'Light Mode',
     darkMode: 'Dark Mode',
     viewProfile: 'View Profile',
+    deepScript: 'Deep Script',
   },
 
   // ── Auth ──

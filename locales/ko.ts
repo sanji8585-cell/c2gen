@@ -38,6 +38,7 @@ const ko = {
     lightMode: '라이트 모드',
     darkMode: '다크 모드',
     viewProfile: '프로필 보기',
+    deepScript: '심층대본',
   },
 
   // ── 인증 ──

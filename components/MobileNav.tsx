@@ -1,6 +1,6 @@
 import React from 'react';
 
-type ViewMode = 'main' | 'gallery' | 'playground' | 'pilot';
+type ViewMode = 'main' | 'gallery' | 'playground' | 'pilot' | 'deepscript';
 
 interface MobileNavProps {
   activeView: ViewMode;

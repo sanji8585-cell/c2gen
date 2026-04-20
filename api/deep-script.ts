@@ -287,8 +287,41 @@ JSON만 출력하세요. 설명 없이.`;
 
 // ── 메인 핸들러 ──
 
+// ── 인증 + operator 전용 체크 ──
+
+async function validateOperatorSession(req: VercelRequest): Promise<{ ok: boolean; error?: string; email?: string }> {
+  try {
+    const sessionToken = req.headers['x-session-token'] as string;
+    // 커스텀 키 사용자는 인증 스킵 (자기 키 사용)
+    if (req.headers['x-custom-api-key']) return { ok: true };
+    if (!sessionToken) return { ok: false, error: '로그인이 필요합니다' };
+
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) return { ok: true };
+
+    const supabase = createClient(url, key);
+    const { data: session } = await supabase
+      .from('c2gen_sessions').select('email').eq('token', sessionToken)
+      .gt('expires_at', new Date().toISOString()).single();
+    if (!session?.email) return { ok: false, error: '세션이 만료되었습니다' };
+
+    const { data: userRow } = await supabase
+      .from('c2gen_users').select('plan').eq('email', session.email).single();
+    if (userRow?.plan !== 'operator') return { ok: false, error: '운영자 전용 기능입니다' };
+
+    return { ok: true, email: session.email };
+  } catch (_) {
+    return { ok: true }; // DB 오류 시 허용 (운영 연속성)
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // ── 인증: operator만 접근 가능 ──
+  const auth = await validateOperatorSession(req);
+  if (!auth.ok) return res.status(403).json({ error: auth.error });
 
   const { topic, language = 'ko', style = 'auto', length = '180', mode = 'deep', channelStylePrompt = '' } = req.body;
   if (!topic) return res.status(400).json({ error: 'topic required' });
