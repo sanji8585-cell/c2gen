@@ -11,7 +11,8 @@
   ],
   "crons": [
     { "path": "/api/scheduler-trigger", "schedule": "0 * * * *" },
-    { "path": "/api/analytics", "schedule": "0 */6 * * *" }
+    { "path": "/api/analytics", "schedule": "0 */6 * * *" },
+    { "path": "/api/toss-storage-cleanup", "schedule": "15 * * * *" }
   ],
   "functions": {
     "api/gemini.ts": { "maxDuration": 120 },
@@ -45,6 +46,7 @@
     "api/toss-auth.ts": { "maxDuration": 30 },
     "api/toss-user.ts": { "maxDuration": 30 },
     "api/toss-disconnect.ts": { "maxDuration": 30 },
-    "api/toss-upload-url.ts": { "maxDuration": 30 }
+    "api/toss-upload-url.ts": { "maxDuration": 30 },
+    "api/toss-storage-cleanup.ts": { "maxDuration": 60 }
   }
 }
