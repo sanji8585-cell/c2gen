@@ -25,12 +25,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   // Basic Auth 검증 (앱인토스 콘솔에 등록한 자격증명)
+  // 토스 콘솔의 "Basic Auth 헤더" 필드 동작이 문서상 모호해서 여러 형식을 모두 허용:
+  //   1) Authorization: Basic <base64(user:pass)>           ← 표준
+  //   2) Authorization: <user:pass>                         ← 콘솔이 raw passthrough
+  //   3) Authorization: Basic <base64(user:pass)>           ← 콘솔이 base64 인코딩
+  //   4) Authorization: <base64(user:pass)>                 ← 콘솔이 base64만 인코딩
   const expectedUser = process.env.TOSS_DISCONNECT_USER;
   const expectedPass = process.env.TOSS_DISCONNECT_PASS;
   if (expectedUser && expectedPass) {
     const auth = req.headers.authorization || '';
-    const expected = 'Basic ' + Buffer.from(`${expectedUser}:${expectedPass}`).toString('base64');
-    if (auth !== expected) {
+    const userPass = `${expectedUser}:${expectedPass}`;
+    const userPassB64 = Buffer.from(userPass).toString('base64');
+    const candidates = [
+      `Basic ${userPassB64}`,
+      `basic ${userPassB64}`,
+      userPassB64,
+      userPass,
+      `Basic ${userPass}`,
+    ];
+    // Authorization 헤더 자체가 콘솔 입력값을 base64한 케이스도 검사
+    // (콘솔이 입력 문자열 전체를 base64한 뒤 전송)
+    let decoded = '';
+    try {
+      const stripped = auth.startsWith('Basic ') ? auth.slice(6) : auth.startsWith('basic ') ? auth.slice(6) : auth;
+      decoded = Buffer.from(stripped, 'base64').toString('utf-8');
+    } catch { /* ignore */ }
+
+    const ok =
+      candidates.includes(auth) ||
+      decoded === userPass ||
+      decoded === `Basic ${userPassB64}`;
+
+    if (!ok) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
   }
